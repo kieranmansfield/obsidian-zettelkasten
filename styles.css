@@ -6,3 +6,12 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/* Subtle filename display beneath suggestion titles */
+.suggestion-note-filename {
+	font-size: 0.85em;
+	color: var(--text-muted);
+	opacity: 0.7;
+	margin-top: 2px;
+	font-family: var(--font-monospace);
+}

@@ -1,11 +1,10 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "obsidian-zettelkasten",
+	"name": "Zettelkasten",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "Bring Zettelkasten note-taking methods to Obsidian.",
+	"author": "Kieran Mansfield",
+	"authorUrl": "https://kieranmansfield.com",
 	"isDesktopOnly": false
 }
