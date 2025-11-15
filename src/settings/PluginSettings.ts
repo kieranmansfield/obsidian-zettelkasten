@@ -16,6 +16,7 @@ export interface ZettelkastenPluginSettings {
 	noteTemplatePath: string;
 	addTitleToFilename: boolean;
 	zettelTag: string;
+	enableSequenceReorder: boolean;
 
 	// Fleeting notes settings
 	enableFleetingNotes: boolean;
@@ -58,6 +59,7 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	noteTemplatePath: "",
 	addTitleToFilename: true,
 	zettelTag: "zettel",
+	enableSequenceReorder: false,
 
 	fleetingNotesLocation: "",
 	fleetingNotesUseSeparateLocation: false,

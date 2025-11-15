@@ -75,82 +75,12 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 	private displayGeneralSettings(containerEl: HTMLElement): void {
 		containerEl.createEl("h2", { text: "General Settings" });
 		containerEl.createEl("p", {
-			text: "Configure general plugin behavior.",
+			text: "General configuration options for the Zettelkasten plugin.",
 			cls: "setting-item-description",
 		});
 
-		// New Note Location
-		new Setting(containerEl)
-			.setName("New note location")
-			.setDesc(
-				"Default folder path where new notes will be created (leave empty for vault root)",
-			)
-			.addText((text) => {
-				const onSelect = async (value: string) => {
-					text.setValue(value);
-					this.plugin.settings.newNoteLocation = value;
-					await this.plugin.saveSettings();
-				};
-				new FolderSuggest(this.app, text.inputEl, onSelect);
-				text.setPlaceholder("path/to/folder")
-					.setValue(this.plugin.settings.newNoteLocation)
-					.onChange(async (value) => {
-						this.plugin.settings.newNoteLocation = value;
-						await this.plugin.saveSettings();
-					});
-			});
-
-		// Ignored Folders
-		const ignoredFoldersSetting = new Setting(containerEl)
-			.setName("Ignored folders")
-			.setDesc(
-				"Folder paths to exclude from commands. Click + to add more.",
-			);
-
-		// Add button to create new folder input
-		ignoredFoldersSetting.addButton((button) => {
-			button
-				.setButtonText("+")
-				.setTooltip("Add folder")
-				.onClick(async () => {
-					this.plugin.settings.ignoredFolders.push("");
-					await this.plugin.saveSettings();
-					this.display();
-				});
-		});
-
-		// Display existing ignored folders
-		this.plugin.settings.ignoredFolders.forEach((folder, index) => {
-			new Setting(containerEl)
-				.setClass("zettelkasten-ignored-folder-item")
-				.addText((text) => {
-					const onSelect = async (value: string) => {
-						text.setValue(value);
-						this.plugin.settings.ignoredFolders[index] = value;
-						await this.plugin.saveSettings();
-					};
-					new FolderSuggest(this.app, text.inputEl, onSelect);
-					text.setPlaceholder("folder/path")
-						.setValue(folder)
-						.onChange(async (value) => {
-							this.plugin.settings.ignoredFolders[index] = value;
-							await this.plugin.saveSettings();
-						});
-				})
-				.addButton((button) => {
-					button
-						.setIcon("trash")
-						.setTooltip("Remove folder")
-						.onClick(async () => {
-							this.plugin.settings.ignoredFolders.splice(
-								index,
-								1,
-							);
-							await this.plugin.saveSettings();
-							this.display();
-						});
-				});
-		});
+		// Add general settings here if needed in the future
+		// Currently no general settings exist in the original file
 	}
 
 	private displayZettelSettings(containerEl: HTMLElement): void {

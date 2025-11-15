@@ -57,6 +57,13 @@ export class NavigatorModal extends Modal {
 		this.createNavigationButton(row3, "down", "↓ Down");
 		row3.createDiv({ cls: "navigator-spacer" });
 
+		// Row 4: Sequence Navigation
+		const row4 = gridEl.createDiv({
+			cls: "navigator-row navigator-sequence-row",
+		});
+		this.createNavigationButton(row4, "prev-sequence", "⇐ Prev Sequence");
+		this.createNavigationButton(row4, "next-sequence", "⇒ Next Sequence");
+
 		// Add styles
 		this.addStyles();
 	}
@@ -143,6 +150,11 @@ export class NavigatorModal extends Modal {
 			}
 			.navigator-spacer {
 				min-width: 100px;
+			}
+			.navigator-sequence-row {
+				margin-top: 10px;
+				padding-top: 10px;
+				border-top: 1px solid var(--background-modifier-border);
 			}
 		`;
 		this.contentEl.appendChild(styleEl);

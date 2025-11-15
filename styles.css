@@ -15,3 +15,42 @@ If your plugin does not need CSS, delete this file.
 	margin-top: 2px;
 	font-family: var(--font-monospace);
 }
+
+/* Settings Tab Navigation */
+.zettelkasten-settings-tabs {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 20px;
+	border-bottom: 2px solid var(--background-modifier-border);
+	padding-bottom: 0;
+}
+
+.zettelkasten-settings-tab {
+	padding: 10px 16px;
+	cursor: pointer;
+	border-radius: 4px 4px 0 0;
+	font-weight: 500;
+	color: var(--text-muted);
+	transition: all 0.2s ease;
+	background-color: transparent;
+	border: 1px solid transparent;
+	border-bottom: none;
+	margin-bottom: -2px;
+}
+
+.zettelkasten-settings-tab:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.zettelkasten-settings-tab.is-active {
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	border-color: var(--background-modifier-border);
+	border-bottom: 2px solid var(--background-primary);
+	font-weight: 600;
+}
+
+.zettelkasten-settings-content {
+	padding-top: 10px;
+}
