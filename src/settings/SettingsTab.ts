@@ -3,6 +3,7 @@ import type ZettelkastenPlugin from "../../main";
 import { FolderSuggest } from "../ui/FolderSuggest";
 import { FileSuggest } from "../ui/FileSuggest";
 import { TagSuggest } from "../ui/TagSuggest";
+import { Box, BoxType } from "./PluginSettings";
 
 // Settings tab for the Zettelkasten plugin
 
@@ -29,22 +30,32 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		);
 
 		// Display the active tab content
-		switch (this.activeTab) {
-			case "general":
-				this.displayGeneralSettings(contentEl);
-				break;
-			case "zettel":
-				this.displayZettelSettings(contentEl);
-				break;
-			case "fleeting":
-				this.displayFleetingSettings(contentEl);
-				break;
-			case "moc":
-				this.displayMocSettings(contentEl);
-				break;
-			case "index":
-				this.displayIndexSettings(contentEl);
-				break;
+		if (this.activeTab === "general") {
+			this.displayGeneralSettings(contentEl);
+		} else if (this.activeTab === "boxes") {
+			this.displayBoxesSettings(contentEl);
+		} else if (this.activeTab.startsWith("box-")) {
+			// Handle individual box tabs
+			const boxId = this.activeTab.substring(4);
+			const box = this.plugin.settings.boxes.find((b) => b.id === boxId);
+			if (box) {
+				this.displayBoxConfiguration(contentEl, box);
+			}
+		} else {
+			switch (this.activeTab) {
+				case "zettel":
+					this.displayZettelSettings(contentEl);
+					break;
+				case "fleeting":
+					this.displayFleetingSettings(contentEl);
+					break;
+				case "moc":
+					this.displayMocSettings(contentEl);
+					break;
+				case "index":
+					this.displayIndexSettings(contentEl);
+					break;
+			}
 		}
 	}
 
@@ -53,12 +64,24 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 
 		const tabs = [
 			{ id: "general", name: "General" },
-			{ id: "zettel", name: "Zettel" },
-			{ id: "fleeting", name: "Fleeting Notes" },
-			{ id: "moc", name: "MOCs" },
-			{ id: "index", name: "Indexes" },
+			...(this.plugin.settings.enableBoxes
+				? [{ id: "boxes", name: "Boxes" }]
+				: []),
+			...(this.plugin.settings.enableBoxes
+				? this.plugin.settings.boxes.map((box) => ({
+						id: `box-${box.id}`,
+						name: box.name,
+					}))
+				: []),
+			...(!this.plugin.settings.enableBoxes
+				? [
+						{ id: "zettel", name: "Zettel" },
+						{ id: "fleeting", name: "Fleeting Notes" },
+						{ id: "moc", name: "MOCs" },
+						{ id: "index", name: "Indexes" },
+					]
+				: []),
 		];
-
 		tabs.forEach((tab) => {
 			const tabEl = tabBar.createDiv("zettelkasten-settings-tab");
 			if (this.activeTab === tab.id) {
@@ -151,6 +174,1529 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						});
 				});
 		});
+
+		// Enable Boxes
+		new Setting(containerEl)
+			.setName("Enable boxes")
+			.setDesc(
+				"Enable multiple zettelkasten boxes within your vault. Each box can be folder-based or tag-based.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableBoxes)
+					.onChange(async (value) => {
+						const wasEnabled = this.plugin.settings.enableBoxes;
+						this.plugin.settings.enableBoxes = value;
+
+						if (value && !wasEnabled) {
+							// Enabling boxes: migrate current settings to a default box if no boxes exist
+							if (this.plugin.settings.boxes.length === 0) {
+								const defaultBox: Box = {
+									id: Date.now().toString(),
+									name: "Default Box",
+									type: "folder",
+									folderPath:
+										this.plugin.settings.zettelsLocation ||
+										"",
+									// Copy zettel settings
+									zettelPrefix: "",
+									zettelIdFormat:
+										this.plugin.settings.zettelIdFormat,
+									zettelIdSeparator:
+										this.plugin.settings.zettelIdSeparator,
+									zettelIdMatchingMode:
+										this.plugin.settings
+											.zettelIdMatchingMode,
+									noteTemplatePath:
+										this.plugin.settings.noteTemplatePath,
+									addTitleToFilename:
+										this.plugin.settings.addTitleToFilename,
+									zettelTag: this.plugin.settings.zettelTag,
+									enableSequenceReorder:
+										this.plugin.settings
+											.enableSequenceReorder,
+									// Copy fleeting notes settings
+									enableFleetingNotes:
+										this.plugin.settings
+											.enableFleetingNotes,
+									fleetingNotesUseSeparateLocation:
+										this.plugin.settings
+											.fleetingNotesUseSeparateLocation,
+									fleetingNotesLocation:
+										this.plugin.settings
+											.fleetingNotesLocation,
+									fleetingNotesTemplatePath:
+										this.plugin.settings
+											.fleetingNotesTemplatePath,
+									fleetingNotesUseZettelId:
+										this.plugin.settings
+											.fleetingNotesUseZettelId,
+									fleetingNotesFilenameFormat:
+										this.plugin.settings
+											.fleetingNotesFilenameFormat,
+									fleetingNotesTag:
+										this.plugin.settings.fleetingNotesTag,
+									// Copy MOCs settings
+									enableMocs: this.plugin.settings.enableMocs,
+									mocsUseSeparateLocation:
+										this.plugin.settings
+											.mocsUseSeparateLocation,
+									mocsLocation:
+										this.plugin.settings.mocsLocation,
+									mocsTemplatePath:
+										this.plugin.settings.mocsTemplatePath,
+									mocsUseZettelId:
+										this.plugin.settings.mocsUseZettelId,
+									mocsFilenameFormat:
+										this.plugin.settings.mocsFilenameFormat,
+									mocsTag: this.plugin.settings.mocsTag,
+									// Copy indexes settings
+									enableIndexes:
+										this.plugin.settings.enableIndexes,
+									indexesUseSeparateLocation:
+										this.plugin.settings
+											.indexesUseSeparateLocation,
+									indexesLocation:
+										this.plugin.settings.indexesLocation,
+									indexesTemplatePath:
+										this.plugin.settings
+											.indexesTemplatePath,
+									indexesUseZettelId:
+										this.plugin.settings.indexesUseZettelId,
+									indexesFilenameFormat:
+										this.plugin.settings
+											.indexesFilenameFormat,
+									indexesTag: this.plugin.settings.indexesTag,
+									// Command opt-in defaults
+									enableIndividualCommands: {
+										quickZettel: true, // Enabled by default
+										openZettel: false,
+										openParent: false,
+										openChild: false,
+										openSibling: false,
+										navigator: false,
+										reorderSequence: false,
+										nextSequence: false,
+										previousSequence: false,
+										nextChild: false,
+										previousChild: false,
+										goUpLevel: false,
+										goDownLevel: false,
+										assignParent: false,
+										assignChild: false,
+										createNote: false,
+										createChild: false,
+										createSibling: false,
+										indent: false,
+										outdent: false,
+										openFleeting: false,
+										createFleeting: false,
+										openMoc: false,
+										createMoc: false,
+										openIndex: false,
+										createIndex: false,
+									},
+								};
+								this.plugin.settings.boxes.push(defaultBox);
+							}
+						} else if (!value && wasEnabled) {
+							// Disabling boxes: migrate first box settings back to global if exactly one box exists
+							if (this.plugin.settings.boxes.length === 1) {
+								const box = this.plugin.settings.boxes[0];
+								// Copy zettel settings back
+								this.plugin.settings.zettelIdFormat =
+									box.zettelIdFormat;
+								this.plugin.settings.zettelIdSeparator =
+									box.zettelIdSeparator;
+								this.plugin.settings.zettelIdMatchingMode =
+									box.zettelIdMatchingMode;
+								this.plugin.settings.noteTemplatePath =
+									box.noteTemplatePath;
+								this.plugin.settings.addTitleToFilename =
+									box.addTitleToFilename;
+								this.plugin.settings.zettelTag = box.zettelTag;
+								this.plugin.settings.enableSequenceReorder =
+									box.enableSequenceReorder;
+								if (box.type === "folder") {
+									this.plugin.settings.zettelsUseSeparateLocation =
+										!!box.folderPath;
+									this.plugin.settings.zettelsLocation =
+										box.folderPath || "";
+								}
+								// Copy fleeting notes settings back
+								this.plugin.settings.enableFleetingNotes =
+									box.enableFleetingNotes;
+								this.plugin.settings.fleetingNotesUseSeparateLocation =
+									box.fleetingNotesUseSeparateLocation;
+								this.plugin.settings.fleetingNotesLocation =
+									box.fleetingNotesLocation;
+								this.plugin.settings.fleetingNotesTemplatePath =
+									box.fleetingNotesTemplatePath;
+								this.plugin.settings.fleetingNotesUseZettelId =
+									box.fleetingNotesUseZettelId;
+								this.plugin.settings.fleetingNotesFilenameFormat =
+									box.fleetingNotesFilenameFormat;
+								this.plugin.settings.fleetingNotesTag =
+									box.fleetingNotesTag;
+								// Copy MOCs settings back
+								this.plugin.settings.enableMocs =
+									box.enableMocs;
+								this.plugin.settings.mocsUseSeparateLocation =
+									box.mocsUseSeparateLocation;
+								this.plugin.settings.mocsLocation =
+									box.mocsLocation;
+								this.plugin.settings.mocsTemplatePath =
+									box.mocsTemplatePath;
+								this.plugin.settings.mocsUseZettelId =
+									box.mocsUseZettelId;
+								this.plugin.settings.mocsFilenameFormat =
+									box.mocsFilenameFormat;
+								this.plugin.settings.mocsTag = box.mocsTag;
+								// Copy indexes settings back
+								this.plugin.settings.enableIndexes =
+									box.enableIndexes;
+								this.plugin.settings.indexesUseSeparateLocation =
+									box.indexesUseSeparateLocation;
+								this.plugin.settings.indexesLocation =
+									box.indexesLocation;
+								this.plugin.settings.indexesTemplatePath =
+									box.indexesTemplatePath;
+								this.plugin.settings.indexesUseZettelId =
+									box.indexesUseZettelId;
+								this.plugin.settings.indexesFilenameFormat =
+									box.indexesFilenameFormat;
+								this.plugin.settings.indexesTag =
+									box.indexesTag;
+							}
+						}
+
+						await this.plugin.saveSettings();
+
+						// Reload the plugin to properly clear and re-register all commands
+						const pluginId = this.plugin.manifest.id;
+						const app = this.plugin.app as any;
+						await app.plugins.disablePlugin(pluginId);
+						await app.plugins.enablePlugin(pluginId);
+
+						// Reopen settings after reload
+						setTimeout(() => {
+							app.setting.open();
+							app.setting.openTabById(pluginId);
+						}, 100);
+					}),
+			);
+	}
+	private displayBoxesSettings(containerEl: HTMLElement): void {
+		containerEl.createEl("h2", { text: "Boxes" });
+		containerEl.createEl("p", {
+			text: "Configure multiple zettelkasten boxes within your vault.",
+			cls: "setting-item-description",
+		});
+
+		containerEl.createEl("p", {
+			text: "Each box can be folder-based or tag-based.",
+			cls: "setting-item-description",
+		});
+
+		const maxBoxes = 5;
+		const hasReachedLimit = this.plugin.settings.boxes.length >= maxBoxes;
+
+		// Add Box button
+		new Setting(containerEl)
+			.setName("Add a new box")
+			.setDesc(
+				hasReachedLimit
+					? `Maximum of ${maxBoxes} boxes reached`
+					: "Create a new zettelkasten box",
+			)
+			.addButton((button) => {
+				button
+					.setButtonText("+ Add Box")
+					.setCta()
+					.setDisabled(hasReachedLimit)
+					.onClick(async () => {
+						const newBox: Box = {
+							id: Date.now().toString(),
+							name: "New Box",
+							type: "folder",
+							folderPath: "",
+							zettelPrefix: "",
+							// Zettel settings defaults
+							zettelIdFormat: "YYYYMMDDHHmmssSSS",
+							zettelIdSeparator: " ",
+							zettelIdMatchingMode: "separator",
+							noteTemplatePath: "",
+							addTitleToFilename: true,
+							zettelTag: "zettel",
+							enableSequenceReorder: false,
+							// Fleeting notes defaults
+							enableFleetingNotes: true,
+							fleetingNotesUseSeparateLocation: false,
+							fleetingNotesLocation: "",
+							fleetingNotesTemplatePath: "",
+							fleetingNotesUseZettelId: true,
+							fleetingNotesFilenameFormat: "",
+							fleetingNotesTag: "fleeting",
+							// MOCs defaults
+							enableMocs: true,
+							mocsUseSeparateLocation: false,
+							mocsLocation: "",
+							mocsTemplatePath: "",
+							mocsUseZettelId: false,
+							mocsFilenameFormat: "{{title}} MOC",
+							mocsTag: "moc",
+							// Indexes defaults
+							enableIndexes: true,
+							indexesUseSeparateLocation: false,
+							indexesLocation: "",
+							indexesTemplatePath: "",
+							indexesUseZettelId: false,
+							indexesFilenameFormat: "{{title}} Index",
+							indexesTag: "index",
+							// Command opt-in defaults
+							enableIndividualCommands: {
+								quickZettel: true, // Enabled by default
+								openZettel: false,
+								openParent: false,
+								openChild: false,
+								openSibling: false,
+								navigator: false,
+								reorderSequence: false,
+								nextSequence: false,
+								previousSequence: false,
+								nextChild: false,
+								previousChild: false,
+								goUpLevel: false,
+								goDownLevel: false,
+								assignParent: false,
+								assignChild: false,
+								createNote: false,
+								createChild: false,
+								createSibling: false,
+								indent: false,
+								outdent: false,
+								openFleeting: false,
+								createFleeting: false,
+								openMoc: false,
+								createMoc: false,
+								openIndex: false,
+								createIndex: false,
+							},
+						};
+						this.plugin.settings.boxes.push(newBox);
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
+
+		// Display existing boxes
+		if (this.plugin.settings.boxes.length === 0) {
+			containerEl.createEl("p", {
+				text: "No boxes configured yet. Click 'Add Box' to create your first box.",
+				cls: "setting-item-description",
+			});
+		} else {
+			this.plugin.settings.boxes.forEach((box, index) => {
+				const boxContainer = containerEl.createDiv(
+					"zettelkasten-box-item",
+				);
+				boxContainer.style.border =
+					"1px solid var(--background-modifier-border)";
+				boxContainer.style.borderRadius = "6px";
+				boxContainer.style.padding = "16px";
+				boxContainer.style.marginBottom = "16px";
+				boxContainer.style.backgroundColor =
+					"var(--background-primary-alt)";
+
+				const boxHeader = boxContainer.createDiv();
+				boxHeader.style.display = "flex";
+				boxHeader.style.justifyContent = "space-between";
+				boxHeader.style.alignItems = "center";
+				boxHeader.style.marginBottom = "8px";
+
+				const boxTitle = boxHeader.createEl("h3", { text: box.name });
+				boxTitle.style.margin = "0";
+
+				const boxType = boxContainer.createEl("p", {
+					text: `Type: ${box.type === "folder" ? "Folder-based" : "Tag-based"}`,
+					cls: "setting-item-description",
+				});
+				boxType.style.margin = "0 0 12px 0";
+
+				if (box.type === "folder" && box.folderPath) {
+					const folderInfo = boxContainer.createEl("p", {
+						text: `Folder: ${box.folderPath}`,
+						cls: "setting-item-description",
+					});
+					folderInfo.style.margin = "0 0 12px 0";
+				} else if (box.type === "tag" && box.tagName) {
+					const tagInfo = boxContainer.createEl("p", {
+						text: `Tag: #${box.tagName}`,
+						cls: "setting-item-description",
+					});
+					tagInfo.style.margin = "0 0 12px 0";
+				}
+
+				const buttonContainer = boxContainer.createDiv();
+				buttonContainer.style.display = "flex";
+				buttonContainer.style.gap = "8px";
+
+				// Edit button
+				const editButton = buttonContainer.createEl("button", {
+					text: "Edit",
+					cls: "mod-cta",
+				});
+				editButton.addEventListener("click", () => {
+					this.activeTab = `box-${box.id}`;
+					this.display();
+				});
+
+				// Delete button
+				const deleteButton = buttonContainer.createEl("button", {
+					text: "Delete",
+					cls: "mod-warning",
+				});
+				deleteButton.addEventListener("click", async () => {
+					const confirmMessage = `Are you sure you want to delete "${box.name}"? This will remove all box-specific settings but will not delete any notes.`;
+					if (confirm(confirmMessage)) {
+						this.plugin.settings.boxes.splice(index, 1);
+						await this.plugin.saveSettings();
+						this.display();
+					}
+				});
+			});
+		}
+	}
+
+	private displayBoxConfiguration(containerEl: HTMLElement, box: Box): void {
+		const boxIndex = this.plugin.settings.boxes.findIndex(
+			(b) => b.id === box.id,
+		);
+		if (boxIndex === -1) return;
+
+		containerEl.createEl("h2", { text: `${box.name}` });
+
+		// Box Basic Configuration Section
+		containerEl.createEl("h3", { text: "Box Configuration" });
+
+		// Box name
+		new Setting(containerEl)
+			.setName("Box name")
+			.setDesc("A descriptive name for this box")
+			.addText((text) =>
+				text
+					.setPlaceholder("My Zettelkasten")
+					.setValue(box.name)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].name = value;
+						await this.plugin.saveSettings();
+						// Update tab name
+						this.display();
+					}),
+			);
+
+		// Box type selector
+		new Setting(containerEl)
+			.setName("Box type")
+			.setDesc("Choose whether this box is folder-based or tag-based")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("folder", "Folder-based")
+					.addOption("tag", "Tag-based")
+					.setValue(box.type)
+					.onChange(async (value: BoxType) => {
+						this.plugin.settings.boxes[boxIndex].type = value;
+						if (value === "folder") {
+							this.plugin.settings.boxes[boxIndex].tagName =
+								undefined;
+						} else {
+							this.plugin.settings.boxes[boxIndex].folderPath =
+								undefined;
+						}
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		// Folder path (shown when type is folder)
+		if (box.type === "folder") {
+			new Setting(containerEl)
+				.setName("Folder path")
+				.setDesc("The folder containing this box's notes")
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.boxes[boxIndex].folderPath = value;
+						await this.plugin.saveSettings();
+					};
+					new FolderSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("path/to/box")
+						.setValue(box.folderPath || "")
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[boxIndex].folderPath =
+								value;
+							await this.plugin.saveSettings();
+						});
+				});
+		}
+
+		// Tag name (shown when type is tag)
+		if (box.type === "tag") {
+			new Setting(containerEl)
+				.setName("Tag name")
+				.setDesc("The tag identifying notes in this box (without #)")
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.boxes[boxIndex].tagName = value;
+						await this.plugin.saveSettings();
+					};
+					new TagSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("box-name")
+						.setValue(box.tagName || "")
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[boxIndex].tagName =
+								value;
+							await this.plugin.saveSettings();
+						});
+				});
+		}
+
+		// Zettel Prefix
+		new Setting(containerEl)
+			.setName("Zettel prefix")
+			.setDesc(
+				"Optional prefix to distinguish zettels from this box (e.g., 'A', 'WORK', 'PERS'). Will be added before the zettel ID.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("e.g., A, WORK, PERS")
+					.setValue(box.zettelPrefix)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].zettelPrefix =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// Create sections for Zettel, Fleeting Notes, MOCs, and Indexes
+		this.displayBoxZettelSettings(containerEl, box, boxIndex);
+		this.displayBoxFleetingSettings(containerEl, box, boxIndex);
+		this.displayBoxMocSettings(containerEl, box, boxIndex);
+		this.displayBoxIndexSettings(containerEl, box, boxIndex);
+		this.displayBoxCommandSettings(containerEl, box, boxIndex);
+	}
+
+	private displayBoxCommandSettings(
+		containerEl: HTMLElement,
+		box: Box,
+		boxIndex: number,
+	): void {
+		containerEl.createEl("h3", { text: "Command Palette" });
+		containerEl.createEl("p", {
+			text: "By default, only the box command palette is shown. Enable individual commands below to expose them directly in the main command palette for quick access.",
+			cls: "setting-item-description",
+		});
+
+		// Quick Actions Section
+		const quickActionsDetails = containerEl.createEl("details");
+		quickActionsDetails.style.backgroundColor =
+			"var(--background-secondary)";
+		quickActionsDetails.style.borderRadius = "var(--radius-s)";
+		quickActionsDetails.style.padding = "12px";
+		quickActionsDetails.style.marginTop = "1.5em";
+		quickActionsDetails.style.marginBottom = "0.5em";
+		const quickActionsSummary = quickActionsDetails.createEl("summary", {
+			text: "Quick Actions",
+		});
+		quickActionsSummary.style.fontSize = "1.3em";
+		quickActionsSummary.style.fontWeight = "600";
+		quickActionsSummary.style.cursor = "pointer";
+		quickActionsSummary.style.marginBottom = "8px";
+		const quickActionsContent = quickActionsDetails.createDiv();
+
+		new Setting(quickActionsContent)
+			.setName("Quick Zettel")
+			.setDesc(
+				"Show 'Quick Zettel' command in main palette (instantly creates a zettel with template)",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.quickZettel)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.quickZettel = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		// Navigation Section
+		const navigationDetails = containerEl.createEl("details");
+		navigationDetails.style.backgroundColor = "var(--background-secondary)";
+		navigationDetails.style.borderRadius = "var(--radius-s)";
+		navigationDetails.style.padding = "12px";
+		navigationDetails.style.marginTop = "1.5em";
+		navigationDetails.style.marginBottom = "0.5em";
+		const navigationSummary = navigationDetails.createEl("summary", {
+			text: "Navigation",
+		});
+		navigationSummary.style.fontSize = "1.3em";
+		navigationSummary.style.fontWeight = "600";
+		navigationSummary.style.cursor = "pointer";
+		navigationSummary.style.marginBottom = "8px";
+		const navigationContent = navigationDetails.createDiv();
+
+		new Setting(navigationContent)
+			.setName("Open Zettel")
+			.setDesc("Show 'Open Zettel' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.openZettel)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.openZettel = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(navigationContent)
+			.setName("Open Parent")
+			.setDesc("Show 'Open Parent Zettel' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.openParent)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.openParent = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(navigationContent)
+			.setName("Open Child")
+			.setDesc("Show 'Open Child Zettel' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.openChild)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.openChild = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(navigationContent)
+			.setName("Open Sibling")
+			.setDesc("Show 'Open Sibling Zettel' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.openSibling)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.openSibling = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(navigationContent)
+			.setName("Navigator")
+			.setDesc("Show 'Navigator' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.navigator)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.navigator = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(navigationContent)
+			.setName("Next Sequence")
+			.setDesc("Show 'Next Sequence' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.nextSequence)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.nextSequence = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(navigationContent)
+			.setName("Previous Sequence")
+			.setDesc("Show 'Previous Sequence' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.previousSequence)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.previousSequence = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(navigationContent)
+			.setName("Next Child")
+			.setDesc("Show 'Next Child' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.nextChild)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.nextChild = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(navigationContent)
+			.setName("Previous Child")
+			.setDesc("Show 'Previous Child' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.previousChild)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.previousChild = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		// Hierarchy Section
+		const hierarchyDetails = containerEl.createEl("details");
+		hierarchyDetails.style.backgroundColor = "var(--background-secondary)";
+		hierarchyDetails.style.borderRadius = "var(--radius-s)";
+		hierarchyDetails.style.padding = "12px";
+		hierarchyDetails.style.marginTop = "1.5em";
+		hierarchyDetails.style.marginBottom = "0.5em";
+		const hierarchySummary = hierarchyDetails.createEl("summary", {
+			text: "Hierarchy",
+		});
+		hierarchySummary.style.fontSize = "1.3em";
+		hierarchySummary.style.fontWeight = "600";
+		hierarchySummary.style.cursor = "pointer";
+		hierarchySummary.style.marginBottom = "8px";
+		const hierarchyContent = hierarchyDetails.createDiv();
+
+		new Setting(hierarchyContent)
+			.setName("Go Up Level")
+			.setDesc("Show 'Go Up Level' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.goUpLevel)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.goUpLevel = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(hierarchyContent)
+			.setName("Go Down Level")
+			.setDesc("Show 'Go Down Level' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.goDownLevel)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.goDownLevel = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(hierarchyContent)
+			.setName("Reorder Sequence")
+			.setDesc("Show 'Reorder Sequence' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.reorderSequence)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.reorderSequence = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(hierarchyContent)
+			.setName("Assign Parent")
+			.setDesc("Show 'Assign Parent' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.assignParent)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.assignParent = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(hierarchyContent)
+			.setName("Assign Child")
+			.setDesc("Show 'Assign Child' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.assignChild)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.assignChild = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(hierarchyContent)
+			.setName("Indent")
+			.setDesc("Show 'Indent Zettel' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.indent)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.indent = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(hierarchyContent)
+			.setName("Outdent")
+			.setDesc("Show 'Outdent Zettel' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.outdent)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.outdent = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		// Creation Section
+		const creationDetails = containerEl.createEl("details");
+		creationDetails.style.backgroundColor = "var(--background-secondary)";
+		creationDetails.style.borderRadius = "var(--radius-s)";
+		creationDetails.style.padding = "12px";
+		creationDetails.style.marginTop = "1.5em";
+		creationDetails.style.marginBottom = "0.5em";
+		const creationSummary = creationDetails.createEl("summary", {
+			text: "Creation",
+		});
+		creationSummary.style.fontSize = "1.3em";
+		creationSummary.style.fontWeight = "600";
+		creationSummary.style.cursor = "pointer";
+		creationSummary.style.marginBottom = "8px";
+		const creationContent = creationDetails.createDiv();
+
+		new Setting(creationContent)
+			.setName("Create Note")
+			.setDesc("Show 'Create Note' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.createNote)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.createNote = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(creationContent)
+			.setName("Create Child")
+			.setDesc("Show 'Create Child Zettel' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.createChild)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.createChild = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(creationContent)
+			.setName("Create Sibling")
+			.setDesc("Show 'Create Sibling Zettel' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.createSibling)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.createSibling = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		// Special Notes Section
+		const specialNotesDetails = containerEl.createEl("details");
+		specialNotesDetails.style.backgroundColor =
+			"var(--background-secondary)";
+		specialNotesDetails.style.borderRadius = "var(--radius-s)";
+		specialNotesDetails.style.padding = "12px";
+		specialNotesDetails.style.marginTop = "1.5em";
+		specialNotesDetails.style.marginBottom = "0.5em";
+		const specialNotesSummary = specialNotesDetails.createEl("summary", {
+			text: "Special Notes",
+		});
+		specialNotesSummary.style.fontSize = "1.3em";
+		specialNotesSummary.style.fontWeight = "600";
+		specialNotesSummary.style.cursor = "pointer";
+		specialNotesSummary.style.marginBottom = "8px";
+		const specialNotesContent = specialNotesDetails.createDiv();
+		new Setting(specialNotesContent)
+			.setName("Open Fleeting Note")
+			.setDesc("Show 'Open Fleeting Note' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.openFleeting)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.openFleeting = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(specialNotesContent)
+			.setName("Create Fleeting Note")
+			.setDesc("Show 'Create Fleeting Note' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.createFleeting)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.createFleeting = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(specialNotesContent)
+			.setName("Open MOC")
+			.setDesc("Show 'Open MOC' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.openMoc)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.openMoc = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(specialNotesContent)
+			.setName("Create MOC")
+			.setDesc("Show 'Create MOC' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.createMoc)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.createMoc = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(specialNotesContent)
+			.setName("Open Index")
+			.setDesc("Show 'Open Index' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.openIndex)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.openIndex = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+
+		new Setting(specialNotesContent)
+			.setName("Create Index")
+			.setDesc("Show 'Create Index' command in main palette")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableIndividualCommands.createIndex)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableIndividualCommands.createIndex = value;
+						await this.plugin.saveSettings();
+						this.plugin.commandManager.reloadCommands();
+					}),
+			);
+	}
+
+	private displayBoxZettelSettings(
+		containerEl: HTMLElement,
+		box: Box,
+		boxIndex: number,
+	): void {
+		containerEl.createEl("h3", { text: "Zettel Settings" });
+
+		// Zettel ID Format
+		new Setting(containerEl)
+			.setName("Zettel ID format")
+			.setDesc(
+				"Date format for generating zettel IDs (e.g., YYYYMMDDHHmm, YYYYMMDD, YYYYMMDDHHmmss)",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("YYYYMMDDHHmm")
+					.setValue(box.zettelIdFormat)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].zettelIdFormat =
+							value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// Zettel Template
+		new Setting(containerEl)
+			.setName("Note template")
+			.setDesc("Template file to use when creating new zettel notes")
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.boxes[boxIndex].noteTemplatePath =
+						value;
+					await this.plugin.saveSettings();
+				};
+				new FileSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("path/to/template.md")
+					.setValue(box.noteTemplatePath)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].noteTemplatePath =
+							value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// Zettel Tag
+		new Setting(containerEl)
+			.setName("Zettel tag")
+			.setDesc("Tag used to identify zettel notes (without #)")
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.boxes[boxIndex].zettelTag = value;
+					await this.plugin.saveSettings();
+				};
+				new TagSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("zettel")
+					.setValue(box.zettelTag)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].zettelTag = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// Add Title to Filename
+		new Setting(containerEl)
+			.setName("Add title to filename")
+			.setDesc(
+				"Include the note title in the filename after the zettel ID",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.addTitleToFilename)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].addTitleToFilename = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// Enable Sequence Reorder
+		const sequenceReorderSetting = new Setting(containerEl).setName(
+			"Enable sequence reorder",
+		);
+		const descEl = sequenceReorderSetting.descEl;
+		descEl.empty();
+		descEl
+			.createDiv()
+			.setText(
+				"Enable the command to reorder child notes within a sequence.",
+			);
+		descEl.createEl("br");
+		descEl
+			.createDiv()
+			.setText("⚠️ Warning: This is an experimental feature.");
+
+		sequenceReorderSetting.addToggle((toggle) =>
+			toggle
+				.setValue(box.enableSequenceReorder)
+				.onChange(async (value) => {
+					this.plugin.settings.boxes[boxIndex].enableSequenceReorder =
+						value;
+					await this.plugin.saveSettings();
+				}),
+		);
+
+		const nameEl = sequenceReorderSetting.nameEl;
+		nameEl.innerHTML = "Enable sequence reorder <strong>(Alpha)</strong>";
+	}
+
+	private displayBoxFleetingSettings(
+		containerEl: HTMLElement,
+		box: Box,
+		boxIndex: number,
+	): void {
+		containerEl.createEl("h3", { text: "Fleeting Notes Settings" });
+
+		// Enable Fleeting Notes
+		new Setting(containerEl)
+			.setName("Enable fleeting notes")
+			.setDesc("Enable fleeting notes support for this box")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.enableFleetingNotes)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].enableFleetingNotes = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (!box.enableFleetingNotes) return;
+
+		// Use Separate Location
+		new Setting(containerEl)
+			.setName("Use separate location")
+			.setDesc("Store fleeting notes in a separate folder")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.fleetingNotesUseSeparateLocation)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].fleetingNotesUseSeparateLocation = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (box.fleetingNotesUseSeparateLocation) {
+			new Setting(containerEl)
+				.setName("Fleeting notes location")
+				.setDesc(
+					"Folder path for fleeting notes (leave empty for vault root)",
+				)
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.boxes[
+							boxIndex
+						].fleetingNotesLocation = value;
+						await this.plugin.saveSettings();
+					};
+					new FolderSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("path/to/fleeting")
+						.setValue(box.fleetingNotesLocation)
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[
+								boxIndex
+							].fleetingNotesLocation = value;
+							await this.plugin.saveSettings();
+						});
+				});
+		}
+
+		// Template
+		new Setting(containerEl)
+			.setName("Fleeting notes template")
+			.setDesc("Template file to use when creating fleeting notes")
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.boxes[
+						boxIndex
+					].fleetingNotesTemplatePath = value;
+					await this.plugin.saveSettings();
+				};
+				new FileSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("path/to/template.md")
+					.setValue(box.fleetingNotesTemplatePath)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].fleetingNotesTemplatePath = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// Use Zettel ID
+		new Setting(containerEl)
+			.setName("Use zettel ID")
+			.setDesc("Use zettel ID format for fleeting note filenames")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.fleetingNotesUseZettelId)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].fleetingNotesUseZettelId = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (!box.fleetingNotesUseZettelId) {
+			new Setting(containerEl)
+				.setName("Filename format")
+				.setDesc(
+					"Custom filename format (use {{title}} as placeholder)",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("{{title}}")
+						.setValue(box.fleetingNotesFilenameFormat)
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[
+								boxIndex
+							].fleetingNotesFilenameFormat = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		// Tag
+		new Setting(containerEl)
+			.setName("Fleeting notes tag")
+			.setDesc("Tag used to identify fleeting notes (without #)")
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.boxes[boxIndex].fleetingNotesTag =
+						value;
+					await this.plugin.saveSettings();
+				};
+				new TagSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("fleeting")
+					.setValue(box.fleetingNotesTag)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].fleetingNotesTag =
+							value;
+						await this.plugin.saveSettings();
+					});
+			});
+	}
+
+	private displayBoxMocSettings(
+		containerEl: HTMLElement,
+		box: Box,
+		boxIndex: number,
+	): void {
+		containerEl.createEl("h3", { text: "MOCs Settings" });
+
+		// Enable MOCs
+		new Setting(containerEl)
+			.setName("Enable MOCs")
+			.setDesc("Enable Maps of Content support for this box")
+			.addToggle((toggle) =>
+				toggle.setValue(box.enableMocs).onChange(async (value) => {
+					this.plugin.settings.boxes[boxIndex].enableMocs = value;
+					await this.plugin.saveSettings();
+					this.display();
+				}),
+			);
+
+		if (!box.enableMocs) return;
+
+		// Use Separate Location
+		new Setting(containerEl)
+			.setName("Use separate location")
+			.setDesc("Store MOCs in a separate folder")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.mocsUseSeparateLocation)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].mocsUseSeparateLocation = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (box.mocsUseSeparateLocation) {
+			new Setting(containerEl)
+				.setName("MOCs location")
+				.setDesc("Folder path for MOCs (leave empty for vault root)")
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.boxes[boxIndex].mocsLocation =
+							value;
+						await this.plugin.saveSettings();
+					};
+					new FolderSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("path/to/mocs")
+						.setValue(box.mocsLocation)
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[boxIndex].mocsLocation =
+								value;
+							await this.plugin.saveSettings();
+						});
+				});
+		}
+
+		// Template
+		new Setting(containerEl)
+			.setName("MOCs template")
+			.setDesc("Template file to use when creating MOCs")
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.boxes[boxIndex].mocsTemplatePath =
+						value;
+					await this.plugin.saveSettings();
+				};
+				new FileSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("path/to/template.md")
+					.setValue(box.mocsTemplatePath)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].mocsTemplatePath =
+							value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// Use Zettel ID
+		new Setting(containerEl)
+			.setName("Use zettel ID")
+			.setDesc("Use zettel ID format for MOC filenames")
+			.addToggle((toggle) =>
+				toggle.setValue(box.mocsUseZettelId).onChange(async (value) => {
+					this.plugin.settings.boxes[boxIndex].mocsUseZettelId =
+						value;
+					await this.plugin.saveSettings();
+					this.display();
+				}),
+			);
+
+		if (!box.mocsUseZettelId) {
+			new Setting(containerEl)
+				.setName("Filename format")
+				.setDesc(
+					"Custom filename format (use {{title}} as placeholder)",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("{{title}} MOC")
+						.setValue(box.mocsFilenameFormat)
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[
+								boxIndex
+							].mocsFilenameFormat = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		// Tag
+		new Setting(containerEl)
+			.setName("MOCs tag")
+			.setDesc("Tag used to identify MOCs (without #)")
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.boxes[boxIndex].mocsTag = value;
+					await this.plugin.saveSettings();
+				};
+				new TagSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("moc")
+					.setValue(box.mocsTag)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].mocsTag = value;
+						await this.plugin.saveSettings();
+					});
+			});
+	}
+
+	private displayBoxIndexSettings(
+		containerEl: HTMLElement,
+		box: Box,
+		boxIndex: number,
+	): void {
+		containerEl.createEl("h3", { text: "Indexes Settings" });
+
+		// Enable Indexes
+		new Setting(containerEl)
+			.setName("Enable indexes")
+			.setDesc("Enable indexes support for this box")
+			.addToggle((toggle) =>
+				toggle.setValue(box.enableIndexes).onChange(async (value) => {
+					this.plugin.settings.boxes[boxIndex].enableIndexes = value;
+					await this.plugin.saveSettings();
+					this.display();
+				}),
+			);
+
+		if (!box.enableIndexes) return;
+
+		// Use Separate Location
+		new Setting(containerEl)
+			.setName("Use separate location")
+			.setDesc("Store indexes in a separate folder")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.indexesUseSeparateLocation)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].indexesUseSeparateLocation = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (box.indexesUseSeparateLocation) {
+			new Setting(containerEl)
+				.setName("Indexes location")
+				.setDesc("Folder path for indexes (leave empty for vault root)")
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.boxes[boxIndex].indexesLocation =
+							value;
+						await this.plugin.saveSettings();
+					};
+					new FolderSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("path/to/indexes")
+						.setValue(box.indexesLocation)
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[
+								boxIndex
+							].indexesLocation = value;
+							await this.plugin.saveSettings();
+						});
+				});
+		}
+
+		// Template
+		new Setting(containerEl)
+			.setName("Indexes template")
+			.setDesc("Template file to use when creating indexes")
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.boxes[boxIndex].indexesTemplatePath =
+						value;
+					await this.plugin.saveSettings();
+				};
+				new FileSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("path/to/template.md")
+					.setValue(box.indexesTemplatePath)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].indexesTemplatePath = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// Use Zettel ID
+		new Setting(containerEl)
+			.setName("Use zettel ID")
+			.setDesc("Use zettel ID format for index filenames")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.indexesUseZettelId)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[
+							boxIndex
+						].indexesUseZettelId = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (!box.indexesUseZettelId) {
+			new Setting(containerEl)
+				.setName("Filename format")
+				.setDesc(
+					"Custom filename format (use {{title}} as placeholder)",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("{{title}} Index")
+						.setValue(box.indexesFilenameFormat)
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[
+								boxIndex
+							].indexesFilenameFormat = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		// Tag
+		new Setting(containerEl)
+			.setName("Indexes tag")
+			.setDesc("Tag used to identify indexes (without #)")
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.boxes[boxIndex].indexesTag = value;
+					await this.plugin.saveSettings();
+				};
+				new TagSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("index")
+					.setValue(box.indexesTag)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].indexesTag = value;
+						await this.plugin.saveSettings();
+					});
+			});
 	}
 
 	private displayZettelSettings(containerEl: HTMLElement): void {

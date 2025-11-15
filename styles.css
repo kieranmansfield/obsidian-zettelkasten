@@ -54,3 +54,66 @@ If your plugin does not need CSS, delete this file.
 .zettelkasten-settings-content {
 	padding-top: 10px;
 }
+
+/* Box Item Styling */
+.zettelkasten-box-item {
+	position: relative;
+}
+
+.zettelkasten-box-item .setting-item:last-child {
+	border-bottom: none;
+	justify-content: flex-end;
+	padding-top: 8px;
+	margin-top: 8px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Box Settings Modal */
+.zettelkasten-box-settings-modal {
+	min-width: 600px;
+}
+
+.box-settings-tabs-container {
+	margin-top: 20px;
+}
+
+.box-settings-tabs {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 20px;
+	border-bottom: 2px solid var(--background-modifier-border);
+	padding-bottom: 0;
+}
+
+.box-settings-tab {
+	padding: 8px 14px;
+	cursor: pointer;
+	border-radius: 4px 4px 0 0;
+	font-weight: 500;
+	color: var(--text-muted);
+	transition: all 0.2s ease;
+	background-color: transparent;
+	border: 1px solid transparent;
+	border-bottom: none;
+	margin-bottom: -2px;
+	font-size: 0.9em;
+}
+
+.box-settings-tab:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.box-settings-tab.is-active {
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	border-color: var(--background-modifier-border);
+	border-bottom: 2px solid var(--background-primary);
+	font-weight: 600;
+}
+
+.box-settings-content {
+	padding-top: 10px;
+	max-height: 60vh;
+	overflow-y: auto;
+}

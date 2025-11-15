@@ -4,16 +4,52 @@ import { ZettelSuggester } from "../ui/ZettelSuggester";
 import { CreateNoteWithSuggestModal } from "../ui/CreateNoteWithSuggestModal";
 import { NavigatorModal, NavigationOption } from "../ui/NavigatorModal";
 import { SequenceReorderModal } from "../ui/SequenceReorderModal";
+import {
+	BoxCommandPaletteModal,
+	BoxCommand,
+} from "../ui/BoxCommandPaletteModal";
 import type ZettelkastenPlugin from "../../main";
+import type { Box } from "../settings/PluginSettings";
 
 // Manages all plugin commands
 export class CommandManager {
 	constructor(private plugin: ZettelkastenPlugin) {}
 
 	/**
+	 * Reloads all commands by re-registering them
+	 */
+	reloadCommands(): void {
+		this.registerCommands();
+	}
+
+	/**
 	 * Registers all commands with the plugin
 	 */
 	registerCommands(): void {
+		// Check if boxes are enabled
+		if (
+			this.plugin.settings.enableBoxes &&
+			this.plugin.settings.boxes.length > 0
+		) {
+			// Register command palette for each box
+			this.plugin.settings.boxes.forEach((box) => {
+				this.registerBoxCommandPalette(box);
+			});
+
+			// Register individual commands if enabled
+			this.plugin.settings.boxes.forEach((box) => {
+				this.registerBoxIndividualCommands(box);
+			});
+		} else {
+			// Register global commands (when boxes disabled)
+			this.registerGlobalCommands();
+		}
+	}
+
+	/**
+	 * Registers global commands (when boxes are disabled)
+	 */
+	private registerGlobalCommands(): void {
 		this.registerOpenZettelCommand();
 		this.registerOpenParentZettelCommand();
 		this.registerOpenChildZettelCommand();
@@ -41,6 +77,137 @@ export class CommandManager {
 		this.registerCreateMocCommand();
 		this.registerOpenIndexCommand();
 		this.registerCreateIndexCommand();
+	}
+
+	/**
+	 * Registers command palette for a specific box
+	 */
+	private registerBoxCommandPalette(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-command-palette`,
+			name: `${box.name}: Command Palette`,
+			icon: "list",
+			callback: () => {
+				const commands = this.getBoxCommands(box);
+				new BoxCommandPaletteModal(
+					this.plugin.app,
+					box.name,
+					commands,
+				).open();
+			},
+		});
+	}
+
+	/**
+	 * Registers individual commands for a specific box (opt-in)
+	 */
+	private registerBoxIndividualCommands(box: Box): void {
+		const cmds = box.enableIndividualCommands;
+
+		// Quick Zettel is enabled by default
+		if (cmds.quickZettel) this.registerBoxQuickZettelCommand(box);
+		if (cmds.openZettel) this.registerBoxOpenZettelCommand(box);
+		if (cmds.openParent) this.registerBoxOpenParentZettelCommand(box);
+		if (cmds.openChild) this.registerBoxOpenChildZettelCommand(box);
+		if (cmds.openSibling) this.registerBoxOpenSiblingZettelCommand(box);
+		if (cmds.navigator) this.registerBoxNavigatorCommand(box);
+		if (cmds.reorderSequence && box.enableSequenceReorder) {
+			this.registerBoxReorderSequenceCommand(box);
+		}
+		if (cmds.nextSequence) this.registerBoxNextSequenceCommand(box);
+		if (cmds.previousSequence) this.registerBoxPreviousSequenceCommand(box);
+		if (cmds.nextChild) this.registerBoxNextChildCommand(box);
+		if (cmds.previousChild) this.registerBoxPreviousChildCommand(box);
+		if (cmds.goUpLevel) this.registerBoxGoUpLevelCommand(box);
+		if (cmds.goDownLevel) this.registerBoxGoDownLevelCommand(box);
+		if (cmds.assignParent) this.registerBoxAssignParentCommand(box);
+		if (cmds.assignChild) this.registerBoxAssignChildCommand(box);
+		if (cmds.createNote) this.registerBoxCreateNoteCommand(box);
+		if (cmds.createChild) this.registerBoxCreateChildZettelCommand(box);
+		if (cmds.createSibling) this.registerBoxCreateSiblingZettelCommand(box);
+		if (cmds.indent) this.registerBoxIndentZettelCommand(box);
+		if (cmds.outdent) this.registerBoxOutdentZettelCommand(box);
+
+		if (box.enableFleetingNotes) {
+			if (cmds.openFleeting) this.registerBoxOpenFleetingCommand(box);
+			if (cmds.createFleeting)
+				this.registerBoxCreateFleetingNoteCommand(box);
+		}
+
+		if (box.enableMocs) {
+			if (cmds.openMoc) this.registerBoxOpenMocCommand(box);
+			if (cmds.createMoc) this.registerBoxCreateMocCommand(box);
+		}
+
+		if (box.enableIndexes) {
+			if (cmds.openIndex) this.registerBoxOpenIndexCommand(box);
+			if (cmds.createIndex) this.registerBoxCreateIndexCommand(box);
+		}
+	} /**
+	 * Gets the list of commands for a box (for the command palette)
+	 */
+	private getBoxCommands(box: Box): BoxCommand[] {
+		const commands: BoxCommand[] = [
+			{
+				id: "open-zettel",
+				name: "Open Zettel",
+				icon: "folder-open",
+				callback: () => this.openZettelForBox(box),
+			},
+			{
+				id: "create-zettel",
+				name: "Create Zettel",
+				icon: "file-plus",
+				callback: () => this.createNoteForBox(box),
+			},
+			{
+				id: "create-child",
+				name: "Create Child Zettel",
+				icon: "file-plus",
+				callback: () => this.createChildZettelForBox(box),
+			},
+			{
+				id: "create-sibling",
+				name: "Create Sibling Zettel",
+				icon: "file-plus",
+				callback: () => this.createSiblingZettelForBox(box),
+			},
+			{
+				id: "navigator",
+				name: "Zettelkasten Navigator",
+				icon: "compass",
+				callback: () => this.openNavigatorForBox(box),
+			},
+		];
+
+		if (box.enableFleetingNotes) {
+			commands.push({
+				id: "create-fleeting",
+				name: "Create Fleeting Note",
+				icon: "file-plus",
+				callback: () => this.createFleetingNoteForBox(box),
+			});
+		}
+
+		if (box.enableMocs) {
+			commands.push({
+				id: "create-moc",
+				name: "Create MOC",
+				icon: "file-plus",
+				callback: () => this.createMocForBox(box),
+			});
+		}
+
+		if (box.enableIndexes) {
+			commands.push({
+				id: "create-index",
+				name: "Create Index",
+				icon: "file-plus",
+				callback: () => this.createIndexForBox(box),
+			});
+		}
+
+		return commands;
 	}
 
 	/**
@@ -1001,55 +1168,36 @@ export class CommandManager {
 			id: "create-fleeting-note",
 			name: "Create Fleeting Note",
 			icon: "file-plus",
-			checkCallback: (checking: boolean) => {
+			callback: async () => {
 				if (!this.plugin.settings.enableFleetingNotes) {
-					return false;
+					new Notice("Fleeting notes are disabled");
+					return;
 				}
 
-				if (checking) {
-					return true;
+				const title = ""; // Empty title for fleeting notes
+				const folder = this.getNoteTypeFolder(
+					this.plugin.settings.fleetingNotesUseSeparateLocation,
+					this.plugin.settings.fleetingNotesLocation,
+				);
+				const filename = this.buildFleetingFilename(title);
+				const path = `${folder.path}/${filename}.md`;
+
+				const creator = new FileCreator(
+					this.plugin.app,
+					path,
+					title,
+					() => {
+						new Notice("Created fleeting note");
+					},
+					this.plugin.settings.fleetingNotesTemplatePath,
+				);
+				try {
+					await creator.create();
+				} catch (error) {
+					new Notice(
+						`Error creating fleeting note: ${error.message}`,
+					);
 				}
-
-				// Get existing fleeting notes for autocomplete
-				this.getNoteTitlesByTag(
-					this.plugin.settings.fleetingNotesTag,
-				).then((notesMap) => {
-					new CreateNoteWithSuggestModal(
-						this.plugin.app,
-						notesMap,
-						async (title: string) => {
-							const folder = this.getNoteTypeFolder(
-								this.plugin.settings
-									.fleetingNotesUseSeparateLocation,
-								this.plugin.settings.fleetingNotesLocation,
-							);
-							const filename = this.buildFleetingFilename(title);
-							const path = `${folder.path}/${filename}.md`;
-
-							const creator = new FileCreator(
-								this.plugin.app,
-								path,
-								title,
-								() => {
-									new Notice(
-										`Created fleeting note: ${title}`,
-									);
-								},
-								this.plugin.settings.fleetingNotesTemplatePath,
-							);
-							try {
-								await creator.create();
-							} catch (error) {
-								new Notice(
-									`Error creating fleeting note: ${error.message}`,
-								);
-							}
-						},
-						true,
-					).open();
-				});
-
-				return true;
 			},
 		});
 	} /**
@@ -2872,5 +3020,1131 @@ export class CommandManager {
 				await this.plugin.app.workspace.getLeaf().openFile(children[0]);
 			},
 		});
+	}
+
+	// ==================== Box-Specific Command Implementations ====================
+
+	private registerBoxOpenZettelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-open-zettel`,
+			name: `${box.name}: Open Zettel`,
+			icon: "folder-open",
+			callback: () => this.openZettelForBox(box),
+		});
+	}
+
+	private async openZettelForBox(box: Box): Promise<void> {
+		// Get notes based on box type
+		let titles: Map<string, TFile>;
+
+		if (box.type === "folder" && box.folderPath) {
+			// For folder-based boxes, get all files in the folder
+			titles = await this.getNoteTitlesFromFolder(box.folderPath);
+		} else {
+			// For tag-based boxes, get files with the tag
+			titles = await this.getNoteTitlesByTag(box.zettelTag);
+		}
+
+		// Filter by prefix if box has one
+		if (box.zettelPrefix) {
+			const prefix = `${box.zettelPrefix}-`;
+			const filteredTitles = new Map<string, TFile>();
+
+			for (const [title, file] of titles.entries()) {
+				if (file.basename.startsWith(prefix)) {
+					filteredTitles.set(title, file);
+				}
+			}
+
+			titles = filteredTitles;
+		}
+
+		new ZettelSuggester(
+			this.plugin.app,
+			titles,
+			this.currentlySelectedText(),
+			(file: TFile) => {
+				this.plugin.app.workspace.getLeaf().openFile(file);
+			},
+		).open();
+	}
+
+	private registerBoxOpenParentZettelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-open-parent`,
+			name: `${box.name}: Open Parent Zettel`,
+			icon: "arrow-up",
+			callback: () => this.openParentZettelForBox(box),
+		});
+	}
+
+	private async openParentZettelForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
+		const upLink = cache?.frontmatter?.up;
+
+		if (!upLink) {
+			new Notice("No parent link found in frontmatter (up:).");
+			return;
+		}
+
+		const linkText = upLink.replace(/^\[\[|\]\]$/g, "");
+		const parentFile = this.plugin.app.metadataCache.getFirstLinkpathDest(
+			linkText,
+			activeFile.path,
+		);
+
+		if (parentFile) {
+			await this.plugin.app.workspace.getLeaf().openFile(parentFile);
+		} else {
+			new Notice(`Parent zettel not found: ${linkText}`);
+		}
+	}
+
+	private registerBoxOpenChildZettelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-open-child`,
+			name: `${box.name}: Open Child Zettel`,
+			icon: "arrow-down",
+			callback: () => this.openChildZettelForBox(box),
+		});
+	}
+
+	private async openChildZettelForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Current file is not a zettel");
+			return;
+		}
+
+		const children = await this.findChildZettels(currentId);
+		if (children.length === 0) {
+			new Notice("No child zettels found");
+			return;
+		}
+
+		if (children.length === 1) {
+			await this.plugin.app.workspace.getLeaf().openFile(children[0]);
+		} else {
+			const titles = new Map(
+				children.map((file) => [file.basename, file]),
+			);
+			new ZettelSuggester(this.plugin.app, titles, "", (file: TFile) => {
+				this.plugin.app.workspace.getLeaf().openFile(file);
+			}).open();
+		}
+	}
+
+	private registerBoxOpenSiblingZettelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-open-sibling`,
+			name: `${box.name}: Open Sibling Zettel`,
+			icon: "arrow-right",
+			callback: () => this.openSiblingZettelForBox(box),
+		});
+	}
+
+	private async openSiblingZettelForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Current file is not a zettel");
+			return;
+		}
+
+		const siblings = await this.findSiblingZettels(currentId);
+		if (siblings.length === 0) {
+			new Notice("No sibling zettels found");
+			return;
+		}
+
+		const titles = new Map(siblings.map((file) => [file.basename, file]));
+		new ZettelSuggester(this.plugin.app, titles, "", (file: TFile) => {
+			this.plugin.app.workspace.getLeaf().openFile(file);
+		}).open();
+	}
+
+	private registerBoxNavigatorCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-navigator`,
+			name: `${box.name}: Zettelkasten Navigator`,
+			icon: "compass",
+			callback: () => this.openNavigatorForBox(box),
+		});
+	}
+
+	private async openNavigatorForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file open");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Current file is not a zettel");
+			return;
+		}
+
+		const options = await this.buildNavigationOptions(currentId);
+
+		new NavigatorModal(
+			this.plugin.app,
+			activeFile.basename,
+			options,
+			(file: TFile) => {
+				this.plugin.app.workspace.getLeaf().openFile(file);
+			},
+		).open();
+	}
+
+	private registerBoxReorderSequenceCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-reorder-sequence`,
+			name: `${box.name}: Reorder Note Sequence`,
+			icon: "arrow-up-down",
+			callback: () => this.reorderSequenceForBox(box),
+		});
+	}
+
+	private async reorderSequenceForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Current file is not a zettel");
+			return;
+		}
+
+		const children = await this.findChildZettels(currentId);
+		if (children.length === 0) {
+			new Notice("No child zettels to reorder");
+			return;
+		}
+
+		new SequenceReorderModal(
+			this.plugin.app,
+			activeFile,
+			children,
+			this.plugin,
+		).open();
+	}
+
+	private registerBoxNextSequenceCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-next-sequence`,
+			name: `${box.name}: Go to Next Sequence`,
+			icon: "arrow-right",
+			callback: () => this.goToNextSequenceForBox(box),
+		});
+	}
+
+	private async goToNextSequenceForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Current file is not a zettel");
+			return;
+		}
+
+		const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
+		const upLink = cache?.frontmatter?.up;
+
+		if (!upLink) {
+			new Notice("No parent link found");
+			return;
+		}
+
+		const linkText = upLink.replace(/^\[\[|\]\]$/g, "");
+		const parentFile = this.plugin.app.metadataCache.getFirstLinkpathDest(
+			linkText,
+			activeFile.path,
+		);
+
+		if (!parentFile) {
+			new Notice("Parent file not found");
+			return;
+		}
+
+		const parentId = this.extractZettelId(parentFile.basename);
+		if (!parentId) {
+			new Notice("Parent is not a zettel");
+			return;
+		}
+
+		const siblings = await this.findChildZettels(parentId);
+		const currentIndex = siblings.findIndex(
+			(f) => f.path === activeFile.path,
+		);
+
+		if (currentIndex === -1) {
+			new Notice("Current file not found in parent's children");
+			return;
+		}
+
+		if (currentIndex < siblings.length - 1) {
+			await this.plugin.app.workspace
+				.getLeaf()
+				.openFile(siblings[currentIndex + 1]);
+		} else {
+			new Notice("Already at the last sibling");
+		}
+	}
+
+	private registerBoxPreviousSequenceCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-previous-sequence`,
+			name: `${box.name}: Go to Previous Sequence`,
+			icon: "arrow-left",
+			callback: () => this.goToPreviousSequenceForBox(box),
+		});
+	}
+
+	private async goToPreviousSequenceForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Current file is not a zettel");
+			return;
+		}
+
+		const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
+		const upLink = cache?.frontmatter?.up;
+
+		if (!upLink) {
+			new Notice("No parent link found");
+			return;
+		}
+
+		const linkText = upLink.replace(/^\[\[|\]\]$/g, "");
+		const parentFile = this.plugin.app.metadataCache.getFirstLinkpathDest(
+			linkText,
+			activeFile.path,
+		);
+
+		if (!parentFile) {
+			new Notice("Parent file not found");
+			return;
+		}
+
+		const parentId = this.extractZettelId(parentFile.basename);
+		if (!parentId) {
+			new Notice("Parent is not a zettel");
+			return;
+		}
+
+		const siblings = await this.findChildZettels(parentId);
+		const currentIndex = siblings.findIndex(
+			(f) => f.path === activeFile.path,
+		);
+
+		if (currentIndex === -1) {
+			new Notice("Current file not found in parent's children");
+			return;
+		}
+
+		if (currentIndex > 0) {
+			await this.plugin.app.workspace
+				.getLeaf()
+				.openFile(siblings[currentIndex - 1]);
+		} else {
+			new Notice("Already at the first sibling");
+		}
+	}
+
+	private registerBoxNextChildCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-next-child`,
+			name: `${box.name}: Go to Next Child`,
+			icon: "arrow-down-right",
+			callback: () => this.goToNextChildForBox(box),
+		});
+	}
+
+	private async goToNextChildForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Current file is not a zettel");
+			return;
+		}
+
+		const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
+		const upLink = cache?.frontmatter?.up;
+
+		if (upLink) {
+			const linkText = upLink.replace(/^\[\[|\]\]$/g, "");
+			const parentFile =
+				this.plugin.app.metadataCache.getFirstLinkpathDest(
+					linkText,
+					activeFile.path,
+				);
+
+			if (parentFile) {
+				const parentId = this.extractZettelId(parentFile.basename);
+				if (parentId) {
+					const siblings = await this.findChildZettels(parentId);
+					const currentIndex = siblings.findIndex(
+						(f) => f.path === activeFile.path,
+					);
+
+					if (
+						currentIndex !== -1 &&
+						currentIndex < siblings.length - 1
+					) {
+						await this.plugin.app.workspace
+							.getLeaf()
+							.openFile(siblings[currentIndex + 1]);
+						return;
+					}
+				}
+			}
+		}
+
+		const children = await this.findChildZettels(currentId);
+		if (children.length === 0) {
+			new Notice("No child zettels found");
+			return;
+		}
+
+		await this.plugin.app.workspace.getLeaf().openFile(children[0]);
+	}
+
+	private registerBoxPreviousChildCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-previous-child`,
+			name: `${box.name}: Go to Previous Child`,
+			icon: "arrow-up-left",
+			callback: () => this.goToPreviousChildForBox(box),
+		});
+	}
+
+	private async goToPreviousChildForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Current file is not a zettel");
+			return;
+		}
+
+		const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
+		const upLink = cache?.frontmatter?.up;
+
+		if (!upLink) {
+			new Notice("No parent link found");
+			return;
+		}
+
+		const linkText = upLink.replace(/^\[\[|\]\]$/g, "");
+		const parentFile = this.plugin.app.metadataCache.getFirstLinkpathDest(
+			linkText,
+			activeFile.path,
+		);
+
+		if (!parentFile) {
+			new Notice("Parent file not found");
+			return;
+		}
+
+		const parentId = this.extractZettelId(parentFile.basename);
+		if (!parentId) {
+			new Notice("Parent is not a zettel");
+			return;
+		}
+
+		const siblings = await this.findChildZettels(parentId);
+		const currentIndex = siblings.findIndex(
+			(f) => f.path === activeFile.path,
+		);
+
+		if (currentIndex === -1) {
+			new Notice("Current file not found in parent's children");
+			return;
+		}
+
+		if (currentIndex > 0) {
+			await this.plugin.app.workspace
+				.getLeaf()
+				.openFile(siblings[currentIndex - 1]);
+		} else {
+			new Notice("Already at the first sibling");
+		}
+	}
+
+	private registerBoxGoUpLevelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-go-up-level`,
+			name: `${box.name}: Go Up a Level`,
+			icon: "chevron-up",
+			callback: () => this.goUpLevelForBox(box),
+		});
+	}
+
+	private async goUpLevelForBox(box: Box): Promise<void> {
+		await this.openParentZettelForBox(box);
+	}
+
+	private registerBoxGoDownLevelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-go-down-level`,
+			name: `${box.name}: Go Down a Level`,
+			icon: "chevron-down",
+			callback: () => this.goDownLevelForBox(box),
+		});
+	}
+
+	private async goDownLevelForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Current file is not a zettel");
+			return;
+		}
+
+		const children = await this.findChildZettels(currentId);
+		if (children.length === 0) {
+			new Notice("No child zettels found");
+			return;
+		}
+
+		await this.plugin.app.workspace.getLeaf().openFile(children[0]);
+	}
+
+	private registerBoxAssignParentCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-assign-parent`,
+			name: `${box.name}: Assign Parent`,
+			icon: "link",
+			callback: () => this.assignParentForBox(box),
+		});
+	}
+
+	private async assignParentForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const titles = await this.getNoteTitlesByTag(box.zettelTag);
+		new ZettelSuggester(
+			this.plugin.app,
+			titles,
+			"",
+			async (parentFile: TFile) => {
+				await this.plugin.app.fileManager.processFrontMatter(
+					activeFile,
+					(frontmatter) => {
+						frontmatter.up = `[[${parentFile.basename}]]`;
+					},
+				);
+				new Notice(`Assigned parent: ${parentFile.basename}`);
+			},
+		).open();
+	}
+
+	private registerBoxAssignChildCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-assign-child`,
+			name: `${box.name}: Assign Child`,
+			icon: "link",
+			callback: () => this.assignChildForBox(box),
+		});
+	}
+
+	private async assignChildForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const titles = await this.getNoteTitlesByTag(box.zettelTag);
+		new ZettelSuggester(
+			this.plugin.app,
+			titles,
+			"",
+			async (childFile: TFile) => {
+				await this.plugin.app.fileManager.processFrontMatter(
+					childFile,
+					(frontmatter) => {
+						frontmatter.up = `[[${activeFile.basename}]]`;
+					},
+				);
+				new Notice(`Assigned child: ${childFile.basename}`);
+			},
+		).open();
+	}
+
+	private registerBoxQuickZettelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-quick-zettel`,
+			name: `${box.name}: Quick Zettel`,
+			icon: "zap",
+			callback: () => this.quickZettelForBox(box),
+		});
+	}
+
+	private async quickZettelForBox(box: Box): Promise<void> {
+		const folder =
+			box.type === "folder" && box.folderPath
+				? (this.plugin.app.vault.getAbstractFileByPath(
+						box.folderPath,
+					) as TFolder)
+				: this.plugin.app.vault.getRoot();
+
+		const zettelId = this.generateZettelId(box.zettelIdFormat);
+		const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
+		const filename = `${prefix}${zettelId}`;
+		const path = `${folder.path}/${filename}.md`;
+
+		const creator = new FileCreator(
+			this.plugin.app,
+			path,
+			"", // Empty title for quick zettel
+			() => {
+				new Notice(`Created quick zettel: ${filename}`);
+			},
+			box.noteTemplatePath,
+		);
+		try {
+			await creator.create();
+		} catch (error) {
+			new Notice(`Error creating quick zettel: ${error.message}`);
+		}
+	}
+
+	private registerBoxCreateNoteCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-create-note`,
+			name: `${box.name}: Create New Note`,
+			icon: "file-plus",
+			callback: () => this.createNoteForBox(box),
+		});
+	}
+
+	private async createNoteForBox(box: Box): Promise<void> {
+		const titles = await this.getNoteTitlesByTag(box.zettelTag);
+		new CreateNoteWithSuggestModal(
+			this.plugin.app,
+			titles,
+			async (title: string) => {
+				const folder =
+					box.type === "folder" && box.folderPath
+						? (this.plugin.app.vault.getAbstractFileByPath(
+								box.folderPath,
+							) as TFolder)
+						: this.plugin.app.vault.getRoot();
+
+				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
+				const filename = box.addTitleToFilename
+					? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
+					: `${prefix}${zettelId}`;
+				const path = `${folder.path}/${filename}.md`;
+
+				const creator = new FileCreator(
+					this.plugin.app,
+					path,
+					title,
+					() => {
+						new Notice(`Created note: ${title}`);
+					},
+					box.noteTemplatePath,
+				);
+				try {
+					await creator.create();
+				} catch (error) {
+					new Notice(`Error creating note: ${error.message}`);
+				}
+			},
+			true,
+		).open();
+	}
+
+	private registerBoxCreateChildZettelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-create-child`,
+			name: `${box.name}: Create Child Zettel`,
+			icon: "file-plus",
+			callback: () => this.createChildZettelForBox(box),
+		});
+	}
+
+	private async createChildZettelForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const titles = await this.getNoteTitlesByTag(box.zettelTag);
+		new CreateNoteWithSuggestModal(
+			this.plugin.app,
+			titles,
+			async (title: string) => {
+				const folder =
+					box.type === "folder" && box.folderPath
+						? (this.plugin.app.vault.getAbstractFileByPath(
+								box.folderPath,
+							) as TFolder)
+						: this.plugin.app.vault.getRoot();
+
+				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
+				const filename = box.addTitleToFilename
+					? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
+					: `${prefix}${zettelId}`;
+				const path = `${folder.path}/${filename}.md`;
+
+				const creator = new FileCreator(
+					this.plugin.app,
+					path,
+					title,
+					() => {
+						new Notice(`Created child zettel: ${title}`);
+					},
+					box.noteTemplatePath,
+					`[[${activeFile.basename}]]`,
+				);
+				try {
+					await creator.create();
+				} catch (error) {
+					new Notice(`Error creating child zettel: ${error.message}`);
+				}
+			},
+			true,
+		).open();
+	}
+
+	private registerBoxCreateSiblingZettelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-create-sibling`,
+			name: `${box.name}: Create Sibling Zettel`,
+			icon: "file-plus",
+			callback: () => this.createSiblingZettelForBox(box),
+		});
+	}
+
+	private async createSiblingZettelForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
+		const upLink = cache?.frontmatter?.up;
+
+		if (!upLink) {
+			new Notice("Current file has no parent (up: property)");
+			return;
+		}
+
+		const titles = await this.getNoteTitlesByTag(box.zettelTag);
+		new CreateNoteWithSuggestModal(
+			this.plugin.app,
+			titles,
+			async (title: string) => {
+				const folder =
+					box.type === "folder" && box.folderPath
+						? (this.plugin.app.vault.getAbstractFileByPath(
+								box.folderPath,
+							) as TFolder)
+						: this.plugin.app.vault.getRoot();
+
+				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
+				const filename = box.addTitleToFilename
+					? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
+					: `${prefix}${zettelId}`;
+				const path = `${folder.path}/${filename}.md`;
+
+				const creator = new FileCreator(
+					this.plugin.app,
+					path,
+					title,
+					() => {
+						new Notice(`Created sibling zettel: ${title}`);
+					},
+					box.noteTemplatePath,
+					upLink,
+				);
+				try {
+					await creator.create();
+				} catch (error) {
+					new Notice(
+						`Error creating sibling zettel: ${error.message}`,
+					);
+				}
+			},
+			true,
+		).open();
+	}
+
+	private registerBoxIndentZettelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-indent`,
+			name: `${box.name}: Indent Zettel`,
+			icon: "indent",
+			callback: () => this.indentZettelForBox(box),
+		});
+	}
+
+	private async indentZettelForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const titles = await this.getNoteTitlesByTag(box.zettelTag);
+		new ZettelSuggester(
+			this.plugin.app,
+			titles,
+			"",
+			async (newParentFile: TFile) => {
+				await this.plugin.app.fileManager.processFrontMatter(
+					activeFile,
+					(frontmatter) => {
+						frontmatter.up = `[[${newParentFile.basename}]]`;
+					},
+				);
+				new Notice(`Indented under: ${newParentFile.basename}`);
+			},
+		).open();
+	}
+
+	private registerBoxOutdentZettelCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-outdent`,
+			name: `${box.name}: Outdent Zettel`,
+			icon: "outdent",
+			callback: () => this.outdentZettelForBox(box),
+		});
+	}
+
+	private async outdentZettelForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
+		const upLink = cache?.frontmatter?.up;
+
+		if (!upLink) {
+			new Notice("No parent to outdent from");
+			return;
+		}
+
+		const linkText = upLink.replace(/^\[\[|\]\]$/g, "");
+		const parentFile = this.plugin.app.metadataCache.getFirstLinkpathDest(
+			linkText,
+			activeFile.path,
+		);
+
+		if (!parentFile) {
+			new Notice("Parent file not found");
+			return;
+		}
+
+		const parentCache =
+			this.plugin.app.metadataCache.getFileCache(parentFile);
+		const grandparentLink = parentCache?.frontmatter?.up;
+
+		await this.plugin.app.fileManager.processFrontMatter(
+			activeFile,
+			(frontmatter) => {
+				if (grandparentLink) {
+					frontmatter.up = grandparentLink;
+				} else {
+					delete frontmatter.up;
+				}
+			},
+		);
+
+		new Notice(
+			grandparentLink ? "Outdented to grandparent" : "Outdented to root",
+		);
+	}
+
+	private registerBoxOpenFleetingCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-open-fleeting`,
+			name: `${box.name}: Open Fleeting Note`,
+			icon: "folder-open",
+			callback: () => this.openFleetingForBox(box),
+		});
+	}
+
+	private async openFleetingForBox(box: Box): Promise<void> {
+		const titles = await this.getNoteTitlesByTag(box.fleetingNotesTag);
+		new ZettelSuggester(
+			this.plugin.app,
+			titles,
+			this.currentlySelectedText(),
+			(file: TFile) => {
+				this.plugin.app.workspace.getLeaf().openFile(file);
+			},
+		).open();
+	}
+
+	private registerBoxCreateFleetingNoteCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-create-fleeting`,
+			name: `${box.name}: Create Fleeting Note`,
+			icon: "file-plus",
+			callback: () => this.createFleetingNoteForBox(box),
+		});
+	}
+
+	private async createFleetingNoteForBox(box: Box): Promise<void> {
+		const folder =
+			box.fleetingNotesUseSeparateLocation && box.fleetingNotesLocation
+				? (this.plugin.app.vault.getAbstractFileByPath(
+						box.fleetingNotesLocation,
+					) as TFolder)
+				: box.type === "folder" && box.folderPath
+					? (this.plugin.app.vault.getAbstractFileByPath(
+							box.folderPath,
+						) as TFolder)
+					: this.plugin.app.vault.getRoot();
+
+		const title = "";
+		const zettelId = this.generateZettelId(box.zettelIdFormat);
+		const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
+
+		let filename: string;
+		if (box.fleetingNotesUseZettelId) {
+			filename = `${prefix}${zettelId}`;
+		} else {
+			filename =
+				box.fleetingNotesFilenameFormat.replace("{{title}}", title) ||
+				`${prefix}${zettelId}`;
+		}
+
+		const path = `${folder.path}/${filename}.md`;
+
+		const creator = new FileCreator(
+			this.plugin.app,
+			path,
+			title,
+			() => {
+				new Notice("Created fleeting note");
+			},
+			box.fleetingNotesTemplatePath,
+		);
+		try {
+			await creator.create();
+		} catch (error) {
+			new Notice(`Error creating fleeting note: ${error.message}`);
+		}
+	}
+
+	private registerBoxOpenMocCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-open-moc`,
+			name: `${box.name}: Open MOC`,
+			icon: "folder-open",
+			callback: () => this.openMocForBox(box),
+		});
+	}
+
+	private async openMocForBox(box: Box): Promise<void> {
+		const titles = await this.getNoteTitlesByTag(box.mocsTag);
+		new ZettelSuggester(
+			this.plugin.app,
+			titles,
+			this.currentlySelectedText(),
+			(file: TFile) => {
+				this.plugin.app.workspace.getLeaf().openFile(file);
+			},
+		).open();
+	}
+
+	private registerBoxCreateMocCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-create-moc`,
+			name: `${box.name}: Create MOC`,
+			icon: "file-plus",
+			callback: () => this.createMocForBox(box),
+		});
+	}
+
+	private async createMocForBox(box: Box): Promise<void> {
+		const titles = await this.getNoteTitlesByTag(box.mocsTag);
+		new CreateNoteWithSuggestModal(
+			this.plugin.app,
+			titles,
+			async (title: string) => {
+				const folder =
+					box.mocsUseSeparateLocation && box.mocsLocation
+						? (this.plugin.app.vault.getAbstractFileByPath(
+								box.mocsLocation,
+							) as TFolder)
+						: box.type === "folder" && box.folderPath
+							? (this.plugin.app.vault.getAbstractFileByPath(
+									box.folderPath,
+								) as TFolder)
+							: this.plugin.app.vault.getRoot();
+
+				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
+
+				let filename: string;
+				if (box.mocsUseZettelId) {
+					filename = `${prefix}${zettelId}${box.zettelIdSeparator}${title}`;
+				} else {
+					filename =
+						box.mocsFilenameFormat.replace("{{title}}", title) ||
+						`${prefix}${title} MOC`;
+				}
+
+				const path = `${folder.path}/${filename}.md`;
+
+				const creator = new FileCreator(
+					this.plugin.app,
+					path,
+					title,
+					() => {
+						new Notice(`Created MOC: ${title}`);
+					},
+					box.mocsTemplatePath,
+				);
+				try {
+					await creator.create();
+				} catch (error) {
+					new Notice(`Error creating MOC: ${error.message}`);
+				}
+			},
+			true,
+		).open();
+	}
+
+	private registerBoxOpenIndexCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-open-index`,
+			name: `${box.name}: Open Index`,
+			icon: "folder-open",
+			callback: () => this.openIndexForBox(box),
+		});
+	}
+
+	private async openIndexForBox(box: Box): Promise<void> {
+		const titles = await this.getNoteTitlesByTag(box.indexesTag);
+		new ZettelSuggester(
+			this.plugin.app,
+			titles,
+			this.currentlySelectedText(),
+			(file: TFile) => {
+				this.plugin.app.workspace.getLeaf().openFile(file);
+			},
+		).open();
+	}
+
+	private registerBoxCreateIndexCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-create-index`,
+			name: `${box.name}: Create Index`,
+			icon: "file-plus",
+			callback: () => this.createIndexForBox(box),
+		});
+	}
+
+	private async createIndexForBox(box: Box): Promise<void> {
+		const titles = await this.getNoteTitlesByTag(box.indexesTag);
+		new CreateNoteWithSuggestModal(
+			this.plugin.app,
+			titles,
+			async (title: string) => {
+				const folder =
+					box.indexesUseSeparateLocation && box.indexesLocation
+						? (this.plugin.app.vault.getAbstractFileByPath(
+								box.indexesLocation,
+							) as TFolder)
+						: box.type === "folder" && box.folderPath
+							? (this.plugin.app.vault.getAbstractFileByPath(
+									box.folderPath,
+								) as TFolder)
+							: this.plugin.app.vault.getRoot();
+
+				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
+
+				let filename: string;
+				if (box.indexesUseZettelId) {
+					filename = `${prefix}${zettelId}${box.zettelIdSeparator}${title}`;
+				} else {
+					filename =
+						box.indexesFilenameFormat.replace("{{title}}", title) ||
+						`${prefix}${title} Index`;
+				}
+
+				const path = `${folder.path}/${filename}.md`;
+
+				const creator = new FileCreator(
+					this.plugin.app,
+					path,
+					title,
+					() => {
+						new Notice(`Created index: ${title}`);
+					},
+					box.indexesTemplatePath,
+				);
+				try {
+					await creator.create();
+				} catch (error) {
+					new Notice(`Error creating index: ${error.message}`);
+				}
+			},
+			true,
+		).open();
 	}
 }
