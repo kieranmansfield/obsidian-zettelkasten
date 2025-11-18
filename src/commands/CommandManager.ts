@@ -484,6 +484,21 @@ export class CommandManager {
 										return;
 									}
 
+									// Extract current ID from active file
+									const currentId = this.extractZettelId(
+										activeFile.basename,
+									);
+									if (!currentId) {
+										new Notice(
+											"Current file doesn't have a valid zettel ID.",
+										);
+										return;
+									}
+
+									// Get all descendants of the current file
+									const descendants =
+										this.getAllDescendants(currentId);
+
 									// Get the folder where zettels are stored
 									const folder = this.getNoteTypeFolder(
 										this.plugin.settings
@@ -491,7 +506,7 @@ export class CommandManager {
 										this.plugin.settings.zettelsLocation,
 									);
 
-									// Generate new child ID based on parent
+									// Generate new child ID based on parent for the active file
 									const newChildId =
 										await this.generateChildZettelId(
 											parentId,
@@ -499,7 +514,7 @@ export class CommandManager {
 											activeFile,
 										);
 
-									// Rename the file with the new child ID
+									// Rename the active file with the new child ID
 									const newPath = `${folder.path}/${newChildId}.md`;
 									await this.plugin.app.fileManager.renameFile(
 										activeFile,
@@ -512,8 +527,30 @@ export class CommandManager {
 										parentFile,
 									);
 
+									// Now rename all descendants to maintain the hierarchy
+									for (const descendant of descendants) {
+										const descendantId =
+											this.extractZettelId(
+												descendant.basename,
+											);
+										if (!descendantId) continue;
+
+										// Replace the old parent ID with the new one in the descendant's ID
+										const newDescendantId =
+											descendantId.replace(
+												currentId,
+												newChildId,
+											);
+
+										const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+										await this.plugin.app.fileManager.renameFile(
+											descendant,
+											descendantNewPath,
+										);
+									}
+
 									new Notice(
-										`Assigned parent and renamed to: ${newChildId}`,
+										`Assigned parent and renamed ${descendants.length + 1} file(s) to: ${newChildId}`,
 									);
 
 									// Keep the file open after rename
@@ -587,6 +624,21 @@ export class CommandManager {
 							this.currentlySelectedText(),
 							async (childFile: TFile) => {
 								try {
+									// Extract current ID from the child file before renaming
+									const currentChildId = this.extractZettelId(
+										childFile.basename,
+									);
+									if (!currentChildId) {
+										new Notice(
+											"Selected child doesn't have a valid zettel ID.",
+										);
+										return;
+									}
+
+									// Get all descendants of the child file
+									const descendants =
+										this.getAllDescendants(currentChildId);
+
 									// Get the folder where zettels are stored
 									const folder = this.getNoteTypeFolder(
 										this.plugin.settings
@@ -615,8 +667,30 @@ export class CommandManager {
 										activeFile,
 									);
 
+									// Now rename all descendants to maintain the hierarchy
+									for (const descendant of descendants) {
+										const descendantId =
+											this.extractZettelId(
+												descendant.basename,
+											);
+										if (!descendantId) continue;
+
+										// Replace the old child ID with the new one in the descendant's ID
+										const newDescendantId =
+											descendantId.replace(
+												currentChildId,
+												newChildId,
+											);
+
+										const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+										await this.plugin.app.fileManager.renameFile(
+											descendant,
+											descendantNewPath,
+										);
+									}
+
 									new Notice(
-										`Assigned child and renamed to: ${newChildId}`,
+										`Assigned child and renamed ${descendants.length + 1} file(s) to: ${newChildId}`,
 									);
 								} catch (error) {
 									new Notice(
@@ -1265,6 +1339,33 @@ export class CommandManager {
 	 */
 	private escapeRegex(str: string): string {
 		return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	}
+
+	/**
+	 * Gets all descendant files of a given zettel ID (children, grandchildren, etc.)
+	 * Returns them in order from closest to furthest descendants
+	 */
+	private getAllDescendants(zettelId: string): TFile[] {
+		const files = this.plugin.app.vault.getMarkdownFiles();
+		const descendants: TFile[] = [];
+
+		// Find all files whose basename starts with the zettelId
+		for (const file of files) {
+			const fileId = this.extractZettelId(file.basename);
+			if (fileId && fileId !== zettelId && fileId.startsWith(zettelId)) {
+				descendants.push(file);
+			}
+		}
+
+		// Sort by ID length (shortest first = closest descendants)
+		// This ensures we rename children before grandchildren
+		descendants.sort((a, b) => {
+			const aId = this.extractZettelId(a.basename) || "";
+			const bId = this.extractZettelId(b.basename) || "";
+			return aId.length - bId.length;
+		});
+
+		return descendants;
 	}
 
 	/**
