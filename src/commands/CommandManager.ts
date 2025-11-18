@@ -4,6 +4,7 @@ import { ZettelSuggester } from "../ui/ZettelSuggester";
 import { CreateNoteWithSuggestModal } from "../ui/CreateNoteWithSuggestModal";
 import { NavigatorModal, NavigationOption } from "../ui/NavigatorModal";
 import { SequenceReorderModal } from "../ui/SequenceReorderModal";
+import { FolderSuggestModal } from "../ui/FolderSuggestModal";
 import type ZettelkastenPlugin from "../../main";
 
 // Manages all plugin commands
@@ -30,6 +31,9 @@ export class CommandManager {
 		this.registerGoDownLevelCommand();
 		this.registerAssignParentCommand();
 		this.registerAssignChildCommand();
+		this.registerMoveToRootCommand();
+		this.registerFixFilenamesCommand();
+		this.registerBatchFixFilenamesCommand();
 		this.registerCreateNoteCommand();
 		this.registerCreateChildZettelCommand();
 		this.registerCreateSiblingZettelCommand();
@@ -484,6 +488,21 @@ export class CommandManager {
 										return;
 									}
 
+									// Extract current ID from active file
+									const currentId = this.extractZettelId(
+										activeFile.basename,
+									);
+									if (!currentId) {
+										new Notice(
+											"Current file doesn't have a valid zettel ID.",
+										);
+										return;
+									}
+
+									// Get all descendants of the current file
+									const descendants =
+										this.getAllDescendants(currentId);
+
 									// Get the folder where zettels are stored
 									const folder = this.getNoteTypeFolder(
 										this.plugin.settings
@@ -491,7 +510,7 @@ export class CommandManager {
 										this.plugin.settings.zettelsLocation,
 									);
 
-									// Generate new child ID based on parent
+									// Generate new child ID based on parent for the active file
 									const newChildId =
 										await this.generateChildZettelId(
 											parentId,
@@ -499,7 +518,7 @@ export class CommandManager {
 											activeFile,
 										);
 
-									// Rename the file with the new child ID
+									// Rename the active file with the new child ID
 									const newPath = `${folder.path}/${newChildId}.md`;
 									await this.plugin.app.fileManager.renameFile(
 										activeFile,
@@ -512,8 +531,30 @@ export class CommandManager {
 										parentFile,
 									);
 
+									// Now rename all descendants to maintain the hierarchy
+									for (const descendant of descendants) {
+										const descendantId =
+											this.extractZettelId(
+												descendant.basename,
+											);
+										if (!descendantId) continue;
+
+										// Transform the descendant ID preserving alternating letter/number pattern
+										const newDescendantId =
+											this.transformDescendantId(
+												descendantId,
+												currentId,
+												newChildId,
+											);
+
+										const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+										await this.plugin.app.fileManager.renameFile(
+											descendant,
+											descendantNewPath,
+										);
+									}
 									new Notice(
-										`Assigned parent and renamed to: ${newChildId}`,
+										`Assigned parent and renamed ${descendants.length + 1} file(s) to: ${newChildId}`,
 									);
 
 									// Keep the file open after rename
@@ -587,6 +628,21 @@ export class CommandManager {
 							this.currentlySelectedText(),
 							async (childFile: TFile) => {
 								try {
+									// Extract current ID from the child file before renaming
+									const currentChildId = this.extractZettelId(
+										childFile.basename,
+									);
+									if (!currentChildId) {
+										new Notice(
+											"Selected child doesn't have a valid zettel ID.",
+										);
+										return;
+									}
+
+									// Get all descendants of the child file
+									const descendants =
+										this.getAllDescendants(currentChildId);
+
 									// Get the folder where zettels are stored
 									const folder = this.getNoteTypeFolder(
 										this.plugin.settings
@@ -615,8 +671,31 @@ export class CommandManager {
 										activeFile,
 									);
 
+									// Now rename all descendants to maintain the hierarchy
+									for (const descendant of descendants) {
+										const descendantId =
+											this.extractZettelId(
+												descendant.basename,
+											);
+										if (!descendantId) continue;
+
+										// Transform the descendant ID preserving alternating letter/number pattern
+										const newDescendantId =
+											this.transformDescendantId(
+												descendantId,
+												currentChildId,
+												newChildId,
+											);
+
+										const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+										await this.plugin.app.fileManager.renameFile(
+											descendant,
+											descendantNewPath,
+										);
+									}
+
 									new Notice(
-										`Assigned child and renamed to: ${newChildId}`,
+										`Assigned child and renamed ${descendants.length + 1} file(s) to: ${newChildId}`,
 									);
 								} catch (error) {
 									new Notice(
@@ -631,6 +710,428 @@ export class CommandManager {
 				return true;
 			},
 		});
+	}
+
+	/**
+	 * Registers the "Move to Root" command
+	 * Moves a zettel and its descendants to root level using the file's creation date
+	 */
+	private registerMoveToRootCommand(): void {
+		this.plugin.addCommand({
+			id: "move-to-root",
+			name: "Move to Root",
+			icon: "arrow-up-to-line",
+			checkCallback: (checking: boolean) => {
+				const activeFile = this.plugin.app.workspace.getActiveFile();
+				if (!activeFile) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				(async () => {
+					try {
+						// Extract current ID from active file
+						const currentId = this.extractZettelId(
+							activeFile.basename,
+						);
+						if (!currentId) {
+							new Notice(
+								"Current file doesn't have a valid zettel ID.",
+							);
+							return;
+						}
+
+						// Get all descendants of the current file
+						const descendants = this.getAllDescendants(currentId);
+
+						// Get the folder where zettels are stored
+						const folder = this.getNoteTypeFolder(
+							this.plugin.settings.zettelsUseSeparateLocation,
+							this.plugin.settings.zettelsLocation,
+						);
+
+						// Generate new root ID based on file's creation date
+						const creationTime = activeFile.stat.ctime;
+						const creationDate = new Date(creationTime);
+						const newRootId = this.formatTimestamp(creationDate);
+
+						// Check if this ID already exists
+						const existingFile = this.plugin.app.vault
+							.getMarkdownFiles()
+							.find((f) => f.basename === newRootId);
+
+						if (
+							existingFile &&
+							existingFile.path !== activeFile.path
+						) {
+							new Notice(
+								`A file with ID ${newRootId} already exists. Cannot move to root.`,
+							);
+							return;
+						}
+
+						// Rename the active file with the new root ID
+						const newPath = `${folder.path}/${newRootId}.md`;
+						await this.plugin.app.fileManager.renameFile(
+							activeFile,
+							newPath,
+						);
+
+						// Remove parent link from file (move to root)
+						await this.removeParentLinkFromFile(activeFile);
+
+						// Now rename all descendants to maintain the hierarchy
+						for (const descendant of descendants) {
+							const descendantId = this.extractZettelId(
+								descendant.basename,
+							);
+							if (!descendantId) continue;
+
+							// Transform the descendant ID preserving alternating letter/number pattern
+							const newDescendantId = this.transformDescendantId(
+								descendantId,
+								currentId,
+								newRootId,
+							);
+
+							const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+							await this.plugin.app.fileManager.renameFile(
+								descendant,
+								descendantNewPath,
+							);
+						}
+
+						new Notice(
+							`Moved to root and renamed ${descendants.length + 1} file(s) to: ${newRootId}`,
+						);
+
+						// Keep the file open after rename
+						await this.plugin.app.workspace
+							.getLeaf()
+							.openFile(activeFile);
+					} catch (error) {
+						new Notice(`Error moving to root: ${error.message}`);
+					}
+				})();
+
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Fix Filenames" command
+	 * Normalizes active file, its siblings, and their descendants to have consistent timestamp length
+	 */
+	private registerFixFilenamesCommand(): void {
+		this.plugin.addCommand({
+			id: "fix-filenames",
+			name: "Fix Filenames (Normalize Length)",
+			icon: "file-check",
+			callback: async () => {
+				try {
+					const activeFile =
+						this.plugin.app.workspace.getActiveFile();
+					if (!activeFile) {
+						new Notice("No active file.");
+						return;
+					}
+
+					const currentId = this.extractZettelId(activeFile.basename);
+					if (!currentId) {
+						new Notice("Active file is not a zettel.");
+						return;
+					}
+
+					const allFiles = this.plugin.app.vault.getMarkdownFiles();
+					const zettels: TFile[] = [];
+
+					// Find all files with zettel IDs
+					for (const file of allFiles) {
+						const id = this.extractZettelId(file.basename);
+						if (id) {
+							zettels.push(file);
+						}
+					}
+
+					// Build parent-child relationships
+					const childrenMap = new Map<string, TFile[]>();
+
+					for (const file of zettels) {
+						const id = this.extractZettelId(file.basename)!;
+						const parentId = this.getParentZettelId(id);
+
+						if (parentId) {
+							if (!childrenMap.has(parentId)) {
+								childrenMap.set(parentId, []);
+							}
+							childrenMap.get(parentId)!.push(file);
+						}
+					}
+
+					// Find siblings (files with the same parent, including the active file)
+					const currentParentId = this.getParentZettelId(currentId);
+					let siblingsToProcess: TFile[] = [];
+
+					if (currentParentId) {
+						// Has a parent - get all siblings including self
+						siblingsToProcess =
+							childrenMap.get(currentParentId) || [];
+					} else {
+						// Is a root - only process itself
+						siblingsToProcess = [activeFile];
+					}
+
+					let fixedCount = 0;
+
+					// Process each sibling and its descendants
+					for (const siblingFile of siblingsToProcess) {
+						const count = await this.fixZettelFilenameRecursive(
+							siblingFile,
+							childrenMap,
+						);
+						fixedCount += count;
+					}
+
+					if (fixedCount > 0) {
+						new Notice(
+							`Fixed ${fixedCount} filename(s) to consistent length.`,
+						);
+					} else {
+						new Notice("All filenames are already correct.");
+					}
+				} catch (error) {
+					new Notice(`Error fixing filenames: ${error.message}`);
+				}
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Batch Fix Filenames by Folder" command
+	 * Normalizes all zettel filenames within a selected folder (including subfolders)
+	 */
+	private registerBatchFixFilenamesCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-fix-filenames",
+			name: "Batch Fix Filenames (Select Folder)",
+			icon: "folder-check",
+			callback: async () => {
+				new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+					try {
+						const allFiles =
+							this.plugin.app.vault.getMarkdownFiles();
+						const zettels: TFile[] = [];
+
+						// Find all files with zettel IDs in the selected folder and subfolders
+						for (const file of allFiles) {
+							// Check if file is within the selected folder
+							if (this.isFileInFolder(file, folder)) {
+								const id = this.extractZettelId(file.basename);
+								if (id) {
+									zettels.push(file);
+								}
+							}
+						}
+
+						if (zettels.length === 0) {
+							new Notice(`No zettels found in ${folder.path}.`);
+							return;
+						}
+
+						// Build parent-child relationships
+						const parentMap = new Map<string, string>();
+						const childrenMap = new Map<string, TFile[]>();
+
+						for (const file of zettels) {
+							const id = this.extractZettelId(file.basename)!;
+							const parentId = this.getParentZettelId(id);
+
+							if (parentId) {
+								parentMap.set(id, parentId);
+
+								if (!childrenMap.has(parentId)) {
+									childrenMap.set(parentId, []);
+								}
+								childrenMap.get(parentId)!.push(file);
+							}
+						}
+
+						// Find root zettels in folder (no parent or parent not in folder)
+						const rootZettels = zettels.filter((file) => {
+							const id = this.extractZettelId(file.basename)!;
+							const parentId = parentMap.get(id);
+
+							// Root if no parent, or parent is not in the zettels list
+							return (
+								!parentId ||
+								!zettels.some(
+									(f) =>
+										this.extractZettelId(f.basename) ===
+										parentId,
+								)
+							);
+						});
+
+						let fixedCount = 0;
+
+						// Process each root and its descendants
+						for (const rootFile of rootZettels) {
+							const count = await this.fixZettelFilenameRecursive(
+								rootFile,
+								childrenMap,
+							);
+							fixedCount += count;
+						}
+
+						const folderDisplay =
+							folder.path === "/" ? "root" : folder.path;
+						if (fixedCount > 0) {
+							new Notice(
+								`Fixed ${fixedCount} filename(s) in ${folderDisplay}.`,
+							);
+						} else {
+							new Notice(
+								`All filenames in ${folderDisplay} are already correct.`,
+							);
+						}
+					} catch (error) {
+						new Notice(`Error fixing filenames: ${error.message}`);
+					}
+				}).open();
+			},
+		});
+	}
+
+	/**
+	 * Helper method to check if a file is within a folder (including subfolders)
+	 */
+	private isFileInFolder(file: TFile, folder: TFolder): boolean {
+		// Root folder contains everything
+		if (folder.path === "/") {
+			return true;
+		}
+
+		// Check if file path starts with folder path
+		return file.path.startsWith(folder.path + "/");
+	}
+
+	/**
+	 * Recursively fixes a zettel and its descendants to have consistent timestamp length
+	 * Returns the number of files fixed
+	 */
+	private async fixZettelFilenameRecursive(
+		file: TFile,
+		childrenMap: Map<string, TFile[]>,
+		parentNormalizedId?: string,
+	): Promise<number> {
+		const currentId = this.extractZettelId(file.basename)!;
+		let normalizedId: string;
+
+		if (parentNormalizedId) {
+			// If we have a parent that was normalized, we need to rebuild this ID based on the normalized parent
+			const currentTimestamp = currentId.match(/^(\d+)/)?.[1] || "";
+			const currentHierarchy = currentId.substring(
+				currentTimestamp.length,
+			);
+
+			// Extract parent's normalized timestamp
+			const parentTimestamp =
+				parentNormalizedId.match(/^(\d+)/)?.[1] || "";
+
+			// Use the same normalized timestamp as parent, with this file's hierarchy
+			normalizedId = parentTimestamp + currentHierarchy;
+		} else {
+			// Root level - normalize independently
+			normalizedId = this.normalizeZettelId(currentId);
+		}
+
+		let count = 0;
+
+		// Check if this file needs fixing
+		if (currentId !== normalizedId) {
+			const folder = file.parent || this.plugin.app.vault.getRoot();
+			const newPath = `${folder.path}/${normalizedId}.md`;
+
+			// Check if target path already exists
+			const existing =
+				this.plugin.app.vault.getAbstractFileByPath(newPath);
+			if (existing && existing !== file) {
+				console.warn(
+					`Cannot fix ${file.basename}: ${normalizedId}.md already exists`,
+				);
+			} else {
+				await this.plugin.app.fileManager.renameFile(file, newPath);
+				count++;
+			}
+		}
+
+		// Process children with the normalized ID as their parent
+		const children = childrenMap.get(currentId) || [];
+		for (const child of children) {
+			const childCount = await this.fixZettelFilenameRecursive(
+				child,
+				childrenMap,
+				normalizedId,
+			);
+			count += childCount;
+		}
+
+		return count;
+	}
+
+	/**
+	 * Normalizes a zettel ID to have consistent timestamp length (17 digits)
+	 * Maintains the hierarchy suffix
+	 */
+	private normalizeZettelId(zettelId: string): string {
+		// Extract timestamp and hierarchy
+		const timestampMatch = zettelId.match(/^(\d+)/);
+		if (!timestampMatch) return zettelId;
+
+		const timestamp = timestampMatch[1];
+		const hierarchy = zettelId.substring(timestamp.length);
+
+		// Target: 17 digits (YYYYMMDDHHmmssSSS)
+		const targetLength = 17;
+
+		let normalizedTimestamp: string;
+
+		if (timestamp.length < targetLength) {
+			// Pad with current milliseconds if ending with 000, otherwise pad with zeros
+			normalizedTimestamp = timestamp.padEnd(targetLength, "0");
+
+			// If the padded timestamp ends with 000, replace with current milliseconds
+			if (normalizedTimestamp.endsWith("000")) {
+				const currentMs = new Date()
+					.getMilliseconds()
+					.toString()
+					.padStart(3, "0");
+				normalizedTimestamp =
+					normalizedTimestamp.substring(0, targetLength - 3) +
+					currentMs;
+			}
+		} else if (timestamp.length > targetLength) {
+			// Truncate to target length
+			normalizedTimestamp = timestamp.substring(0, targetLength);
+		} else {
+			// Already correct length - check if ends with 000
+			if (timestamp.endsWith("000")) {
+				const currentMs = new Date()
+					.getMilliseconds()
+					.toString()
+					.padStart(3, "0");
+				normalizedTimestamp =
+					timestamp.substring(0, targetLength - 3) + currentMs;
+			} else {
+				normalizedTimestamp = timestamp;
+			}
+		}
+
+		return normalizedTimestamp + hierarchy;
 	}
 
 	/**
@@ -1268,6 +1769,136 @@ export class CommandManager {
 	}
 
 	/**
+	 * Gets all descendants of a zettel (files whose IDs start with the given ID)
+	 */
+	private getAllDescendants(zettelId: string): TFile[] {
+		const allFiles = this.plugin.app.vault.getMarkdownFiles();
+		const descendants: TFile[] = [];
+
+		for (const file of allFiles) {
+			const fileId = this.extractZettelId(file.basename);
+			if (!fileId) continue;
+
+			// Check if this file's ID starts with the given zettel ID
+			// and is not the exact same file
+			if (fileId.startsWith(zettelId) && fileId !== zettelId) {
+				descendants.push(file);
+			}
+		}
+
+		// Sort by ID length (shortest first) to rename from closest descendants to furthest
+		descendants.sort((a, b) => {
+			const aId = this.extractZettelId(a.basename) || "";
+			const bId = this.extractZettelId(b.basename) || "";
+			return aId.length - bId.length;
+		});
+
+		return descendants;
+	}
+
+	/**
+	 * Transforms a descendant ID when its ancestor is moved to a new parent
+	 * Recalculates hierarchy to maintain alternating letter/number pattern
+	 *
+	 * Example:
+	 *   20241118123456789 → 20241118999999999a
+	 *   20241118123456789a → 20241118999999999a1
+	 *   20241118123456789a1 → 20241118999999999a1a
+	 */
+	private transformDescendantId(
+		descendantId: string,
+		oldAncestorId: string,
+		newAncestorId: string,
+	): string {
+		// Extract the timestamp part (first 13+ digits)
+		const timestampMatch = descendantId.match(/^(\d{13,})/);
+		if (!timestampMatch) return descendantId;
+
+		const timestamp = timestampMatch[1];
+
+		// Get the hierarchy parts
+		const descendantHierarchy = descendantId.substring(timestamp.length);
+		const oldAncestorHierarchy = oldAncestorId.substring(timestamp.length);
+		const newAncestorHierarchy = newAncestorId.substring(timestamp.length);
+
+		// The descendant's hierarchy should start with the old ancestor's hierarchy
+		if (!descendantHierarchy.startsWith(oldAncestorHierarchy)) {
+			return descendantId; // Something's wrong, return unchanged
+		}
+
+		// Get the relative hierarchy (what comes after the ancestor's hierarchy)
+		const relativeHierarchy = descendantHierarchy.substring(
+			oldAncestorHierarchy.length,
+		);
+
+		// Parse the relative hierarchy into segments (letters and numbers)
+		const segments = this.parseHierarchySegments(relativeHierarchy);
+
+		// Build new hierarchy by appending segments with correct alternation
+		let newHierarchy = newAncestorHierarchy;
+
+		for (const segment of segments) {
+			// Determine if next segment should be letter or number based on current hierarchy
+			const shouldUseLetter = this.shouldUseLetterForChild(
+				timestamp + newHierarchy,
+			);
+
+			if (shouldUseLetter) {
+				// Segment should be a letter
+				if (/^[a-z]$/.test(segment)) {
+					newHierarchy += segment;
+				} else {
+					// Segment is a number but we need a letter - convert
+					// For simplicity, map number to letter (1->a, 2->b, etc)
+					const num = parseInt(segment);
+					const letter = String.fromCharCode(96 + num); // 1->a, 2->b, etc
+					newHierarchy += letter;
+				}
+			} else {
+				// Segment should be a number
+				if (/^\d+$/.test(segment)) {
+					newHierarchy += segment;
+				} else {
+					// Segment is a letter but we need a number - convert
+					const num = segment.charCodeAt(0) - 96; // a->1, b->2, etc
+					newHierarchy += num;
+				}
+			}
+		}
+
+		return timestamp + newHierarchy;
+	}
+
+	/**
+	 * Parses hierarchy string into individual segments (letters and numbers)
+	 * Example: "a1b2" -> ["a", "1", "b", "2"]
+	 */
+	private parseHierarchySegments(hierarchy: string): string[] {
+		const segments: string[] = [];
+		let i = 0;
+
+		while (i < hierarchy.length) {
+			if (/[a-z]/.test(hierarchy[i])) {
+				// Single letter segment
+				segments.push(hierarchy[i]);
+				i++;
+			} else if (/\d/.test(hierarchy[i])) {
+				// Number segment (can be multiple digits)
+				let num = "";
+				while (i < hierarchy.length && /\d/.test(hierarchy[i])) {
+					num += hierarchy[i];
+					i++;
+				}
+				segments.push(num);
+			} else {
+				i++; // Skip unknown characters
+			}
+		}
+
+		return segments;
+	}
+
+	/**
 	 * Resolves a timestamp collision by trying creation date or generating new timestamp
 	 * Preserves year, month, and day from original timestamp when possible
 	 */
@@ -1378,6 +2009,9 @@ export class CommandManager {
 			return;
 		}
 
+		// Get all descendants of the current file before renaming
+		const descendants = this.getAllDescendants(currentId);
+
 		// Generate new child ID under previous sibling
 		const folder = file.parent || this.plugin.app.vault.getRoot();
 		let newId = await this.generateChildZettelId(
@@ -1415,7 +2049,26 @@ export class CommandManager {
 			},
 		);
 
-		new Notice(`Indented to ${newId}`);
+		// Now rename all descendants to maintain the hierarchy
+		for (const descendant of descendants) {
+			const descendantId = this.extractZettelId(descendant.basename);
+			if (!descendantId) continue;
+
+			// Transform the descendant ID preserving alternating letter/number pattern
+			const newDescendantId = this.transformDescendantId(
+				descendantId,
+				currentId,
+				newId,
+			);
+
+			const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+			await this.plugin.app.fileManager.renameFile(
+				descendant,
+				descendantNewPath,
+			);
+		}
+
+		new Notice(`Indented ${descendants.length + 1} file(s) to ${newId}`);
 	}
 
 	/**
@@ -1438,6 +2091,9 @@ export class CommandManager {
 
 		// Find the parent file to get grandparent link
 		const parentFile = await this.findZettelById(parentId);
+
+		// Get all descendants of the current file before renaming
+		const descendants = this.getAllDescendants(currentId);
 
 		// Generate new sibling ID at parent's level
 		const folder = file.parent || this.plugin.app.vault.getRoot();
@@ -1483,7 +2139,26 @@ export class CommandManager {
 			);
 		}
 
-		new Notice(`Outdented to ${newId}`);
+		// Now rename all descendants to maintain the hierarchy
+		for (const descendant of descendants) {
+			const descendantId = this.extractZettelId(descendant.basename);
+			if (!descendantId) continue;
+
+			// Transform the descendant ID preserving alternating letter/number pattern
+			const newDescendantId = this.transformDescendantId(
+				descendantId,
+				currentId,
+				newId,
+			);
+
+			const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+			await this.plugin.app.fileManager.renameFile(
+				descendant,
+				descendantNewPath,
+			);
+		}
+
+		new Notice(`Outdented ${descendants.length + 1} file(s) to ${newId}`);
 	}
 
 	/**
@@ -1869,6 +2544,22 @@ export class CommandManager {
 			);
 		} catch (error) {
 			console.error("Error adding parent link:", error);
+		}
+	}
+
+	/**
+	 * Removes the parent link from a file's frontmatter
+	 */
+	private async removeParentLinkFromFile(file: TFile): Promise<void> {
+		try {
+			await this.plugin.app.fileManager.processFrontMatter(
+				file,
+				(frontmatter) => {
+					delete frontmatter.up;
+				},
+			);
+		} catch (error) {
+			console.error("Error removing parent link:", error);
 		}
 	}
 
