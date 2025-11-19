@@ -319,6 +319,38 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		// Add Alpha label to the name
 		const nameEl = sequenceReorderSetting.nameEl;
 		nameEl.innerHTML = "Enable sequence reorder <strong>(Alpha)</strong>";
+
+		// Use Zettel Prefix Toggle
+		new Setting(containerEl)
+			.setName("Use zettel prefix")
+			.setDesc(
+				"Add a prefix to the beginning of zettel IDs (e.g., z20241119123456789)",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.useZettelPrefix)
+					.onChange(async (value) => {
+						this.plugin.settings.useZettelPrefix = value;
+						await this.plugin.saveSettings();
+						this.display(); // Refresh to show/hide prefix settings
+					}),
+			);
+
+		if (this.plugin.settings.useZettelPrefix) {
+			// Zettel Prefix
+			new Setting(containerEl)
+				.setName("Zettel prefix")
+				.setDesc("Prefix character(s) for zettel notes")
+				.addText((text) =>
+					text
+						.setPlaceholder("Z")
+						.setValue(this.plugin.settings.zettelPrefix)
+						.onChange(async (value) => {
+							this.plugin.settings.zettelPrefix = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 	}
 
 	private displayFleetingSettings(containerEl: HTMLElement): void {
@@ -467,6 +499,39 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						});
 				});
+
+			// Use Fleeting Notes Prefix Toggle
+			new Setting(containerEl)
+				.setName("Use fleeting notes prefix")
+				.setDesc(
+					"Add a prefix to the beginning of fleeting note IDs (e.g., f20241119123456789)",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.useFleetingNotesPrefix)
+						.onChange(async (value) => {
+							this.plugin.settings.useFleetingNotesPrefix = value;
+							await this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+
+			// Fleeting Notes Prefix (shown when prefix is enabled)
+			if (this.plugin.settings.useFleetingNotesPrefix) {
+				new Setting(containerEl)
+					.setName("Fleeting notes prefix")
+					.setDesc("Prefix character(s) for fleeting notes")
+					.addText((text) =>
+						text
+							.setPlaceholder("f")
+							.setValue(this.plugin.settings.fleetingNotesPrefix)
+							.onChange(async (value) => {
+								this.plugin.settings.fleetingNotesPrefix =
+									value;
+								await this.plugin.saveSettings();
+							}),
+					);
+			}
 		}
 	}
 
@@ -602,6 +667,38 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						});
 				});
+
+			// Use MOCs Prefix Toggle
+			new Setting(containerEl)
+				.setName("Use MOCs prefix")
+				.setDesc(
+					"Add a prefix to the beginning of MOC IDs (e.g., m20241119123456789)",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.useMocsPrefix)
+						.onChange(async (value) => {
+							this.plugin.settings.useMocsPrefix = value;
+							await this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+
+			// MOCs Prefix (shown when prefix is enabled)
+			if (this.plugin.settings.useMocsPrefix) {
+				new Setting(containerEl)
+					.setName("MOCs prefix")
+					.setDesc("Prefix character(s) for MOCs")
+					.addText((text) =>
+						text
+							.setPlaceholder("m")
+							.setValue(this.plugin.settings.mocsPrefix)
+							.onChange(async (value) => {
+								this.plugin.settings.mocsPrefix = value;
+								await this.plugin.saveSettings();
+							}),
+					);
+			}
 		}
 	}
 
@@ -742,6 +839,38 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						});
 				});
+
+			// Use Indexes Prefix Toggle
+			new Setting(containerEl)
+				.setName("Use indexes prefix")
+				.setDesc(
+					"Add a prefix to the beginning of index IDs (e.g., i20241119123456789)",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.useIndexesPrefix)
+						.onChange(async (value) => {
+							this.plugin.settings.useIndexesPrefix = value;
+							await this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+
+			// Indexes Prefix (shown when prefix is enabled)
+			if (this.plugin.settings.useIndexesPrefix) {
+				new Setting(containerEl)
+					.setName("Indexes prefix")
+					.setDesc("Prefix character(s) for indexes")
+					.addText((text) =>
+						text
+							.setPlaceholder("i")
+							.setValue(this.plugin.settings.indexesPrefix)
+							.onChange(async (value) => {
+								this.plugin.settings.indexesPrefix = value;
+								await this.plugin.saveSettings();
+							}),
+					);
+			}
 		}
 	}
 }

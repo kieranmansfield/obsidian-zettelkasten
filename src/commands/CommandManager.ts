@@ -1033,20 +1033,25 @@ export class CommandManager {
 
 		if (parentNormalizedId) {
 			// If we have a parent that was normalized, we need to rebuild this ID based on the normalized parent
-			const currentTimestamp = currentId.match(/^(\d+)/)?.[1] || "";
-			const currentHierarchy = currentId.substring(
+			const currentPrefix = this.getPrefix(currentId);
+			const currentIdWithoutPrefix = this.stripPrefix(currentId);
+			const currentTimestamp =
+				currentIdWithoutPrefix.match(/^(\d+)/)?.[1] || "";
+			const currentHierarchy = currentIdWithoutPrefix.substring(
 				currentTimestamp.length,
 			);
 
-			// Extract parent's normalized timestamp
+			// Extract parent's normalized timestamp and prefix
+			const parentPrefix = this.getPrefix(parentNormalizedId);
+			const parentIdWithoutPrefix = this.stripPrefix(parentNormalizedId);
 			const parentTimestamp =
-				parentNormalizedId.match(/^(\d+)/)?.[1] || "";
+				parentIdWithoutPrefix.match(/^(\d+)/)?.[1] || "";
 
-			// Use the same normalized timestamp as parent, with this file's hierarchy
-			normalizedId = parentTimestamp + currentHierarchy;
+			// Use the same normalized timestamp and prefix as parent, with this file's hierarchy
+			normalizedId = parentPrefix + parentTimestamp + currentHierarchy;
 		} else {
-			// Root level - normalize independently
-			normalizedId = this.normalizeZettelId(currentId);
+			// Root level - normalize independently and add/update prefix based on note type
+			normalizedId = this.normalizeZettelId(file, currentId);
 		}
 
 		let count = 0;
@@ -1085,15 +1090,24 @@ export class CommandManager {
 
 	/**
 	 * Normalizes a zettel ID to have consistent timestamp length (17 digits)
-	 * Maintains the hierarchy suffix
+	 * Maintains the hierarchy suffix and adds/updates prefix based on note type
 	 */
-	private normalizeZettelId(zettelId: string): string {
-		// Extract timestamp and hierarchy
-		const timestampMatch = zettelId.match(/^(\d+)/);
+	private normalizeZettelId(file: TFile, zettelId: string): string {
+		// Determine note type from file tags
+		const noteType = this.getNoteTypeFromFile(file);
+		const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType);
+		const desiredPrefix = shouldUsePrefix
+			? this.getPrefixForNoteType(noteType)
+			: "";
+
+		// Extract current prefix (if any) and strip it
+		const idWithoutPrefix = this.stripPrefix(zettelId);
+
+		const timestampMatch = idWithoutPrefix.match(/^(\d+)/);
 		if (!timestampMatch) return zettelId;
 
 		const timestamp = timestampMatch[1];
-		const hierarchy = zettelId.substring(timestamp.length);
+		const hierarchy = idWithoutPrefix.substring(timestamp.length);
 
 		// Target: 17 digits (YYYYMMDDHHmmssSSS)
 		const targetLength = 17;
@@ -1131,7 +1145,7 @@ export class CommandManager {
 			}
 		}
 
-		return normalizedTimestamp + hierarchy;
+		return desiredPrefix + normalizedTimestamp + hierarchy;
 	}
 
 	/**
@@ -1672,15 +1686,21 @@ export class CommandManager {
 	 * Looks for timestamp-based ID with optional hierarchy at the start of filename
 	 */
 	private extractZettelId(filename: string): string | null {
-		// Match timestamp pattern (13+ digits to handle various formats) with optional alternating letters/numbers
-		// Examples: 2025111321511, 20251114154532123, 20251114154532123a, 20251114154532123a1
-		const match = filename.match(/^(\d{13,}(?:[a-z]+|\d+)*)/);
-		return match ? match[1] : null;
+		// Match optional prefix followed by timestamp pattern (13+ digits) with optional alternating letters/numbers
+		// Examples: "20241118123456789", "Z20241118123456789a", "f20241118123456789a1"
+		const match = filename.match(/^([A-Za-z]*)(\d{13,}(?:[a-z]+|\d+)*)/);
+		if (match) {
+			// Return prefix + timestamp + hierarchy
+			return match[1] + match[2];
+		}
+		return null;
 	}
 
 	/**
 	 * Generates a child zettel ID based on parent ID
 	 * Alternates between letters and numbers: 123 -> 123a -> 123a1 -> 123a1a -> 123a1a1
+	 * Letters expand: a-z, then aa-zz, then aaa-zzz, etc.
+	 * Numbers continue incrementing: 1, 2, 3... 9, 10, 11, etc.
 	 * If moving an existing file and there's a collision, uses file's creation date or generates new ID
 	 */
 	private async generateChildZettelId(
@@ -1694,27 +1714,33 @@ export class CommandManager {
 		const shouldUseLetter = this.shouldUseLetterForChild(parentId);
 
 		if (shouldUseLetter) {
-			// Find all children with letters (e.g., 123a, 123b, 123c)
+			// Find all children with letters (e.g., 123a, 123b, 123z, 123aa, 123ab, etc.)
 			const childPattern = new RegExp(
-				`^${this.escapeRegex(parentId)}([a-z])(?![a-z0-9])`,
+				`^${this.escapeRegex(parentId)}([a-z]+)(?![a-z0-9])`,
 			);
-			let maxLetter = "";
+			let maxLetterSequence = "";
 
 			for (const file of files) {
 				const match = file.basename.match(childPattern);
 				if (match) {
-					const letter = match[1];
-					if (!maxLetter || letter > maxLetter) {
-						maxLetter = letter;
+					const letterSeq = match[1];
+					if (
+						!maxLetterSequence ||
+						this.compareLetterSequences(
+							letterSeq,
+							maxLetterSequence,
+						) > 0
+					) {
+						maxLetterSequence = letterSeq;
 					}
 				}
 			}
 
-			// Return next available letter (a if none exist, otherwise increment)
-			const nextLetter = maxLetter
-				? String.fromCharCode(maxLetter.charCodeAt(0) + 1)
+			// Return next available letter sequence
+			const nextLetterSequence = maxLetterSequence
+				? this.incrementLetterSequence(maxLetterSequence)
 				: "a";
-			return `${parentId}${nextLetter}`;
+			return `${parentId}${nextLetterSequence}`;
 		} else {
 			// Find all children with numbers (e.g., 123a1, 123a2, 123a3)
 			const childPattern = new RegExp(
@@ -1738,27 +1764,85 @@ export class CommandManager {
 	}
 
 	/**
+	 * Compares two letter sequences (e.g., "a" vs "z", "z" vs "aa", "az" vs "ba")
+	 * Returns: negative if seq1 < seq2, 0 if equal, positive if seq1 > seq2
+	 */
+	private compareLetterSequences(seq1: string, seq2: string): number {
+		// First compare by length - longer sequences come after shorter ones
+		if (seq1.length !== seq2.length) {
+			return seq1.length - seq2.length;
+		}
+
+		// Same length - compare alphabetically
+		return seq1.localeCompare(seq2);
+	}
+
+	/**
+	 * Increments a letter sequence: a->b, z->aa, az->ba, zz->aaa
+	 */
+	private incrementLetterSequence(seq: string): string {
+		const chars = seq.split("");
+		let carry = true;
+
+		// Start from the rightmost character
+		for (let i = chars.length - 1; i >= 0 && carry; i--) {
+			if (chars[i] === "z") {
+				chars[i] = "a";
+				// carry remains true
+			} else {
+				chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
+				carry = false;
+			}
+		}
+
+		// If we still have a carry, we need to add a new 'a' at the beginning
+		if (carry) {
+			chars.unshift("a");
+		}
+
+		return chars.join("");
+	}
+
+	/**
+	 * Converts a letter sequence to a number: a->1, b->2, z->26, aa->27, ab->28, etc.
+	 * This is like base-26 but starting from 1 instead of 0
+	 */
+	private letterSequenceToNumber(seq: string): number {
+		let result = 0;
+		const base = 26;
+
+		for (let i = 0; i < seq.length; i++) {
+			const charValue = seq.charCodeAt(i) - 96; // a->1, b->2, ... z->26
+			result = result * base + charValue;
+		}
+
+		return result;
+	}
+
+	/**
 	 * Determines if the next child should use a letter or number
-	 * Alternates based on hierarchy depth
+	 * Root children (first level) always use letters
+	 * After that, alternates: letters -> numbers -> letters -> numbers
 	 */
 	private shouldUseLetterForChild(parentId: string): boolean {
+		// Strip prefix to work with timestamp and hierarchy only
+		const idWithoutPrefix = this.stripPrefix(parentId);
+
 		// Remove the timestamp portion (first 13+ digits)
-		const hierarchyPart = parentId.replace(/^\d{13,}/, "");
+		const hierarchyPart = idWithoutPrefix.replace(/^\d{13,}/, "");
 
 		if (!hierarchyPart) {
-			// No hierarchy yet, first level should use letters
+			// No hierarchy yet, first level (direct children of root) should use letters
 			return true;
 		}
 
-		// Count the depth by counting letters and numbers
-		const letterMatches = hierarchyPart.match(/[a-z]/g);
-		const numberMatches = hierarchyPart.match(/\d+/g);
+		// Parse hierarchy into segments to count depth
+		const segments = this.parseHierarchySegments(hierarchyPart);
 
-		const letterCount = letterMatches ? letterMatches.length : 0;
-		const numberCount = numberMatches ? numberMatches.length : 0;
-
-		// If counts are equal, use letter; otherwise use number
-		return letterCount === numberCount;
+		// After letters (level 1), alternate between numbers and letters
+		// Odd depth (1, 3, 5...) = letters
+		// Even depth (2, 4, 6...) = numbers
+		return segments.length % 2 === 1;
 	}
 
 	/**
@@ -1844,8 +1928,8 @@ export class CommandManager {
 			);
 
 			if (shouldUseLetter) {
-				// Segment should be a letter
-				if (/^[a-z]$/.test(segment)) {
+				// Segment should be letter(s)
+				if (/^[a-z]+$/.test(segment)) {
 					newHierarchy += segment;
 				} else {
 					// Segment is a number but we need a letter - convert
@@ -1859,8 +1943,9 @@ export class CommandManager {
 				if (/^\d+$/.test(segment)) {
 					newHierarchy += segment;
 				} else {
-					// Segment is a letter but we need a number - convert
-					const num = segment.charCodeAt(0) - 96; // a->1, b->2, etc
+					// Segment is letter(s) but we need a number - convert
+					// Convert multi-letter sequences: a->1, b->2, z->26, aa->27, ab->28, etc.
+					const num = this.letterSequenceToNumber(segment);
 					newHierarchy += num;
 				}
 			}
@@ -1873,15 +1958,24 @@ export class CommandManager {
 	 * Parses hierarchy string into individual segments (letters and numbers)
 	 * Example: "a1b2" -> ["a", "1", "b", "2"]
 	 */
+	/**
+	 * Parses a hierarchy string into segments
+	 * Example: "a1b2" -> ["a", "1", "b", "2"]
+	 * Example: "aa1bb2" -> ["aa", "1", "bb", "2"]
+	 */
 	private parseHierarchySegments(hierarchy: string): string[] {
 		const segments: string[] = [];
 		let i = 0;
 
 		while (i < hierarchy.length) {
 			if (/[a-z]/.test(hierarchy[i])) {
-				// Single letter segment
-				segments.push(hierarchy[i]);
-				i++;
+				// Letter segment (can be multiple letters like "aa", "ab", etc.)
+				let letters = "";
+				while (i < hierarchy.length && /[a-z]/.test(hierarchy[i])) {
+					letters += hierarchy[i];
+					i++;
+				}
+				segments.push(letters);
 			} else if (/\d/.test(hierarchy[i])) {
 				// Number segment (can be multiple digits)
 				let num = "";
@@ -2165,8 +2259,12 @@ export class CommandManager {
 	 * Gets the parent zettel ID from a child ID
 	 */
 	private getParentZettelId(childId: string): string | null {
+		// Extract and preserve the prefix
+		const prefix = this.getPrefix(childId);
+		const idWithoutPrefix = this.stripPrefix(childId);
+
 		// Remove the timestamp portion to get hierarchy
-		const hierarchyPart = childId.replace(/^(\d{13,})/, "");
+		const hierarchyPart = idWithoutPrefix.replace(/^(\d{13,})/, "");
 
 		if (!hierarchyPart) {
 			// No hierarchy, this is a root zettel
@@ -2175,9 +2273,9 @@ export class CommandManager {
 
 		// Remove the last segment (letter or number)
 		const parentHierarchy = hierarchyPart.replace(/[a-z]+$|[0-9]+$/, "");
-		const timestamp = childId.match(/^(\d{13,})/)?.[1];
+		const timestamp = idWithoutPrefix.match(/^(\d{13,})/)?.[1];
 
-		return timestamp ? timestamp + parentHierarchy : null;
+		return timestamp ? prefix + timestamp + parentHierarchy : null;
 	}
 
 	/**
@@ -2274,9 +2372,9 @@ export class CommandManager {
 
 			// Check if this is a direct child (not a grandchild or deeper)
 			if (shouldUseLetter) {
-				// Direct child should be a single letter only
-				// Examples: "a", "b", "z" but not "ab", "a1", "a1a"
-				if (/^[a-z]$/.test(suffix)) {
+				// Direct child should be letters only (one or more)
+				// Examples: "a", "b", "z", "aa", "ab", "zz" but not "a1", "aa1", "a1a"
+				if (/^[a-z]+$/.test(suffix)) {
 					children.push(file);
 				}
 			} else {
@@ -2327,15 +2425,21 @@ export class CommandManager {
 		let parentId: string;
 		let siblingPattern: RegExp;
 
-		// Check if the last character is a letter or part of a number sequence
+		// Check if the last portion is letters or numbers
 		const lastChar = hierarchyPart.charAt(hierarchyPart.length - 1);
 
 		if (/[a-z]/.test(lastChar)) {
-			// Last character is a letter, so siblings have letter suffixes
-			parentId = timestamp + hierarchyPart.slice(0, -1);
-			siblingPattern = new RegExp(
-				`^${this.escapeRegex(parentId)}[a-z](?![a-z0-9])`,
-			);
+			// Last portion is letters - find where the letter sequence starts
+			const letterMatch = hierarchyPart.match(/([a-z]+)$/);
+			if (letterMatch) {
+				parentId =
+					timestamp + hierarchyPart.slice(0, -letterMatch[1].length);
+				siblingPattern = new RegExp(
+					`^${this.escapeRegex(parentId)}[a-z]+(?![a-z0-9])`,
+				);
+			} else {
+				return siblings; // Invalid format
+			}
 		} else {
 			// Last part is a number sequence
 			const numberMatch = hierarchyPart.match(/(\d+)$/);
@@ -2596,7 +2700,9 @@ export class CommandManager {
 	/**
 	 * Generates a zettel ID based on the format in settings
 	 */
-	private generateZettelId(): string {
+	private generateZettelId(
+		noteType: "zettel" | "fleeting" | "moc" | "index" = "zettel",
+	): string {
 		const format = this.plugin.settings.zettelIdFormat || "YYYYMMDDHHmmss";
 		const now = new Date();
 
@@ -2620,7 +2726,100 @@ export class CommandManager {
 		id = id.replace(/ss/g, seconds);
 		id = id.replace(/SSS/g, milliseconds);
 
+		// Add prefix if enabled for this note type
+		const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType);
+		if (shouldUsePrefix) {
+			const prefix = this.getPrefixForNoteType(noteType);
+			id = prefix + id;
+		}
+
 		return id;
+	}
+
+	/**
+	 * Gets the prefix for a given note type
+	 */
+	private getPrefixForNoteType(
+		noteType: "zettel" | "fleeting" | "moc" | "index",
+	): string {
+		switch (noteType) {
+			case "zettel":
+				return this.plugin.settings.zettelPrefix;
+			case "fleeting":
+				return this.plugin.settings.fleetingNotesPrefix;
+			case "moc":
+				return this.plugin.settings.mocsPrefix;
+			case "index":
+				return this.plugin.settings.indexesPrefix;
+		}
+	}
+
+	/**
+	 * Checks if prefix should be used for a given note type
+	 */
+	private shouldUsePrefixForNoteType(
+		noteType: "zettel" | "fleeting" | "moc" | "index",
+	): boolean {
+		switch (noteType) {
+			case "zettel":
+				return this.plugin.settings.useZettelPrefix;
+			case "fleeting":
+				return this.plugin.settings.useFleetingNotesPrefix;
+			case "moc":
+				return this.plugin.settings.useMocsPrefix;
+			case "index":
+				return this.plugin.settings.useIndexesPrefix;
+		}
+	}
+
+	/**
+	 * Determines note type from file tags
+	 */
+	private getNoteTypeFromFile(
+		file: TFile,
+	): "zettel" | "fleeting" | "moc" | "index" {
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const tags = cache?.tags?.map((t) => t.tag.replace("#", "")) || [];
+		const frontmatterTags = cache?.frontmatter?.tags || [];
+
+		// Combine both tag sources
+		const allTags = [
+			...tags,
+			...(Array.isArray(frontmatterTags)
+				? frontmatterTags
+				: [frontmatterTags].filter(Boolean)),
+		].map((t) => String(t).replace("#", ""));
+
+		// Check for note type tags
+		if (allTags.includes(this.plugin.settings.fleetingNotesTag)) {
+			return "fleeting";
+		}
+		if (allTags.includes(this.plugin.settings.mocsTag)) {
+			return "moc";
+		}
+		if (allTags.includes(this.plugin.settings.indexesTag)) {
+			return "index";
+		}
+		// Default to zettel
+		return "zettel";
+	}
+
+	/**
+	 * Strips prefix from a zettel ID to get the timestamp and hierarchy only
+	 * Example: "Z20241118123456789a" -> "20241118123456789a"
+	 */
+	private stripPrefix(zettelId: string): string {
+		// Remove any leading letters (prefix)
+		return zettelId.replace(/^[A-Za-z]+/, "");
+	}
+
+	/**
+	 * Gets the prefix from a zettel ID
+	 * Example: "Z20241118123456789a" -> "Z"
+	 */
+	private getPrefix(zettelId: string): string {
+		const match = zettelId.match(/^([A-Za-z]+)/);
+		return match ? match[1] : "";
 	}
 
 	/**
@@ -2983,7 +3182,7 @@ export class CommandManager {
 		let childPattern: RegExp;
 		if (shouldUseLetter) {
 			childPattern = new RegExp(
-				`^${this.escapeRegex(parentId)}[a-z](?![a-z0-9])`,
+				`^${this.escapeRegex(parentId)}[a-z]+(?![a-z0-9])`,
 			);
 		} else {
 			childPattern = new RegExp(
