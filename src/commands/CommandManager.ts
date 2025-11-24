@@ -34,6 +34,10 @@ export class CommandManager {
 		this.registerMoveToRootCommand();
 		this.registerFixFilenamesCommand();
 		this.registerBatchFixFilenamesCommand();
+		this.registerFixCurrentMocFilenameCommand();
+		this.registerBatchFixMocFilenamesCommand();
+		this.registerFixCurrentIndexFilenameCommand();
+		this.registerBatchFixIndexFilenamesCommand();
 		this.registerCreateNoteCommand();
 		this.registerCreateChildZettelCommand();
 		this.registerCreateSiblingZettelCommand();
@@ -1007,6 +1011,270 @@ export class CommandManager {
 	}
 
 	/**
+	 * Registers the "Fix Current MOC Filename" command
+	 * Renames the current MOC file to match the configured filename format
+	 */
+	private registerFixCurrentMocFilenameCommand(): void {
+		this.plugin.addCommand({
+			id: "fix-current-moc-filename",
+			name: "Fix Current MOC Filename",
+			icon: "file-check",
+			callback: async () => {
+				try {
+					const activeFile =
+						this.plugin.app.workspace.getActiveFile();
+					if (!activeFile) {
+						new Notice("No active file.");
+						return;
+					}
+
+					// Check if file has MOC tag
+					const noteType = this.getNoteTypeFromFile(activeFile);
+					if (noteType !== "moc") {
+						new Notice("Active file is not a MOC.");
+						return;
+					}
+
+					const fixed = await this.fixMocFilename(activeFile);
+					if (fixed) {
+						new Notice("MOC filename fixed.");
+					} else {
+						new Notice("MOC filename is already correct.");
+					}
+				} catch (error) {
+					new Notice(`Error fixing MOC filename: ${error.message}`);
+				}
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Batch Fix MOC Filenames" command
+	 * Renames MOC files in a selected folder to match the configured filename format
+	 */
+	private registerBatchFixMocFilenamesCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-fix-moc-filenames",
+			name: "Batch Fix MOC Filenames (Select Folder)",
+			icon: "folder-check",
+			callback: async () => {
+				new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+					try {
+						const allFiles =
+							this.plugin.app.vault.getMarkdownFiles();
+						let fixedCount = 0;
+
+						for (const file of allFiles) {
+							// Check if file is within the selected folder
+							if (!this.isFileInFolder(file, folder)) {
+								continue;
+							}
+
+							// Skip ignored folders
+							if (this.shouldIgnoreFile(file)) {
+								continue;
+							}
+
+							// Check if file has MOC tag
+							const noteType = this.getNoteTypeFromFile(file);
+							if (noteType !== "moc") {
+								continue;
+							}
+
+							const fixed = await this.fixMocFilename(file);
+							if (fixed) {
+								fixedCount++;
+							}
+						}
+
+						const folderDisplay =
+							folder.path === "/" ? "root" : folder.path;
+						if (fixedCount > 0) {
+							new Notice(
+								`Fixed ${fixedCount} MOC filename(s) in ${folderDisplay}.`,
+							);
+						} else {
+							new Notice(
+								`All MOC filenames in ${folderDisplay} are already correct.`,
+							);
+						}
+					} catch (error) {
+						new Notice(
+							`Error fixing MOC filenames: ${error.message}`,
+						);
+					}
+				}).open();
+			},
+		});
+	}
+
+	/**
+	 * Fixes a single MOC file's filename to match the configured format
+	 * Returns true if the file was renamed, false if already correct
+	 */
+	private async fixMocFilename(file: TFile): Promise<boolean> {
+		// Get title from frontmatter or current filename
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const title = cache?.frontmatter?.title || file.basename;
+
+		// Build the expected filename based on settings
+		const expectedFilename = this.buildMocFilename(title);
+
+		// Check if filename needs fixing
+		if (file.basename !== expectedFilename) {
+			const folder = file.parent || this.plugin.app.vault.getRoot();
+			const newPath = `${folder.path}/${expectedFilename}.md`;
+
+			// Check if target path already exists
+			const existing =
+				this.plugin.app.vault.getAbstractFileByPath(newPath);
+			if (existing && existing !== file) {
+				console.warn(
+					`Cannot fix ${file.basename}: ${expectedFilename}.md already exists`,
+				);
+				return false;
+			} else {
+				await this.plugin.app.fileManager.renameFile(file, newPath);
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Registers the "Fix Current Index Filename" command
+	 * Renames the current Index file to match the configured filename format
+	 */
+	private registerFixCurrentIndexFilenameCommand(): void {
+		this.plugin.addCommand({
+			id: "fix-current-index-filename",
+			name: "Fix Current Index Filename",
+			icon: "file-check",
+			callback: async () => {
+				try {
+					const activeFile =
+						this.plugin.app.workspace.getActiveFile();
+					if (!activeFile) {
+						new Notice("No active file.");
+						return;
+					}
+
+					// Check if file has Index tag
+					const noteType = this.getNoteTypeFromFile(activeFile);
+					if (noteType !== "index") {
+						new Notice("Active file is not an Index.");
+						return;
+					}
+
+					const fixed = await this.fixIndexFilename(activeFile);
+					if (fixed) {
+						new Notice("Index filename fixed.");
+					} else {
+						new Notice("Index filename is already correct.");
+					}
+				} catch (error) {
+					new Notice(`Error fixing Index filename: ${error.message}`);
+				}
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Batch Fix Index Filenames" command
+	 * Renames Index files in a selected folder to match the configured filename format
+	 */
+	private registerBatchFixIndexFilenamesCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-fix-index-filenames",
+			name: "Batch Fix Index Filenames (Select Folder)",
+			icon: "folder-check",
+			callback: async () => {
+				new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+					try {
+						const allFiles =
+							this.plugin.app.vault.getMarkdownFiles();
+						let fixedCount = 0;
+
+						for (const file of allFiles) {
+							// Check if file is within the selected folder
+							if (!this.isFileInFolder(file, folder)) {
+								continue;
+							}
+
+							// Skip ignored folders
+							if (this.shouldIgnoreFile(file)) {
+								continue;
+							}
+
+							// Check if file has Index tag
+							const noteType = this.getNoteTypeFromFile(file);
+							if (noteType !== "index") {
+								continue;
+							}
+
+							const fixed = await this.fixIndexFilename(file);
+							if (fixed) {
+								fixedCount++;
+							}
+						}
+
+						const folderDisplay =
+							folder.path === "/" ? "root" : folder.path;
+						if (fixedCount > 0) {
+							new Notice(
+								`Fixed ${fixedCount} Index filename(s) in ${folderDisplay}.`,
+							);
+						} else {
+							new Notice(
+								`All Index filenames in ${folderDisplay} are already correct.`,
+							);
+						}
+					} catch (error) {
+						new Notice(
+							`Error fixing Index filenames: ${error.message}`,
+						);
+					}
+				}).open();
+			},
+		});
+	}
+
+	/**
+	 * Fixes a single Index file's filename to match the configured format
+	 * Returns true if the file was renamed, false if already correct
+	 */
+	private async fixIndexFilename(file: TFile): Promise<boolean> {
+		// Get title from frontmatter or current filename
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const title = cache?.frontmatter?.title || file.basename;
+
+		// Build the expected filename based on settings
+		const expectedFilename = this.buildIndexFilename(title);
+
+		// Check if filename needs fixing
+		if (file.basename !== expectedFilename) {
+			const folder = file.parent || this.plugin.app.vault.getRoot();
+			const newPath = `${folder.path}/${expectedFilename}.md`;
+
+			// Check if target path already exists
+			const existing =
+				this.plugin.app.vault.getAbstractFileByPath(newPath);
+			if (existing && existing !== file) {
+				console.warn(
+					`Cannot fix ${file.basename}: ${expectedFilename}.md already exists`,
+				);
+				return false;
+			} else {
+				await this.plugin.app.fileManager.renameFile(file, newPath);
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Helper method to check if a file is within a folder (including subfolders)
 	 */
 	private isFileInFolder(file: TFile, folder: TFolder): boolean {
@@ -1033,7 +1301,6 @@ export class CommandManager {
 
 		if (parentNormalizedId) {
 			// If we have a parent that was normalized, we need to rebuild this ID based on the normalized parent
-			const currentPrefix = this.getPrefix(currentId);
 			const currentIdWithoutPrefix = this.stripPrefix(currentId);
 			const currentTimestamp =
 				currentIdWithoutPrefix.match(/^(\d+)/)?.[1] || "";
@@ -1041,14 +1308,20 @@ export class CommandManager {
 				currentTimestamp.length,
 			);
 
-			// Extract parent's normalized timestamp and prefix
-			const parentPrefix = this.getPrefix(parentNormalizedId);
+			// Extract parent's normalized timestamp (without prefix)
 			const parentIdWithoutPrefix = this.stripPrefix(parentNormalizedId);
 			const parentTimestamp =
 				parentIdWithoutPrefix.match(/^(\d+)/)?.[1] || "";
 
-			// Use the same normalized timestamp and prefix as parent, with this file's hierarchy
-			normalizedId = parentPrefix + parentTimestamp + currentHierarchy;
+			// Determine this file's own prefix based on its note type
+			const noteType = this.getNoteTypeFromFile(file);
+			const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType);
+			const desiredPrefix = shouldUsePrefix
+				? this.getPrefixForNoteType(noteType)
+				: "";
+
+			// Use the parent's normalized timestamp with this file's own prefix and hierarchy
+			normalizedId = desiredPrefix + parentTimestamp + currentHierarchy;
 		} else {
 			// Root level - normalize independently and add/update prefix based on note type
 			normalizedId = this.normalizeZettelId(file, currentId);
