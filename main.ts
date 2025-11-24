@@ -27,8 +27,9 @@ export default class ZettelkastenPlugin extends Plugin {
 		const loadedData = await this.loadData();
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
 
-		// Migration: Add enableIndividualCommands to existing boxes
+		// Migration: Add enableIndividualCommands and useSeparatorFormat to existing boxes
 		if (this.settings.boxes && this.settings.boxes.length > 0) {
+			let needsSave = false;
 			this.settings.boxes.forEach((box) => {
 				if (!box.enableIndividualCommands) {
 					box.enableIndividualCommands = {
@@ -59,15 +60,37 @@ export default class ZettelkastenPlugin extends Plugin {
 						openIndex: false,
 						createIndex: false,
 					};
+					needsSave = true;
 				} else if (
 					box.enableIndividualCommands.quickZettel === undefined
 				) {
 					// Add quickZettel to existing enableIndividualCommands
 					box.enableIndividualCommands.quickZettel = true;
+					needsSave = true;
+				}
+
+				// Add useSeparatorFormat if missing
+				if (box.useSeparatorFormat === undefined) {
+					box.useSeparatorFormat = false;
+					needsSave = true;
+				}
+
+				// Ensure zettelIdSeparator has a default value if empty/missing
+				if (!box.zettelIdSeparator) {
+					box.zettelIdSeparator = "⁝ ";
+					needsSave = true;
 				}
 			});
+
 			// Save migrated settings
-			await this.saveSettings();
+			if (needsSave) {
+				await this.saveSettings();
+			}
+		}
+
+		// Ensure global zettelIdSeparator has a value (fallback to default if empty)
+		if (!this.settings.zettelIdSeparator) {
+			this.settings.zettelIdSeparator = DEFAULT_SETTINGS.zettelIdSeparator;
 		}
 
 		console.log("Loaded settings:", JSON.stringify(this.settings, null, 2));

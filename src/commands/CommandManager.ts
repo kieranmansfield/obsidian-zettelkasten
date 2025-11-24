@@ -2053,8 +2053,9 @@ export class CommandManager {
 	/**
 	 * Generates a zettel ID based on the format in settings
 	 */
-	private generateZettelId(): string {
-		const format = this.plugin.settings.zettelIdFormat || "YYYYMMDDHHmmss";
+	private generateZettelId(customFormat?: string): string {
+		const format =
+			customFormat || this.plugin.settings.zettelIdFormat || "YYYYMMDDHHmmss";
 		const now = new Date();
 
 		// Simple date format replacement (supports common patterns)
@@ -3202,7 +3203,10 @@ export class CommandManager {
 			return;
 		}
 
-		const options = await this.buildNavigationOptions(currentId);
+		const options = await this.buildNavigationOptions(
+			activeFile,
+			currentId,
+		);
 
 		new NavigatorModal(
 			this.plugin.app,
@@ -3246,7 +3250,23 @@ export class CommandManager {
 			this.plugin.app,
 			activeFile,
 			children,
-			this.plugin,
+			async (
+				reorderedNotes: TFile[],
+				promoted: TFile[],
+				indentLevels: Map<TFile, number>,
+			) => {
+				try {
+					await this.handleSequenceReorder(
+						activeFile,
+						currentId,
+						reorderedNotes,
+						promoted,
+						indentLevels,
+					);
+				} catch (error) {
+					new Notice(`Error reordering sequence: ${error.message}`);
+				}
+			},
 		).open();
 	}
 
@@ -3683,9 +3703,10 @@ export class CommandManager {
 
 				const zettelId = this.generateZettelId(box.zettelIdFormat);
 				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
-				const filename = box.addTitleToFilename
-					? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
-					: `${prefix}${zettelId}`;
+				const filename =
+					box.useSeparatorFormat && title
+						? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
+						: `${prefix}${zettelId}`;
 				const path = `${folder.path}/${filename}.md`;
 
 				const creator = new FileCreator(
@@ -3737,9 +3758,10 @@ export class CommandManager {
 
 				const zettelId = this.generateZettelId(box.zettelIdFormat);
 				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
-				const filename = box.addTitleToFilename
-					? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
-					: `${prefix}${zettelId}`;
+				const filename =
+					box.useSeparatorFormat && title
+						? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
+						: `${prefix}${zettelId}`;
 				const path = `${folder.path}/${filename}.md`;
 
 				const creator = new FileCreator(
@@ -3750,7 +3772,6 @@ export class CommandManager {
 						new Notice(`Created child zettel: ${title}`);
 					},
 					box.noteTemplatePath,
-					`[[${activeFile.basename}]]`,
 				);
 				try {
 					await creator.create();
@@ -3800,9 +3821,10 @@ export class CommandManager {
 
 				const zettelId = this.generateZettelId(box.zettelIdFormat);
 				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
-				const filename = box.addTitleToFilename
-					? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
-					: `${prefix}${zettelId}`;
+				const filename =
+					box.useSeparatorFormat && title
+						? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
+						: `${prefix}${zettelId}`;
 				const path = `${folder.path}/${filename}.md`;
 
 				const creator = new FileCreator(
@@ -3813,7 +3835,6 @@ export class CommandManager {
 						new Notice(`Created sibling zettel: ${title}`);
 					},
 					box.noteTemplatePath,
-					upLink,
 				);
 				try {
 					await creator.create();
@@ -4040,7 +4061,10 @@ export class CommandManager {
 
 				let filename: string;
 				if (box.mocsUseZettelId) {
-					filename = `${prefix}${zettelId}${box.zettelIdSeparator}${title}`;
+					filename =
+						box.useSeparatorFormat && title
+							? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
+							: `${prefix}${zettelId}`;
 				} else {
 					filename =
 						box.mocsFilenameFormat.replace("{{title}}", title) ||
@@ -4120,7 +4144,10 @@ export class CommandManager {
 
 				let filename: string;
 				if (box.indexesUseZettelId) {
-					filename = `${prefix}${zettelId}${box.zettelIdSeparator}${title}`;
+					filename =
+						box.useSeparatorFormat && title
+							? `${prefix}${zettelId}${box.zettelIdSeparator}${title}`
+							: `${prefix}${zettelId}`;
 				} else {
 					filename =
 						box.indexesFilenameFormat.replace("{{title}}", title) ||

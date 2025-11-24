@@ -425,7 +425,6 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							zettelPrefix: "",
 							// Zettel settings defaults
 							zettelIdFormat: "YYYYMMDDHHmmssSSS",
-						useSeparatorFormat: false,
 							zettelIdSeparator: " ",
 							zettelIdMatchingMode: "separator",
 							noteTemplatePath: "",

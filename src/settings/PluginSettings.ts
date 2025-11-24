@@ -14,6 +14,7 @@ export interface Box {
 
 	// Zettel settings
 	zettelIdFormat: string;
+	useSeparatorFormat: boolean;
 	zettelIdSeparator: string;
 	zettelIdMatchingMode: ZettelIdMatchingMode;
 	noteTemplatePath: string;
@@ -93,12 +94,15 @@ export interface ZettelkastenPluginSettings {
 	zettelsUseSeparateLocation: boolean;
 	zettelsLocation: string;
 	zettelIdFormat: string;
+	useSeparatorFormat: boolean;
 	zettelIdSeparator: string;
 	zettelIdMatchingMode: ZettelIdMatchingMode;
 	noteTemplatePath: string;
 	addTitleToFilename: boolean;
 	zettelTag: string;
 	enableSequenceReorder: boolean;
+	useZettelPrefix: boolean;
+	zettelPrefix: string;
 
 	// Fleeting notes settings
 	enableFleetingNotes: boolean;
@@ -108,6 +112,8 @@ export interface ZettelkastenPluginSettings {
 	fleetingNotesUseZettelId: boolean;
 	fleetingNotesFilenameFormat: string;
 	fleetingNotesTag: string;
+	useFleetingNotesPrefix: boolean;
+	fleetingNotesPrefix: string;
 
 	// MOCs settings
 	enableMocs: boolean;
@@ -117,6 +123,8 @@ export interface ZettelkastenPluginSettings {
 	mocsUseZettelId: boolean;
 	mocsFilenameFormat: string;
 	mocsTag: string;
+	useMocsPrefix: boolean;
+	mocsPrefix: string;
 
 	// Indexes settings
 	enableIndexes: boolean;
@@ -126,6 +134,8 @@ export interface ZettelkastenPluginSettings {
 	indexesUseZettelId: boolean;
 	indexesFilenameFormat: string;
 	indexesTag: string;
+	useIndexesPrefix: boolean;
+	indexesPrefix: string;
 }
 
 // Default settings values
@@ -138,12 +148,15 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	zettelsUseSeparateLocation: false,
 	zettelsLocation: "",
 	zettelIdFormat: "YYYYMMDDHHmmssSSS",
-	zettelIdSeparator: " ",
+	useSeparatorFormat: false,
+	zettelIdSeparator: "⁝ ",
 	zettelIdMatchingMode: "separator",
 	noteTemplatePath: "",
 	addTitleToFilename: true,
 	zettelTag: "zettel",
 	enableSequenceReorder: false,
+	useZettelPrefix: false,
+	zettelPrefix: "z",
 
 	fleetingNotesLocation: "",
 	fleetingNotesUseSeparateLocation: false,
@@ -152,6 +165,8 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	fleetingNotesFilenameFormat: "",
 	fleetingNotesTag: "fleeting",
 	enableFleetingNotes: true,
+	useFleetingNotesPrefix: false,
+	fleetingNotesPrefix: "f",
 
 	mocsLocation: "",
 	mocsUseSeparateLocation: false,
@@ -160,6 +175,8 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	mocsFilenameFormat: "{{title}} MOC",
 	mocsTag: "moc",
 	enableMocs: true,
+	useMocsPrefix: false,
+	mocsPrefix: "m",
 
 	indexesLocation: "",
 	indexesUseSeparateLocation: false,
@@ -168,4 +185,6 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	indexesFilenameFormat: "{{title}} Index",
 	indexesTag: "index",
 	enableIndexes: true,
+	useIndexesPrefix: false,
+	indexesPrefix: "i",
 };
