@@ -14,6 +14,8 @@ import type { Box } from "../settings/PluginSettings";
 
 // Manages all plugin commands
 export class CommandManager {
+	private registeredBoxIds = new Set<string>();
+
 	constructor(private plugin: ZettelkastenPlugin) {}
 
 	/**
@@ -21,6 +23,27 @@ export class CommandManager {
 	 */
 	reloadCommands(): void {
 		this.registerCommands();
+	}
+
+	/**
+	 * Registers box commands that haven't been registered yet
+	 * This allows dynamic addition of boxes without requiring restart
+	 */
+	refreshBoxCommands(): void {
+		if (
+			this.plugin.settings.enableBoxes &&
+			this.plugin.settings.boxes.length > 0
+		) {
+			// Register commands for any new boxes
+			this.plugin.settings.boxes.forEach((box) => {
+				if (!this.registeredBoxIds.has(box.id)) {
+					this.registerBoxCommandPalette(box);
+					this.registerBoxFixFilenameCommandPalette(box);
+					this.registerBoxIndividualCommands(box);
+					this.registeredBoxIds.add(box.id);
+				}
+			});
+		}
 	}
 
 	/**
@@ -35,6 +58,7 @@ export class CommandManager {
 			// Register command palette for each box
 			this.plugin.settings.boxes.forEach((box) => {
 				this.registerBoxCommandPalette(box);
+				this.registeredBoxIds.add(box.id);
 			});
 
 			// Register fix filename command palette for each box
@@ -1555,6 +1579,45 @@ export class CommandManager {
 
 		// Check if file path starts with folder path
 		return file.path.startsWith(folder.path + "/");
+	}
+
+	/**
+	 * Helper method to check if a file belongs to a specific box
+	 */
+	private fileMatchesBox(file: TFile, box: Box): boolean {
+		if (box.type === "folder" && box.folderPath) {
+			// For folder-based boxes, check if file is in the specified folder
+			const normalizedFolderPath = box.folderPath.endsWith("/")
+				? box.folderPath.slice(0, -1)
+				: box.folderPath;
+
+			// Root folder
+			if (normalizedFolderPath === "" || normalizedFolderPath === "/") {
+				return true;
+			}
+
+			return (
+				file.path.startsWith(normalizedFolderPath + "/") ||
+				file.path === normalizedFolderPath
+			);
+		} else if (box.type === "tag" && box.tagName) {
+			// For tag-based boxes, check if file has the tag
+			const cache = this.plugin.app.metadataCache.getFileCache(file);
+			const inlineTags =
+				cache?.tags?.map((t) => t.tag.replace("#", "")) || [];
+			const frontmatterTags = cache?.frontmatter?.tags || [];
+
+			const allTags = [
+				...inlineTags,
+				...(Array.isArray(frontmatterTags)
+					? frontmatterTags
+					: [frontmatterTags].filter(Boolean)),
+			].map((t) => String(t).replace("#", ""));
+
+			return allTags.includes(box.tagName);
+		}
+
+		return false;
 	}
 
 	/**
@@ -6390,13 +6453,21 @@ export class CommandManager {
 				return;
 			}
 
+			// Check if active file belongs to this box
+			if (!this.fileMatchesBox(activeFile, box)) {
+				new Notice(
+					`Active file does not belong to the "${box.name}" box.`,
+				);
+				return;
+			}
+
 			const allFiles = this.plugin.app.vault.getMarkdownFiles();
 			const zettels: TFile[] = [];
 
-			// Find all files with zettel IDs
+			// Find all files with zettel IDs that belong to this box
 			for (const file of allFiles) {
 				const id = this.extractZettelId(file.basename);
-				if (id) {
+				if (id && this.fileMatchesBox(file, box)) {
 					zettels.push(file);
 				}
 			}
@@ -6448,76 +6519,72 @@ export class CommandManager {
 	}
 
 	/**
-	 * Batch fix filenames for a box (all files in a folder)
+	 * Batch fix filenames for a box (all files in the box)
 	 */
 	private async batchFixFilenamesForBox(box: Box): Promise<void> {
-		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
-			try {
-				const allFiles =
-					this.plugin.app.vault.getMarkdownFiles().filter(
-						(file) => file.path.startsWith(folder.path),
-					);
+		try {
+			const allFiles = this.plugin.app.vault.getMarkdownFiles();
 
-				const zettels = allFiles.filter((file) =>
-					this.extractZettelId(file.basename),
-				);
+			// Find all files with zettel IDs that belong to this box
+			const zettels = allFiles.filter(
+				(file) =>
+					this.extractZettelId(file.basename) &&
+					this.fileMatchesBox(file, box),
+			);
 
-				if (zettels.length === 0) {
-					new Notice("No zettels found in this folder.");
-					return;
-				}
-
-				// Build parent-child relationships
-				const childrenMap = new Map<string, TFile[]>();
-
-				for (const file of zettels) {
-					const id = this.extractZettelId(file.basename)!;
-					const parentId = this.getParentZettelId(id);
-
-					if (parentId) {
-						if (!childrenMap.has(parentId)) {
-							childrenMap.set(parentId, []);
-						}
-						childrenMap.get(parentId)!.push(file);
-					}
-				}
-
-				// Find root zettels (those without parents)
-				const rootZettels = zettels.filter((file) => {
-					const id = this.extractZettelId(file.basename);
-					if (!id) return false;
-					const parentId = this.getParentZettelId(id);
-					return !parentId;
-				});
-
-				let fixedCount = 0;
-
-				// Process each root and its descendants
-				for (const rootFile of rootZettels) {
-					const count = await this.fixZettelFilenameRecursive(
-						rootFile,
-						childrenMap,
-						undefined,
-						box,
-					);
-					fixedCount += count;
-				}
-
-				const folderDisplay =
-					folder.path === "/" ? "root" : folder.path;
-				if (fixedCount > 0) {
-					new Notice(
-						`Fixed ${fixedCount} filename(s) in ${folderDisplay}.`,
-					);
-				} else {
-					new Notice(
-						`All filenames in ${folderDisplay} are already correct.`,
-					);
-				}
-			} catch (error) {
-				new Notice(`Error fixing filenames: ${error.message}`);
+			if (zettels.length === 0) {
+				new Notice(`No zettels found in the "${box.name}" box.`);
+				return;
 			}
-		}).open();
+
+			// Build parent-child relationships
+			const childrenMap = new Map<string, TFile[]>();
+
+			for (const file of zettels) {
+				const id = this.extractZettelId(file.basename)!;
+				const parentId = this.getParentZettelId(id);
+
+				if (parentId) {
+					if (!childrenMap.has(parentId)) {
+						childrenMap.set(parentId, []);
+					}
+					childrenMap.get(parentId)!.push(file);
+				}
+			}
+
+			// Find root zettels (those without parents)
+			const rootZettels = zettels.filter((file) => {
+				const id = this.extractZettelId(file.basename);
+				if (!id) return false;
+				const parentId = this.getParentZettelId(id);
+				return !parentId;
+			});
+
+			let fixedCount = 0;
+
+			// Process each root and its descendants
+			for (const rootFile of rootZettels) {
+				const count = await this.fixZettelFilenameRecursive(
+					rootFile,
+					childrenMap,
+					undefined,
+					box,
+				);
+				fixedCount += count;
+			}
+
+			if (fixedCount > 0) {
+				new Notice(
+					`Fixed ${fixedCount} filename(s) in the "${box.name}" box.`,
+				);
+			} else {
+				new Notice(
+					`All filenames in the "${box.name}" box are already correct.`,
+				);
+			}
+		} catch (error) {
+			new Notice(`Error fixing filenames: ${error.message}`);
+		}
 	}
 
 	/**
@@ -6528,6 +6595,14 @@ export class CommandManager {
 			const activeFile = this.plugin.app.workspace.getActiveFile();
 			if (!activeFile) {
 				new Notice("No active file.");
+				return;
+			}
+
+			// Check if active file belongs to this box
+			if (!this.fileMatchesBox(activeFile, box)) {
+				new Notice(
+					`Active file does not belong to the "${box.name}" box.`,
+				);
 				return;
 			}
 
@@ -6549,46 +6624,42 @@ export class CommandManager {
 	}
 
 	/**
-	 * Batch fix MOC filenames for a box (all MOCs in a folder)
+	 * Batch fix MOC filenames for a box (all MOCs in the box)
 	 */
 	private async batchFixMocFilenamesForBox(box: Box): Promise<void> {
-		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
-			try {
-				const allFiles =
-					this.plugin.app.vault.getMarkdownFiles().filter(
-						(file) => file.path.startsWith(folder.path),
-					);
+		try {
+			const allFiles = this.plugin.app.vault.getMarkdownFiles();
 
-				let fixedCount = 0;
-				for (const file of allFiles) {
-					const noteType = this.getNoteTypeFromFile(file);
-					if (noteType !== "moc") {
-						continue;
-					}
-
-					const fixed = await this.fixMocFilename(file, box);
-					if (fixed) {
-						fixedCount++;
-					}
+			let fixedCount = 0;
+			for (const file of allFiles) {
+				// Check if file belongs to this box
+				if (!this.fileMatchesBox(file, box)) {
+					continue;
 				}
 
-				const folderDisplay =
-					folder.path === "/" ? "root" : folder.path;
-				if (fixedCount > 0) {
-					new Notice(
-						`Fixed ${fixedCount} MOC filename(s) in ${folderDisplay}.`,
-					);
-				} else {
-					new Notice(
-						`All MOC filenames in ${folderDisplay} are already correct.`,
-					);
+				const noteType = this.getNoteTypeFromFile(file);
+				if (noteType !== "moc") {
+					continue;
 				}
-			} catch (error) {
+
+				const fixed = await this.fixMocFilename(file, box);
+				if (fixed) {
+					fixedCount++;
+				}
+			}
+
+			if (fixedCount > 0) {
 				new Notice(
-					`Error fixing MOC filenames: ${error.message}`,
+					`Fixed ${fixedCount} MOC filename(s) in the "${box.name}" box.`,
+				);
+			} else {
+				new Notice(
+					`All MOC filenames in the "${box.name}" box are already correct.`,
 				);
 			}
-		}).open();
+		} catch (error) {
+			new Notice(`Error fixing MOC filenames: ${error.message}`);
+		}
 	}
 
 	/**
@@ -6599,6 +6670,14 @@ export class CommandManager {
 			const activeFile = this.plugin.app.workspace.getActiveFile();
 			if (!activeFile) {
 				new Notice("No active file.");
+				return;
+			}
+
+			// Check if active file belongs to this box
+			if (!this.fileMatchesBox(activeFile, box)) {
+				new Notice(
+					`Active file does not belong to the "${box.name}" box.`,
+				);
 				return;
 			}
 
@@ -6620,45 +6699,41 @@ export class CommandManager {
 	}
 
 	/**
-	 * Batch fix Index filenames for a box (all Indexes in a folder)
+	 * Batch fix Index filenames for a box (all Indexes in the box)
 	 */
 	private async batchFixIndexFilenamesForBox(box: Box): Promise<void> {
-		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
-			try {
-				const allFiles =
-					this.plugin.app.vault.getMarkdownFiles().filter(
-						(file) => file.path.startsWith(folder.path),
-					);
+		try {
+			const allFiles = this.plugin.app.vault.getMarkdownFiles();
 
-				let fixedCount = 0;
-				for (const file of allFiles) {
-					const noteType = this.getNoteTypeFromFile(file);
-					if (noteType !== "index") {
-						continue;
-					}
-
-					const fixed = await this.fixIndexFilename(file, box);
-					if (fixed) {
-						fixedCount++;
-					}
+			let fixedCount = 0;
+			for (const file of allFiles) {
+				// Check if file belongs to this box
+				if (!this.fileMatchesBox(file, box)) {
+					continue;
 				}
 
-				const folderDisplay =
-					folder.path === "/" ? "root" : folder.path;
-				if (fixedCount > 0) {
-					new Notice(
-						`Fixed ${fixedCount} Index filename(s) in ${folderDisplay}.`,
-					);
-				} else {
-					new Notice(
-						`All Index filenames in ${folderDisplay} are already correct.`,
-					);
+				const noteType = this.getNoteTypeFromFile(file);
+				if (noteType !== "index") {
+					continue;
 				}
-			} catch (error) {
+
+				const fixed = await this.fixIndexFilename(file, box);
+				if (fixed) {
+					fixedCount++;
+				}
+			}
+
+			if (fixedCount > 0) {
 				new Notice(
-					`Error fixing Index filenames: ${error.message}`,
+					`Fixed ${fixedCount} Index filename(s) in the "${box.name}" box.`,
+				);
+			} else {
+				new Notice(
+					`All Index filenames in the "${box.name}" box are already correct.`,
 				);
 			}
-		}).open();
+		} catch (error) {
+			new Notice(`Error fixing Index filenames: ${error.message}`);
+		}
 	}
 }

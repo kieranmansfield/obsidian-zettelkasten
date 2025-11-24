@@ -534,6 +534,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						};
 						this.plugin.settings.boxes.push(newBox);
 						await this.plugin.saveSettings();
+						// Refresh commands to register the new box's commands
+						this.plugin.commandManager.refreshBoxCommands();
 						this.display();
 					});
 			});
