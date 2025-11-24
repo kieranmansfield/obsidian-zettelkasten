@@ -210,8 +210,6 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 											.zettelIdMatchingMode,
 									noteTemplatePath:
 										this.plugin.settings.noteTemplatePath,
-									addTitleToFilename:
-										this.plugin.settings.addTitleToFilename,
 									zettelTag: this.plugin.settings.zettelTag,
 									enableSequenceReorder:
 										this.plugin.settings
@@ -341,8 +339,6 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 									box.zettelIdMatchingMode;
 								this.plugin.settings.noteTemplatePath =
 									box.noteTemplatePath;
-								this.plugin.settings.addTitleToFilename =
-									box.addTitleToFilename;
 								this.plugin.settings.zettelTag = box.zettelTag;
 								this.plugin.settings.enableSequenceReorder =
 									box.enableSequenceReorder;
@@ -452,10 +448,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							// Zettel settings defaults
 							zettelIdFormat: "YYYYMMDDHHmmssSSS",
 							useSeparatorFormat: false,
-							zettelIdSeparator: " ",
+							zettelIdSeparator: "⁝ ",
 							zettelIdMatchingMode: "separator",
 							noteTemplatePath: "",
-							addTitleToFilename: true,
 							zettelTag: "zettel",
 							enableSequenceReorder: false,
 							useZettelPrefix: false,
@@ -1284,22 +1279,37 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					});
 			});
 
-		// Add Title to Filename
+		// Use Separator Format
 		new Setting(containerEl)
-			.setName("Add title to filename")
+			.setName("Use separator format")
 			.setDesc(
-				"Include the note title in the filename after the zettel ID",
+				"Include title in filename with separator (e.g., z20241118123456789⁝ My Note Title)",
 			)
 			.addToggle((toggle) =>
 				toggle
-					.setValue(box.addTitleToFilename)
+					.setValue(box.useSeparatorFormat)
 					.onChange(async (value) => {
-						this.plugin.settings.boxes[
-							boxIndex
-						].addTitleToFilename = value;
+						this.plugin.settings.boxes[boxIndex].useSeparatorFormat = value;
 						await this.plugin.saveSettings();
+						this.display();
 					}),
 			);
+
+		// Zettel ID Separator (shown when separator format is enabled)
+		if (box.useSeparatorFormat) {
+			new Setting(containerEl)
+				.setName("Zettel ID separator")
+				.setDesc("Character(s) separating the zettel ID from the title")
+				.addText((text) =>
+					text
+						.setPlaceholder("⁝ ")
+						.setValue(box.zettelIdSeparator?.trim() ? box.zettelIdSeparator : "⁝ ")
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[boxIndex].zettelIdSeparator = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 
 		// Enable Sequence Reorder
 		const sequenceReorderSetting = new Setting(containerEl).setName(
@@ -1834,7 +1844,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) =>
 					text
 						.setPlaceholder("⁝ ")
-						.setValue(this.plugin.settings.zettelIdSeparator)
+						.setValue(this.plugin.settings.zettelIdSeparator?.trim() ? this.plugin.settings.zettelIdSeparator : "⁝ ")
 						.onChange(async (value) => {
 							this.plugin.settings.zettelIdSeparator = value;
 							await this.plugin.saveSettings();

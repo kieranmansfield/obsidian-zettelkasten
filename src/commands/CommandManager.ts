@@ -3766,8 +3766,9 @@ export class CommandManager {
 	 * Example: "z20241118123456789⁝ My Note Title"
 	 * Only applies separator format if useSeparatorFormat is enabled
 	 */
-	private buildZettelFilename(zettelId: string, title: string): string {
-		const { useSeparatorFormat, zettelIdSeparator } = this.plugin.settings;
+	private buildZettelFilename(zettelId: string, title: string, box?: Box): string {
+		const useSeparatorFormat = box?.useSeparatorFormat ?? this.plugin.settings.useSeparatorFormat;
+		const zettelIdSeparator = box?.zettelIdSeparator ?? this.plugin.settings.zettelIdSeparator;
 
 		if (useSeparatorFormat && title) {
 			return `${zettelId}${zettelIdSeparator}${title}`;
@@ -3776,18 +3777,6 @@ export class CommandManager {
 		return zettelId;
 	}
 
-	/**
-	 * Builds filename based on settings (with or without title)
-	 */
-	private buildFilename(title: string): string {
-		const { addTitleToFilename } = this.plugin.settings;
-
-		if (addTitleToFilename) {
-			return `${title}`;
-		}
-
-		return title;
-	}
 
 	/**
 	 * Builds fleeting note filename based on settings
@@ -5931,7 +5920,7 @@ export class CommandManager {
 		try {
 			// Rename the active file with the new root ID
 			const title = this.getTitleFromFile(activeFile);
-			const newFilename = this.buildZettelFilename(newRootId, title);
+			const newFilename = this.buildZettelFilename(newRootId, title, box);
 			const newPath = `${folder.path}/${newFilename}.md`;
 			await this.plugin.app.fileManager.renameFile(activeFile, newPath);
 
@@ -5956,6 +5945,7 @@ export class CommandManager {
 				const descendantNewFilename = this.buildZettelFilename(
 					newDescendantId,
 					descendantTitle,
+					box,
 				);
 				const descendantFolder =
 					descendant.parent || this.plugin.app.vault.getRoot();

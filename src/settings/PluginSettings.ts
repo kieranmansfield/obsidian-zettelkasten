@@ -17,7 +17,6 @@ export interface Box {
 	zettelIdSeparator: string;
 	zettelIdMatchingMode: ZettelIdMatchingMode;
 	noteTemplatePath: string;
-	addTitleToFilename: boolean;
 	zettelTag: string;
 	enableSequenceReorder: boolean;
 	useZettelPrefix: boolean;
@@ -116,7 +115,6 @@ export interface ZettelkastenPluginSettings {
 	zettelIdSeparator: string;
 	zettelIdMatchingMode: ZettelIdMatchingMode;
 	noteTemplatePath: string;
-	addTitleToFilename: boolean;
 	zettelTag: string;
 	enableSequenceReorder: boolean;
 	useZettelPrefix: boolean;
@@ -170,7 +168,6 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	zettelIdSeparator: "⁝ ",
 	zettelIdMatchingMode: "separator",
 	noteTemplatePath: "",
-	addTitleToFilename: true,
 	zettelTag: "zettel",
 	enableSequenceReorder: false,
 	useZettelPrefix: false,
