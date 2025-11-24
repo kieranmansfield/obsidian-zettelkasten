@@ -11,6 +11,10 @@ export interface Box {
 	folderPath?: string; // Used when type is "folder"
 	tagName?: string; // Used when type is "tag"
 
+	// Box prefix (applies to all notes in this box)
+	useBoxPrefix: boolean;
+	boxPrefix: string;
+
 	// Zettel settings
 	zettelIdFormat: string;
 	useSeparatorFormat: boolean;

@@ -92,6 +92,16 @@ export default class ZettelkastenPlugin extends Plugin {
 					needsSave = true;
 				}
 
+				// Add box prefix settings if missing
+				if (box.useBoxPrefix === undefined) {
+					box.useBoxPrefix = false;
+					needsSave = true;
+				}
+				if (box.boxPrefix === undefined) {
+					box.boxPrefix = "";
+					needsSave = true;
+				}
+
 				// Add prefix settings to existing boxes if missing
 				if (box.useZettelPrefix === undefined) {
 					box.useZettelPrefix = false;

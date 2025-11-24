@@ -198,6 +198,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 									folderPath:
 										this.plugin.settings.zettelsLocation ||
 										"",
+									// Box prefix defaults
+									useBoxPrefix: false,
+									boxPrefix: "",
 									// Copy zettel settings
 									zettelIdFormat:
 										this.plugin.settings.zettelIdFormat,
@@ -445,6 +448,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							name: "New Box",
 							type: "folder",
 							folderPath: "",
+							// Box prefix defaults
+							useBoxPrefix: false,
+							boxPrefix: "",
 							// Zettel settings defaults
 							zettelIdFormat: "YYYYMMDDHHmmssSSS",
 							useSeparatorFormat: false,
@@ -705,22 +711,39 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				});
 		}
 
-		// Zettel Prefix
+		// Box Prefix Toggle
 		new Setting(containerEl)
-			.setName("Zettel prefix")
+			.setName("Use box prefix")
 			.setDesc(
-				"Optional prefix to distinguish zettels from this box (e.g., 'A', 'WORK', 'PERS'). Will be added before the zettel ID.",
+				"Enable a prefix for all notes in this box (applies to all note types). This helps distinguish notes from different boxes.",
 			)
-			.addText((text) =>
-				text
-					.setPlaceholder("e.g., A, WORK, PERS")
-					.setValue(box.zettelPrefix)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.useBoxPrefix)
 					.onChange(async (value) => {
-						this.plugin.settings.boxes[boxIndex].zettelPrefix =
-							value;
+						this.plugin.settings.boxes[boxIndex].useBoxPrefix = value;
 						await this.plugin.saveSettings();
+						this.display();
 					}),
 			);
+
+		// Box Prefix (shown when enabled)
+		if (box.useBoxPrefix) {
+			new Setting(containerEl)
+				.setName("Box prefix")
+				.setDesc(
+					"Prefix to add to all notes in this box (e.g., 'A', 'WORK', 'PERS')",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("e.g., A, WORK, PERS")
+						.setValue(box.boxPrefix || "")
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[boxIndex].boxPrefix = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 
 		// Create sections for Zettel, Fleeting Notes, MOCs, and Indexes
 		this.displayBoxZettelSettings(containerEl, box, boxIndex);
@@ -1306,6 +1329,40 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						.setValue(box.zettelIdSeparator?.trim() ? box.zettelIdSeparator : "⁝ ")
 						.onChange(async (value) => {
 							this.plugin.settings.boxes[boxIndex].zettelIdSeparator = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		// Zettel Prefix Toggle
+		new Setting(containerEl)
+			.setName("Use zettel prefix")
+			.setDesc(
+				"Enable a prefix specifically for zettel notes (added after box prefix if enabled)",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(box.useZettelPrefix)
+					.onChange(async (value) => {
+						this.plugin.settings.boxes[boxIndex].useZettelPrefix = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		// Zettel Prefix (shown when enabled)
+		if (box.useZettelPrefix) {
+			new Setting(containerEl)
+				.setName("Zettel prefix")
+				.setDesc(
+					"Prefix for zettel notes (e.g., 'z', 'Z')",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("e.g., z")
+						.setValue(box.zettelPrefix || "")
+						.onChange(async (value) => {
+							this.plugin.settings.boxes[boxIndex].zettelPrefix = value;
 							await this.plugin.saveSettings();
 						}),
 				);

@@ -1382,13 +1382,13 @@ export class CommandManager {
 	 * Fixes a single MOC file's filename to match the configured format
 	 * Returns true if the file was renamed, false if already correct
 	 */
-	private async fixMocFilename(file: TFile): Promise<boolean> {
+	private async fixMocFilename(file: TFile, box?: Box): Promise<boolean> {
 		// Get title from frontmatter or current filename
 		const cache = this.plugin.app.metadataCache.getFileCache(file);
 		const title = cache?.frontmatter?.title || file.basename;
 
 		// Build the expected filename based on settings
-		const expectedFilename = this.buildMocFilename(title);
+		const expectedFilename = this.buildMocFilename(title, box);
 
 		// Check if filename needs fixing
 		if (file.basename !== expectedFilename) {
@@ -1514,13 +1514,13 @@ export class CommandManager {
 	 * Fixes a single Index file's filename to match the configured format
 	 * Returns true if the file was renamed, false if already correct
 	 */
-	private async fixIndexFilename(file: TFile): Promise<boolean> {
+	private async fixIndexFilename(file: TFile, box?: Box): Promise<boolean> {
 		// Get title from frontmatter or current filename
 		const cache = this.plugin.app.metadataCache.getFileCache(file);
 		const title = cache?.frontmatter?.title || file.basename;
 
 		// Build the expected filename based on settings
-		const expectedFilename = this.buildIndexFilename(title);
+		const expectedFilename = this.buildIndexFilename(title, box);
 
 		// Check if filename needs fixing
 		if (file.basename !== expectedFilename) {
@@ -1565,6 +1565,7 @@ export class CommandManager {
 		file: TFile,
 		childrenMap: Map<string, TFile[]>,
 		parentNormalizedId?: string,
+		box?: Box,
 	): Promise<number> {
 		const currentId = this.extractZettelId(file.basename)!;
 		let normalizedId: string;
@@ -1585,23 +1586,23 @@ export class CommandManager {
 
 			// Determine this file's own prefix based on its note type
 			const noteType = this.getNoteTypeFromFile(file);
-			const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType);
+			const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType, box);
 			const desiredPrefix = shouldUsePrefix
-				? this.getPrefixForNoteType(noteType)
+				? this.getPrefixForNoteType(noteType, box)
 				: "";
 
 			// Use the parent's normalized timestamp with this file's own prefix and hierarchy
 			normalizedId = desiredPrefix + parentTimestamp + currentHierarchy;
 		} else {
 			// Root level - normalize independently and add/update prefix based on note type
-			normalizedId = this.normalizeZettelId(file, currentId);
+			normalizedId = this.normalizeZettelId(file, currentId, box);
 		}
 
 		let count = 0;
 
 		// Build the full filename with separator and title
 		const title = this.getTitleFromFile(file);
-		const newFilename = this.buildZettelFilename(normalizedId, title);
+		const newFilename = this.buildZettelFilename(normalizedId, title, box);
 
 		// Check if this file needs fixing (compare full filename, not just ID)
 		if (file.basename !== newFilename) {
@@ -1628,6 +1629,7 @@ export class CommandManager {
 				child,
 				childrenMap,
 				normalizedId,
+				box,
 			);
 			count += childCount;
 		}
@@ -1639,12 +1641,12 @@ export class CommandManager {
 	 * Normalizes a zettel ID to have consistent timestamp length (17 digits)
 	 * Maintains the hierarchy suffix and adds/updates prefix based on note type
 	 */
-	private normalizeZettelId(file: TFile, zettelId: string): string {
+	private normalizeZettelId(file: TFile, zettelId: string, box?: Box): string {
 		// Determine note type from file tags
 		const noteType = this.getNoteTypeFromFile(file);
-		const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType);
+		const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType, box);
 		const desiredPrefix = shouldUsePrefix
-			? this.getPrefixForNoteType(noteType)
+			? this.getPrefixForNoteType(noteType, box)
 			: "";
 
 		// Extract current prefix (if any) and strip it
@@ -3614,6 +3616,7 @@ export class CommandManager {
 	private generateZettelId(
 		noteType: "zettel" | "fleeting" | "moc" | "index" = "zettel",
 		customFormat?: string,
+		box?: Box,
 	): string {
 		const format =
 			customFormat || this.plugin.settings.zettelIdFormat || "YYYYMMDDHHmmss";
@@ -3640,9 +3643,9 @@ export class CommandManager {
 		id = id.replace(/SSS/g, milliseconds);
 
 		// Add prefix if enabled for this note type
-		const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType);
+		const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType, box);
 		if (shouldUsePrefix) {
-			const prefix = this.getPrefixForNoteType(noteType);
+			const prefix = this.getPrefixForNoteType(noteType, box);
 			id = prefix + id;
 		}
 
@@ -3650,39 +3653,102 @@ export class CommandManager {
 	}
 
 	/**
-	 * Gets the prefix for a given note type
+	 * Gets the prefix for a given note type (includes box prefix if applicable)
+	 * Format: boxPrefix + noteTypePrefix
 	 */
 	private getPrefixForNoteType(
 		noteType: "zettel" | "fleeting" | "moc" | "index",
+		box?: Box,
 	): string {
-		switch (noteType) {
-			case "zettel":
-				return this.plugin.settings.zettelPrefix;
-			case "fleeting":
-				return this.plugin.settings.fleetingNotesPrefix;
-			case "moc":
-				return this.plugin.settings.mocsPrefix;
-			case "index":
-				return this.plugin.settings.indexesPrefix;
+		let prefix = "";
+
+		// Add box prefix first (if enabled)
+		if (box && box.useBoxPrefix) {
+			prefix += box.boxPrefix || "";
 		}
+
+		// Add note type prefix
+		if (box) {
+			switch (noteType) {
+				case "zettel":
+					prefix += box.zettelPrefix || "";
+					break;
+				case "fleeting":
+					prefix += box.fleetingNotesPrefix || "";
+					break;
+				case "moc":
+					prefix += box.mocsPrefix || "";
+					break;
+				case "index":
+					prefix += box.indexesPrefix || "";
+					break;
+			}
+		} else {
+			switch (noteType) {
+				case "zettel":
+					prefix += this.plugin.settings.zettelPrefix || "";
+					break;
+				case "fleeting":
+					prefix += this.plugin.settings.fleetingNotesPrefix || "";
+					break;
+				case "moc":
+					prefix += this.plugin.settings.mocsPrefix || "";
+					break;
+				case "index":
+					prefix += this.plugin.settings.indexesPrefix || "";
+					break;
+			}
+		}
+
+		return prefix;
 	}
 
 	/**
 	 * Checks if prefix should be used for a given note type
+	 * Returns true if either box prefix OR note type prefix is enabled
 	 */
 	private shouldUsePrefixForNoteType(
 		noteType: "zettel" | "fleeting" | "moc" | "index",
+		box?: Box,
 	): boolean {
-		switch (noteType) {
-			case "zettel":
-				return this.plugin.settings.useZettelPrefix;
-			case "fleeting":
-				return this.plugin.settings.useFleetingNotesPrefix;
-			case "moc":
-				return this.plugin.settings.useMocsPrefix;
-			case "index":
-				return this.plugin.settings.useIndexesPrefix;
+		// Check if box prefix is enabled
+		const hasBoxPrefix = box && box.useBoxPrefix;
+
+		// Check if note type prefix is enabled
+		let hasNoteTypePrefix = false;
+		if (box) {
+			switch (noteType) {
+				case "zettel":
+					hasNoteTypePrefix = box.useZettelPrefix;
+					break;
+				case "fleeting":
+					hasNoteTypePrefix = box.useFleetingNotesPrefix;
+					break;
+				case "moc":
+					hasNoteTypePrefix = box.useMocsPrefix;
+					break;
+				case "index":
+					hasNoteTypePrefix = box.useIndexesPrefix;
+					break;
+			}
+		} else {
+			switch (noteType) {
+				case "zettel":
+					hasNoteTypePrefix = this.plugin.settings.useZettelPrefix;
+					break;
+				case "fleeting":
+					hasNoteTypePrefix = this.plugin.settings.useFleetingNotesPrefix;
+					break;
+				case "moc":
+					hasNoteTypePrefix = this.plugin.settings.useMocsPrefix;
+					break;
+				case "index":
+					hasNoteTypePrefix = this.plugin.settings.useIndexesPrefix;
+					break;
+			}
 		}
+
+		return hasBoxPrefix || hasNoteTypePrefix;
 	}
 
 	/**
@@ -3781,13 +3847,14 @@ export class CommandManager {
 	/**
 	 * Builds fleeting note filename based on settings
 	 */
-	private buildFleetingFilename(title: string): string {
-		const { fleetingNotesUseZettelId, fleetingNotesFilenameFormat } =
-			this.plugin.settings;
+	private buildFleetingFilename(title: string, box?: Box): string {
+		const fleetingNotesUseZettelId = box?.fleetingNotesUseZettelId ?? this.plugin.settings.fleetingNotesUseZettelId;
+		const fleetingNotesFilenameFormat = box?.fleetingNotesFilenameFormat ?? this.plugin.settings.fleetingNotesFilenameFormat;
 
 		if (fleetingNotesUseZettelId) {
-			// Use zettel ID format
-			return this.generateZettelId();
+			// Use zettel ID format with prefix
+			const zettelId = this.generateZettelId("fleeting", box?.zettelIdFormat, box);
+			return this.buildZettelFilename(zettelId, title, box);
 		}
 
 		// Use custom format if specified
@@ -3802,12 +3869,14 @@ export class CommandManager {
 	/**
 	 * Builds MOC filename based on settings
 	 */
-	private buildMocFilename(title: string): string {
-		const { mocsUseZettelId, mocsFilenameFormat } = this.plugin.settings;
+	private buildMocFilename(title: string, box?: Box): string {
+		const mocsUseZettelId = box?.mocsUseZettelId ?? this.plugin.settings.mocsUseZettelId;
+		const mocsFilenameFormat = box?.mocsFilenameFormat ?? this.plugin.settings.mocsFilenameFormat;
 
 		if (mocsUseZettelId) {
-			// Use zettel ID format
-			return title;
+			// Use zettel ID format with prefix
+			const zettelId = this.generateZettelId("moc", box?.zettelIdFormat, box);
+			return this.buildZettelFilename(zettelId, title, box);
 		}
 
 		// Use custom format if specified
@@ -3822,13 +3891,14 @@ export class CommandManager {
 	/**
 	 * Builds index filename based on settings
 	 */
-	private buildIndexFilename(title: string): string {
-		const { indexesUseZettelId, indexesFilenameFormat } =
-			this.plugin.settings;
+	private buildIndexFilename(title: string, box?: Box): string {
+		const indexesUseZettelId = box?.indexesUseZettelId ?? this.plugin.settings.indexesUseZettelId;
+		const indexesFilenameFormat = box?.indexesFilenameFormat ?? this.plugin.settings.indexesFilenameFormat;
 
 		if (indexesUseZettelId) {
-			// Use zettel ID format
-			return title;
+			// Use zettel ID format with prefix
+			const zettelId = this.generateZettelId("index", box?.zettelIdFormat, box);
+			return this.buildZettelFilename(zettelId, title, box);
 		}
 
 		// Use custom format if specified
@@ -6359,6 +6429,8 @@ export class CommandManager {
 				const count = await this.fixZettelFilenameRecursive(
 					siblingFile,
 					childrenMap,
+					undefined,
+					box,
 				);
 				fixedCount += count;
 			}
@@ -6425,6 +6497,8 @@ export class CommandManager {
 					const count = await this.fixZettelFilenameRecursive(
 						rootFile,
 						childrenMap,
+						undefined,
+						box,
 					);
 					fixedCount += count;
 				}
@@ -6463,7 +6537,7 @@ export class CommandManager {
 				return;
 			}
 
-			const fixed = await this.fixMocFilename(activeFile);
+			const fixed = await this.fixMocFilename(activeFile, box);
 			if (fixed) {
 				new Notice("MOC filename fixed.");
 			} else {
@@ -6492,7 +6566,7 @@ export class CommandManager {
 						continue;
 					}
 
-					const fixed = await this.fixMocFilename(file);
+					const fixed = await this.fixMocFilename(file, box);
 					if (fixed) {
 						fixedCount++;
 					}
@@ -6534,7 +6608,7 @@ export class CommandManager {
 				return;
 			}
 
-			const fixed = await this.fixIndexFilename(activeFile);
+			const fixed = await this.fixIndexFilename(activeFile, box);
 			if (fixed) {
 				new Notice("Index filename fixed.");
 			} else {
@@ -6563,7 +6637,7 @@ export class CommandManager {
 						continue;
 					}
 
-					const fixed = await this.fixIndexFilename(file);
+					const fixed = await this.fixIndexFilename(file, box);
 					if (fixed) {
 						fixedCount++;
 					}
