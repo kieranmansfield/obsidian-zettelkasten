@@ -10,7 +10,6 @@ export interface Box {
 	type: BoxType;
 	folderPath?: string; // Used when type is "folder"
 	tagName?: string; // Used when type is "tag"
-	zettelPrefix: string; // Prefix to distinguish zettels between boxes
 
 	// Zettel settings
 	zettelIdFormat: string;
@@ -21,6 +20,8 @@ export interface Box {
 	addTitleToFilename: boolean;
 	zettelTag: string;
 	enableSequenceReorder: boolean;
+	useZettelPrefix: boolean;
+	zettelPrefix: string;
 
 	// Fleeting notes settings
 	enableFleetingNotes: boolean;
@@ -30,6 +31,8 @@ export interface Box {
 	fleetingNotesUseZettelId: boolean;
 	fleetingNotesFilenameFormat: string;
 	fleetingNotesTag: string;
+	useFleetingNotesPrefix: boolean;
+	fleetingNotesPrefix: string;
 
 	// MOCs settings
 	enableMocs: boolean;
@@ -39,6 +42,8 @@ export interface Box {
 	mocsUseZettelId: boolean;
 	mocsFilenameFormat: string;
 	mocsTag: string;
+	useMocsPrefix: boolean;
+	mocsPrefix: string;
 
 	// Indexes settings
 	enableIndexes: boolean;
@@ -48,6 +53,8 @@ export interface Box {
 	indexesUseZettelId: boolean;
 	indexesFilenameFormat: string;
 	indexesTag: string;
+	useIndexesPrefix: boolean;
+	indexesPrefix: string;
 
 	// Individual command settings (opt-in to expose commands to main palette)
 	enableIndividualCommands: {

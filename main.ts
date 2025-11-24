@@ -80,6 +80,40 @@ export default class ZettelkastenPlugin extends Plugin {
 					box.zettelIdSeparator = "⁝ ";
 					needsSave = true;
 				}
+
+				// Add prefix settings to existing boxes if missing
+				if (box.useZettelPrefix === undefined) {
+					box.useZettelPrefix = false;
+					needsSave = true;
+				}
+				if (!box.zettelPrefix) {
+					box.zettelPrefix = "";
+					needsSave = true;
+				}
+				if (box.useFleetingNotesPrefix === undefined) {
+					box.useFleetingNotesPrefix = false;
+					needsSave = true;
+				}
+				if (!box.fleetingNotesPrefix) {
+					box.fleetingNotesPrefix = "";
+					needsSave = true;
+				}
+				if (box.useMocsPrefix === undefined) {
+					box.useMocsPrefix = false;
+					needsSave = true;
+				}
+				if (!box.mocsPrefix) {
+					box.mocsPrefix = "";
+					needsSave = true;
+				}
+				if (box.useIndexesPrefix === undefined) {
+					box.useIndexesPrefix = false;
+					needsSave = true;
+				}
+				if (!box.indexesPrefix) {
+					box.indexesPrefix = "";
+					needsSave = true;
+				}
 			});
 
 			// Save migrated settings

@@ -47,7 +47,8 @@ export class SequenceReorderModal extends Modal {
 
 	private extractZettelId(basename: string): string | null {
 		// Extract the zettel ID from the filename
-		const match = basename.match(/^(\d+[a-z]*\d*[a-z]*)/);
+		// Match timestamp (13+ digits) followed by optional alternating letter/number sequences
+		const match = basename.match(/^(\d{13,}(?:[a-z]+|\d+)*)/);
 		return match ? match[1] : null;
 	}
 

@@ -8,6 +8,7 @@ import {
 	BoxCommandPaletteModal,
 	BoxCommand,
 } from "../ui/BoxCommandPaletteModal";
+import { FolderSuggestModal } from "../ui/FolderSuggestModal";
 import type ZettelkastenPlugin from "../../main";
 import type { Box } from "../settings/PluginSettings";
 
@@ -66,6 +67,13 @@ export class CommandManager {
 		this.registerGoDownLevelCommand();
 		this.registerAssignParentCommand();
 		this.registerAssignChildCommand();
+		this.registerMoveToRootCommand();
+		this.registerFixFilenamesCommand();
+		this.registerBatchFixFilenamesCommand();
+		this.registerFixCurrentMocFilenameCommand();
+		this.registerBatchFixMocFilenamesCommand();
+		this.registerFixCurrentIndexFilenameCommand();
+		this.registerBatchFixIndexFilenamesCommand();
 		this.registerCreateNoteCommand();
 		this.registerCreateChildZettelCommand();
 		this.registerCreateSiblingZettelCommand();
@@ -77,6 +85,10 @@ export class CommandManager {
 		this.registerCreateMocCommand();
 		this.registerOpenIndexCommand();
 		this.registerCreateIndexCommand();
+		this.registerMoveToCorrectLocationCommand();
+		this.registerBatchMoveToCorrectLocationCommand();
+		this.registerTagAsCorrectTypeCommand();
+		this.registerBatchTagAsCorrectTypeCommand();
 	}
 
 	/**
@@ -651,6 +663,21 @@ export class CommandManager {
 										return;
 									}
 
+									// Extract current ID from active file
+									const currentId = this.extractZettelId(
+										activeFile.basename,
+									);
+									if (!currentId) {
+										new Notice(
+											"Current file doesn't have a valid zettel ID.",
+										);
+										return;
+									}
+
+									// Get all descendants of the current file
+									const descendants =
+										this.getAllDescendants(currentId);
+
 									// Get the folder where zettels are stored
 									const folder = this.getNoteTypeFolder(
 										this.plugin.settings
@@ -658,7 +685,7 @@ export class CommandManager {
 										this.plugin.settings.zettelsLocation,
 									);
 
-									// Generate new child ID based on parent
+									// Generate new child ID based on parent for the active file
 									const newChildId =
 										await this.generateChildZettelId(
 											parentId,
@@ -666,7 +693,7 @@ export class CommandManager {
 											activeFile,
 										);
 
-									// Rename the file with the new child ID
+									// Rename the active file with the new child ID
 									const newPath = `${folder.path}/${newChildId}.md`;
 									await this.plugin.app.fileManager.renameFile(
 										activeFile,
@@ -679,8 +706,30 @@ export class CommandManager {
 										parentFile,
 									);
 
+									// Now rename all descendants to maintain the hierarchy
+									for (const descendant of descendants) {
+										const descendantId =
+											this.extractZettelId(
+												descendant.basename,
+											);
+										if (!descendantId) continue;
+
+										// Transform the descendant ID preserving alternating letter/number pattern
+										const newDescendantId =
+											this.transformDescendantId(
+												descendantId,
+												currentId,
+												newChildId,
+											);
+
+										const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+										await this.plugin.app.fileManager.renameFile(
+											descendant,
+											descendantNewPath,
+										);
+									}
 									new Notice(
-										`Assigned parent and renamed to: ${newChildId}`,
+										`Assigned parent and renamed ${descendants.length + 1} file(s) to: ${newChildId}`,
 									);
 
 									// Keep the file open after rename
@@ -754,6 +803,21 @@ export class CommandManager {
 							this.currentlySelectedText(),
 							async (childFile: TFile) => {
 								try {
+									// Extract current ID from the child file before renaming
+									const currentChildId = this.extractZettelId(
+										childFile.basename,
+									);
+									if (!currentChildId) {
+										new Notice(
+											"Selected child doesn't have a valid zettel ID.",
+										);
+										return;
+									}
+
+									// Get all descendants of the child file
+									const descendants =
+										this.getAllDescendants(currentChildId);
+
 									// Get the folder where zettels are stored
 									const folder = this.getNoteTypeFolder(
 										this.plugin.settings
@@ -782,8 +846,31 @@ export class CommandManager {
 										activeFile,
 									);
 
+									// Now rename all descendants to maintain the hierarchy
+									for (const descendant of descendants) {
+										const descendantId =
+											this.extractZettelId(
+												descendant.basename,
+											);
+										if (!descendantId) continue;
+
+										// Transform the descendant ID preserving alternating letter/number pattern
+										const newDescendantId =
+											this.transformDescendantId(
+												descendantId,
+												currentChildId,
+												newChildId,
+											);
+
+										const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+										await this.plugin.app.fileManager.renameFile(
+											descendant,
+											descendantNewPath,
+										);
+									}
+
 									new Notice(
-										`Assigned child and renamed to: ${newChildId}`,
+										`Assigned child and renamed ${descendants.length + 1} file(s) to: ${newChildId}`,
 									);
 								} catch (error) {
 									new Notice(
@@ -798,6 +885,715 @@ export class CommandManager {
 				return true;
 			},
 		});
+	}
+
+	/**
+	 * Registers the "Move to Root" command
+	 * Moves a zettel and its descendants to root level using the file's creation date
+	 */
+	private registerMoveToRootCommand(): void {
+		this.plugin.addCommand({
+			id: "move-to-root",
+			name: "Move to Root",
+			icon: "arrow-up-to-line",
+			checkCallback: (checking: boolean) => {
+				const activeFile = this.plugin.app.workspace.getActiveFile();
+				if (!activeFile) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				(async () => {
+					try {
+						// Extract current ID from active file
+						const currentId = this.extractZettelId(
+							activeFile.basename,
+						);
+						if (!currentId) {
+							new Notice(
+								"Current file doesn't have a valid zettel ID.",
+							);
+							return;
+						}
+
+						// Get all descendants of the current file
+						const descendants = this.getAllDescendants(currentId);
+
+						// Get the folder where zettels are stored
+						const folder = this.getNoteTypeFolder(
+							this.plugin.settings.zettelsUseSeparateLocation,
+							this.plugin.settings.zettelsLocation,
+						);
+
+						// Generate new root ID based on file's creation date
+						const creationTime = activeFile.stat.ctime;
+						const creationDate = new Date(creationTime);
+						const newRootId = this.formatTimestamp(creationDate);
+
+						// Check if this ID already exists
+						const existingFile = this.plugin.app.vault
+							.getMarkdownFiles()
+							.find((f) => f.basename === newRootId);
+
+						if (
+							existingFile &&
+							existingFile.path !== activeFile.path
+						) {
+							new Notice(
+								`A file with ID ${newRootId} already exists. Cannot move to root.`,
+							);
+							return;
+						}
+
+						// Rename the active file with the new root ID
+						const newPath = `${folder.path}/${newRootId}.md`;
+						await this.plugin.app.fileManager.renameFile(
+							activeFile,
+							newPath,
+						);
+
+						// Remove parent link from file (move to root)
+						await this.removeParentLinkFromFile(activeFile);
+
+						// Now rename all descendants to maintain the hierarchy
+						for (const descendant of descendants) {
+							const descendantId = this.extractZettelId(
+								descendant.basename,
+							);
+							if (!descendantId) continue;
+
+							// Transform the descendant ID preserving alternating letter/number pattern
+							const newDescendantId = this.transformDescendantId(
+								descendantId,
+								currentId,
+								newRootId,
+							);
+
+							const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+							await this.plugin.app.fileManager.renameFile(
+								descendant,
+								descendantNewPath,
+							);
+						}
+
+						new Notice(
+							`Moved to root and renamed ${descendants.length + 1} file(s) to: ${newRootId}`,
+						);
+
+						// Keep the file open after rename
+						await this.plugin.app.workspace
+							.getLeaf()
+							.openFile(activeFile);
+					} catch (error) {
+						new Notice(`Error moving to root: ${error.message}`);
+					}
+				})();
+
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Fix Filenames" command
+	 * Normalizes active file, its siblings, and their descendants to have consistent timestamp length
+	 */
+	private registerFixFilenamesCommand(): void {
+		this.plugin.addCommand({
+			id: "fix-filenames",
+			name: "Fix Filenames (Normalize Length)",
+			icon: "file-check",
+			callback: async () => {
+				try {
+					const activeFile =
+						this.plugin.app.workspace.getActiveFile();
+					if (!activeFile) {
+						new Notice("No active file.");
+						return;
+					}
+
+					const currentId = this.extractZettelId(activeFile.basename);
+					if (!currentId) {
+						new Notice("Active file is not a zettel.");
+						return;
+					}
+
+					const allFiles = this.plugin.app.vault.getMarkdownFiles();
+					const zettels: TFile[] = [];
+
+					// Find all files with zettel IDs
+					for (const file of allFiles) {
+						const id = this.extractZettelId(file.basename);
+						if (id) {
+							zettels.push(file);
+						}
+					}
+
+					// Build parent-child relationships
+					const childrenMap = new Map<string, TFile[]>();
+
+					for (const file of zettels) {
+						const id = this.extractZettelId(file.basename)!;
+						const parentId = this.getParentZettelId(id);
+
+						if (parentId) {
+							if (!childrenMap.has(parentId)) {
+								childrenMap.set(parentId, []);
+							}
+							childrenMap.get(parentId)!.push(file);
+						}
+					}
+
+					// Find siblings (files with the same parent, including the active file)
+					const currentParentId = this.getParentZettelId(currentId);
+					let siblingsToProcess: TFile[] = [];
+
+					if (currentParentId) {
+						// Has a parent - get all siblings including self
+						siblingsToProcess =
+							childrenMap.get(currentParentId) || [];
+					} else {
+						// Is a root - only process itself
+						siblingsToProcess = [activeFile];
+					}
+
+					let fixedCount = 0;
+
+					// Process each sibling and its descendants
+					for (const siblingFile of siblingsToProcess) {
+						const count = await this.fixZettelFilenameRecursive(
+							siblingFile,
+							childrenMap,
+						);
+						fixedCount += count;
+					}
+
+					if (fixedCount > 0) {
+						new Notice(
+							`Fixed ${fixedCount} filename(s) to consistent length.`,
+						);
+					} else {
+						new Notice("All filenames are already correct.");
+					}
+				} catch (error) {
+					new Notice(`Error fixing filenames: ${error.message}`);
+				}
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Batch Fix Filenames by Folder" command
+	 * Normalizes all zettel filenames within a selected folder (including subfolders)
+	 */
+	private registerBatchFixFilenamesCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-fix-filenames",
+			name: "Batch Fix Filenames (Select Folder)",
+			icon: "folder-check",
+			callback: async () => {
+				new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+					try {
+						const allFiles =
+							this.plugin.app.vault.getMarkdownFiles();
+						const zettels: TFile[] = [];
+
+						// Find all files with zettel IDs in the selected folder and subfolders
+						for (const file of allFiles) {
+							// Check if file is within the selected folder
+							if (this.isFileInFolder(file, folder)) {
+								const id = this.extractZettelId(file.basename);
+								if (id) {
+									zettels.push(file);
+								}
+							}
+						}
+
+						if (zettels.length === 0) {
+							new Notice(`No zettels found in ${folder.path}.`);
+							return;
+						}
+
+						// Build parent-child relationships
+						const parentMap = new Map<string, string>();
+						const childrenMap = new Map<string, TFile[]>();
+
+						for (const file of zettels) {
+							const id = this.extractZettelId(file.basename)!;
+							const parentId = this.getParentZettelId(id);
+
+							if (parentId) {
+								parentMap.set(id, parentId);
+
+								if (!childrenMap.has(parentId)) {
+									childrenMap.set(parentId, []);
+								}
+								childrenMap.get(parentId)!.push(file);
+							}
+						}
+
+						// Find root zettels in folder (no parent or parent not in folder)
+						const rootZettels = zettels.filter((file) => {
+							const id = this.extractZettelId(file.basename)!;
+							const parentId = parentMap.get(id);
+
+							// Root if no parent, or parent is not in the zettels list
+							return (
+								!parentId ||
+								!zettels.some(
+									(f) =>
+										this.extractZettelId(f.basename) ===
+										parentId,
+								)
+							);
+						});
+
+						let fixedCount = 0;
+
+						// Process each root and its descendants
+						for (const rootFile of rootZettels) {
+							const count = await this.fixZettelFilenameRecursive(
+								rootFile,
+								childrenMap,
+							);
+							fixedCount += count;
+						}
+
+						const folderDisplay =
+							folder.path === "/" ? "root" : folder.path;
+						if (fixedCount > 0) {
+							new Notice(
+								`Fixed ${fixedCount} filename(s) in ${folderDisplay}.`,
+							);
+						} else {
+							new Notice(
+								`All filenames in ${folderDisplay} are already correct.`,
+							);
+						}
+					} catch (error) {
+						new Notice(`Error fixing filenames: ${error.message}`);
+					}
+				}).open();
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Fix Current MOC Filename" command
+	 * Renames the current MOC file to match the configured filename format
+	 */
+	private registerFixCurrentMocFilenameCommand(): void {
+		this.plugin.addCommand({
+			id: "fix-current-moc-filename",
+			name: "Fix Current MOC Filename",
+			icon: "file-check",
+			callback: async () => {
+				try {
+					const activeFile =
+						this.plugin.app.workspace.getActiveFile();
+					if (!activeFile) {
+						new Notice("No active file.");
+						return;
+					}
+
+					// Check if file has MOC tag
+					const noteType = this.getNoteTypeFromFile(activeFile);
+					if (noteType !== "moc") {
+						new Notice("Active file is not a MOC.");
+						return;
+					}
+
+					const fixed = await this.fixMocFilename(activeFile);
+					if (fixed) {
+						new Notice("MOC filename fixed.");
+					} else {
+						new Notice("MOC filename is already correct.");
+					}
+				} catch (error) {
+					new Notice(`Error fixing MOC filename: ${error.message}`);
+				}
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Batch Fix MOC Filenames" command
+	 * Renames MOC files in a selected folder to match the configured filename format
+	 */
+	private registerBatchFixMocFilenamesCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-fix-moc-filenames",
+			name: "Batch Fix MOC Filenames (Select Folder)",
+			icon: "folder-check",
+			callback: async () => {
+				new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+					try {
+						const allFiles =
+							this.plugin.app.vault.getMarkdownFiles();
+						let fixedCount = 0;
+
+						for (const file of allFiles) {
+							// Check if file is within the selected folder
+							if (!this.isFileInFolder(file, folder)) {
+								continue;
+							}
+
+							// Skip ignored folders
+							if (this.shouldIgnoreFile(file)) {
+								continue;
+							}
+
+							// Check if file has MOC tag
+							const noteType = this.getNoteTypeFromFile(file);
+							if (noteType !== "moc") {
+								continue;
+							}
+
+							const fixed = await this.fixMocFilename(file);
+							if (fixed) {
+								fixedCount++;
+							}
+						}
+
+						const folderDisplay =
+							folder.path === "/" ? "root" : folder.path;
+						if (fixedCount > 0) {
+							new Notice(
+								`Fixed ${fixedCount} MOC filename(s) in ${folderDisplay}.`,
+							);
+						} else {
+							new Notice(
+								`All MOC filenames in ${folderDisplay} are already correct.`,
+							);
+						}
+					} catch (error) {
+						new Notice(
+							`Error fixing MOC filenames: ${error.message}`,
+						);
+					}
+				}).open();
+			},
+		});
+	}
+
+	/**
+	 * Fixes a single MOC file's filename to match the configured format
+	 * Returns true if the file was renamed, false if already correct
+	 */
+	private async fixMocFilename(file: TFile): Promise<boolean> {
+		// Get title from frontmatter or current filename
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const title = cache?.frontmatter?.title || file.basename;
+
+		// Build the expected filename based on settings
+		const expectedFilename = this.buildMocFilename(title);
+
+		// Check if filename needs fixing
+		if (file.basename !== expectedFilename) {
+			const folder = file.parent || this.plugin.app.vault.getRoot();
+			const newPath = `${folder.path}/${expectedFilename}.md`;
+
+			// Check if target path already exists
+			const existing =
+				this.plugin.app.vault.getAbstractFileByPath(newPath);
+			if (existing && existing !== file) {
+				console.warn(
+					`Cannot fix ${file.basename}: ${expectedFilename}.md already exists`,
+				);
+				return false;
+			} else {
+				await this.plugin.app.fileManager.renameFile(file, newPath);
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Registers the "Fix Current Index Filename" command
+	 * Renames the current Index file to match the configured filename format
+	 */
+	private registerFixCurrentIndexFilenameCommand(): void {
+		this.plugin.addCommand({
+			id: "fix-current-index-filename",
+			name: "Fix Current Index Filename",
+			icon: "file-check",
+			callback: async () => {
+				try {
+					const activeFile =
+						this.plugin.app.workspace.getActiveFile();
+					if (!activeFile) {
+						new Notice("No active file.");
+						return;
+					}
+
+					// Check if file has Index tag
+					const noteType = this.getNoteTypeFromFile(activeFile);
+					if (noteType !== "index") {
+						new Notice("Active file is not an Index.");
+						return;
+					}
+
+					const fixed = await this.fixIndexFilename(activeFile);
+					if (fixed) {
+						new Notice("Index filename fixed.");
+					} else {
+						new Notice("Index filename is already correct.");
+					}
+				} catch (error) {
+					new Notice(`Error fixing Index filename: ${error.message}`);
+				}
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Batch Fix Index Filenames" command
+	 * Renames Index files in a selected folder to match the configured filename format
+	 */
+	private registerBatchFixIndexFilenamesCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-fix-index-filenames",
+			name: "Batch Fix Index Filenames (Select Folder)",
+			icon: "folder-check",
+			callback: async () => {
+				new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+					try {
+						const allFiles =
+							this.plugin.app.vault.getMarkdownFiles();
+						let fixedCount = 0;
+
+						for (const file of allFiles) {
+							// Check if file is within the selected folder
+							if (!this.isFileInFolder(file, folder)) {
+								continue;
+							}
+
+							// Skip ignored folders
+							if (this.shouldIgnoreFile(file)) {
+								continue;
+							}
+
+							// Check if file has Index tag
+							const noteType = this.getNoteTypeFromFile(file);
+							if (noteType !== "index") {
+								continue;
+							}
+
+							const fixed = await this.fixIndexFilename(file);
+							if (fixed) {
+								fixedCount++;
+							}
+						}
+
+						const folderDisplay =
+							folder.path === "/" ? "root" : folder.path;
+						if (fixedCount > 0) {
+							new Notice(
+								`Fixed ${fixedCount} Index filename(s) in ${folderDisplay}.`,
+							);
+						} else {
+							new Notice(
+								`All Index filenames in ${folderDisplay} are already correct.`,
+							);
+						}
+					} catch (error) {
+						new Notice(
+							`Error fixing Index filenames: ${error.message}`,
+						);
+					}
+				}).open();
+			},
+		});
+	}
+
+	/**
+	 * Fixes a single Index file's filename to match the configured format
+	 * Returns true if the file was renamed, false if already correct
+	 */
+	private async fixIndexFilename(file: TFile): Promise<boolean> {
+		// Get title from frontmatter or current filename
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const title = cache?.frontmatter?.title || file.basename;
+
+		// Build the expected filename based on settings
+		const expectedFilename = this.buildIndexFilename(title);
+
+		// Check if filename needs fixing
+		if (file.basename !== expectedFilename) {
+			const folder = file.parent || this.plugin.app.vault.getRoot();
+			const newPath = `${folder.path}/${expectedFilename}.md`;
+
+			// Check if target path already exists
+			const existing =
+				this.plugin.app.vault.getAbstractFileByPath(newPath);
+			if (existing && existing !== file) {
+				console.warn(
+					`Cannot fix ${file.basename}: ${expectedFilename}.md already exists`,
+				);
+				return false;
+			} else {
+				await this.plugin.app.fileManager.renameFile(file, newPath);
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Helper method to check if a file is within a folder (including subfolders)
+	 */
+	private isFileInFolder(file: TFile, folder: TFolder): boolean {
+		// Root folder contains everything
+		if (folder.path === "/") {
+			return true;
+		}
+
+		// Check if file path starts with folder path
+		return file.path.startsWith(folder.path + "/");
+	}
+
+	/**
+	 * Recursively fixes a zettel and its descendants to have consistent timestamp length
+	 * Returns the number of files fixed
+	 */
+	private async fixZettelFilenameRecursive(
+		file: TFile,
+		childrenMap: Map<string, TFile[]>,
+		parentNormalizedId?: string,
+	): Promise<number> {
+		const currentId = this.extractZettelId(file.basename)!;
+		let normalizedId: string;
+
+		if (parentNormalizedId) {
+			// If we have a parent that was normalized, we need to rebuild this ID based on the normalized parent
+			const currentIdWithoutPrefix = this.stripPrefix(currentId);
+			const currentTimestamp =
+				currentIdWithoutPrefix.match(/^(\d+)/)?.[1] || "";
+			const currentHierarchy = currentIdWithoutPrefix.substring(
+				currentTimestamp.length,
+			);
+
+			// Extract parent's normalized timestamp (without prefix)
+			const parentIdWithoutPrefix = this.stripPrefix(parentNormalizedId);
+			const parentTimestamp =
+				parentIdWithoutPrefix.match(/^(\d+)/)?.[1] || "";
+
+			// Determine this file's own prefix based on its note type
+			const noteType = this.getNoteTypeFromFile(file);
+			const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType);
+			const desiredPrefix = shouldUsePrefix
+				? this.getPrefixForNoteType(noteType)
+				: "";
+
+			// Use the parent's normalized timestamp with this file's own prefix and hierarchy
+			normalizedId = desiredPrefix + parentTimestamp + currentHierarchy;
+		} else {
+			// Root level - normalize independently and add/update prefix based on note type
+			normalizedId = this.normalizeZettelId(file, currentId);
+		}
+
+		let count = 0;
+
+		// Build the full filename with separator and title
+		const title = this.getTitleFromFile(file);
+		const newFilename = this.buildZettelFilename(normalizedId, title);
+
+		// Check if this file needs fixing (compare full filename, not just ID)
+		if (file.basename !== newFilename) {
+			const folder = file.parent || this.plugin.app.vault.getRoot();
+			const newPath = `${folder.path}/${newFilename}.md`;
+
+			// Check if target path already exists
+			const existing =
+				this.plugin.app.vault.getAbstractFileByPath(newPath);
+			if (existing && existing !== file) {
+				console.warn(
+					`Cannot fix ${file.basename}: ${newFilename}.md already exists`,
+				);
+			} else {
+				await this.plugin.app.fileManager.renameFile(file, newPath);
+				count++;
+			}
+		}
+
+		// Process children with the normalized ID as their parent
+		const children = childrenMap.get(currentId) || [];
+		for (const child of children) {
+			const childCount = await this.fixZettelFilenameRecursive(
+				child,
+				childrenMap,
+				normalizedId,
+			);
+			count += childCount;
+		}
+
+		return count;
+	}
+
+	/**
+	 * Normalizes a zettel ID to have consistent timestamp length (17 digits)
+	 * Maintains the hierarchy suffix and adds/updates prefix based on note type
+	 */
+	private normalizeZettelId(file: TFile, zettelId: string): string {
+		// Determine note type from file tags
+		const noteType = this.getNoteTypeFromFile(file);
+		const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType);
+		const desiredPrefix = shouldUsePrefix
+			? this.getPrefixForNoteType(noteType)
+			: "";
+
+		// Extract current prefix (if any) and strip it
+		const idWithoutPrefix = this.stripPrefix(zettelId);
+
+		const timestampMatch = idWithoutPrefix.match(/^(\d+)/);
+		if (!timestampMatch) return zettelId;
+
+		const timestamp = timestampMatch[1];
+		const hierarchy = idWithoutPrefix.substring(timestamp.length);
+
+		// Target: 17 digits (YYYYMMDDHHmmssSSS)
+		const targetLength = 17;
+
+		let normalizedTimestamp: string;
+
+		if (timestamp.length < targetLength) {
+			// Pad with current milliseconds if ending with 000, otherwise pad with zeros
+			normalizedTimestamp = timestamp.padEnd(targetLength, "0");
+
+			// If the padded timestamp ends with 000, replace with current milliseconds
+			if (normalizedTimestamp.endsWith("000")) {
+				const currentMs = new Date()
+					.getMilliseconds()
+					.toString()
+					.padStart(3, "0");
+				normalizedTimestamp =
+					normalizedTimestamp.substring(0, targetLength - 3) +
+					currentMs;
+			}
+		} else if (timestamp.length > targetLength) {
+			// Truncate to target length
+			normalizedTimestamp = timestamp.substring(0, targetLength);
+		} else {
+			// Already correct length - check if ends with 000
+			if (timestamp.endsWith("000")) {
+				const currentMs = new Date()
+					.getMilliseconds()
+					.toString()
+					.padStart(3, "0");
+				normalizedTimestamp =
+					timestamp.substring(0, targetLength - 3) + currentMs;
+			} else {
+				normalizedTimestamp = timestamp;
+			}
+		}
+
+		return desiredPrefix + normalizedTimestamp + hierarchy;
 	}
 
 	/**
@@ -1315,19 +2111,408 @@ export class CommandManager {
 	}
 
 	/**
+	 * Registers the "Move to Correct Location" command
+	 * Moves the current file to its correct folder based on note type
+	 * Only active when at least one note type has separate location enabled
+	 */
+	private registerMoveToCorrectLocationCommand(): void {
+		this.plugin.addCommand({
+			id: "move-to-correct-location",
+			name: "Move to Correct Location",
+			icon: "folder-input",
+			checkCallback: (checking: boolean) => {
+				// Only show command if at least one note type has separate location enabled
+				const hasSeparateLocations =
+					this.plugin.settings.zettelsUseSeparateLocation ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
+
+				if (!hasSeparateLocations) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				this.executeMoveToCorrectLocationCommand();
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Executes the move to correct location command logic
+	 */
+	private async executeMoveToCorrectLocationCommand(): Promise<void> {
+		try {
+			const activeFile = this.plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice("No active file.");
+				return;
+			}
+
+			const moved = await this.moveFileToCorrectLocation(activeFile);
+			if (moved) {
+				new Notice("File moved to correct location.");
+			} else {
+				new Notice("File is already in the correct location.");
+			}
+		} catch (error) {
+			new Notice(`Error moving file: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Registers the "Batch Move to Correct Location" command
+	 * Moves all files in a selected folder to their correct locations based on note type
+	 * Only active when at least one note type has separate location enabled
+	 */
+	private registerBatchMoveToCorrectLocationCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-move-to-correct-location",
+			name: "Batch Move to Correct Location (Select Folder)",
+			icon: "folders",
+			checkCallback: (checking: boolean) => {
+				// Only show command if at least one note type has separate location enabled
+				const hasSeparateLocations =
+					this.plugin.settings.zettelsUseSeparateLocation ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
+
+				if (!hasSeparateLocations) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				this.executeBatchMoveToCorrectLocationCommand();
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Executes the batch move to correct location command logic
+	 */
+	private async executeBatchMoveToCorrectLocationCommand(): Promise<void> {
+		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+			try {
+				const allFiles = this.plugin.app.vault.getMarkdownFiles();
+				let movedCount = 0;
+
+				for (const file of allFiles) {
+					// Check if file is within the selected folder
+					if (!this.isFileInFolder(file, folder)) {
+						continue;
+					}
+
+					// Skip ignored folders
+					if (this.shouldIgnoreFile(file)) {
+						continue;
+					}
+
+					const moved = await this.moveFileToCorrectLocation(file);
+					if (moved) {
+						movedCount++;
+					}
+				}
+
+				const folderDisplay =
+					folder.path === "/" ? "root" : folder.path;
+				if (movedCount > 0) {
+					new Notice(
+						`Moved ${movedCount} file(s) from ${folderDisplay}.`,
+					);
+				} else {
+					new Notice(
+						`All files in ${folderDisplay} are already in correct locations.`,
+					);
+				}
+			} catch (error) {
+				new Notice(`Error moving files: ${error.message}`);
+			}
+		}).open();
+	}
+
+	/**
+	 * Moves a file to its correct location based on note type
+	 * Returns true if the file was moved, false if already correct
+	 */
+	private async moveFileToCorrectLocation(file: TFile): Promise<boolean> {
+		const noteType = this.getNoteTypeFromFile(file);
+		let targetFolder: TFolder;
+
+		switch (noteType) {
+			case "fleeting":
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.fleetingNotesUseSeparateLocation,
+					this.plugin.settings.fleetingNotesLocation,
+				);
+				break;
+			case "moc":
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.mocsUseSeparateLocation,
+					this.plugin.settings.mocsLocation,
+				);
+				break;
+			case "index":
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.indexesUseSeparateLocation,
+					this.plugin.settings.indexesLocation,
+				);
+				break;
+			default: // zettel
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.zettelsUseSeparateLocation,
+					this.plugin.settings.zettelsLocation,
+				);
+		}
+
+		// Check if file is already in the correct folder
+		const currentFolder = file.parent;
+		if (currentFolder && currentFolder.path === targetFolder.path) {
+			return false;
+		}
+
+		// Move the file
+		const newPath = `${targetFolder.path}/${file.name}`;
+
+		// Check if target path already exists
+		const existing = this.plugin.app.vault.getAbstractFileByPath(newPath);
+		if (existing && existing !== file) {
+			console.warn(
+				`Cannot move ${file.basename}: ${file.name} already exists in target folder`,
+			);
+			return false;
+		}
+
+		await this.plugin.app.fileManager.renameFile(file, newPath);
+		return true;
+	}
+
+	/**
+	 * Registers the "Tag as Correct Type" command
+	 * Adds the correct tag to the current file based on its note type
+	 * Only active when at least one note type has separate location enabled
+	 */
+	private registerTagAsCorrectTypeCommand(): void {
+		this.plugin.addCommand({
+			id: "tag-as-correct-type",
+			name: "Tag as Correct Type",
+			icon: "tag",
+			checkCallback: (checking: boolean) => {
+				// Only show command if at least one note type has separate location enabled
+				const hasSeparateLocations =
+					this.plugin.settings.zettelsUseSeparateLocation ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
+
+				if (!hasSeparateLocations) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				this.executeTagAsCorrectTypeCommand();
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Executes the tag as correct type command logic
+	 */
+	private async executeTagAsCorrectTypeCommand(): Promise<void> {
+		try {
+			const activeFile = this.plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice("No active file.");
+				return;
+			}
+
+			const tagged = await this.tagFileAsCorrectType(activeFile);
+			if (tagged) {
+				new Notice("File tagged with correct type.");
+			} else {
+				new Notice("File already has the correct tag.");
+			}
+		} catch (error) {
+			new Notice(`Error tagging file: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Registers the "Batch Tag as Correct Type" command
+	 * Adds correct tags to all files in a selected folder based on note type
+	 * Only active when at least one note type has separate location enabled
+	 */
+	private registerBatchTagAsCorrectTypeCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-tag-as-correct-type",
+			name: "Batch Tag as Correct Type (Select Folder)",
+			icon: "tags",
+			checkCallback: (checking: boolean) => {
+				// Only show command if at least one note type has separate location enabled
+				const hasSeparateLocations =
+					this.plugin.settings.zettelsUseSeparateLocation ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
+
+				if (!hasSeparateLocations) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				this.executeBatchTagAsCorrectTypeCommand();
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Executes the batch tag as correct type command logic
+	 */
+	private async executeBatchTagAsCorrectTypeCommand(): Promise<void> {
+		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+			try {
+				const allFiles = this.plugin.app.vault.getMarkdownFiles();
+				let taggedCount = 0;
+
+				for (const file of allFiles) {
+					// Check if file is within the selected folder
+					if (!this.isFileInFolder(file, folder)) {
+						continue;
+					}
+
+					// Skip ignored folders
+					if (this.shouldIgnoreFile(file)) {
+						continue;
+					}
+
+					const tagged = await this.tagFileAsCorrectType(file);
+					if (tagged) {
+						taggedCount++;
+					}
+				}
+
+				const folderDisplay =
+					folder.path === "/" ? "root" : folder.path;
+				if (taggedCount > 0) {
+					new Notice(
+						`Tagged ${taggedCount} file(s) in ${folderDisplay}.`,
+					);
+				} else {
+					new Notice(
+						`All files in ${folderDisplay} already have correct tags.`,
+					);
+				}
+			} catch (error) {
+				new Notice(`Error tagging files: ${error.message}`);
+			}
+		}).open();
+	}
+
+	/**
+	 * Tags a file with the correct note type tag based on its current type
+	 * Returns true if a tag was added, false if already correct
+	 */
+	private async tagFileAsCorrectType(file: TFile): Promise<boolean> {
+		const noteType = this.getNoteTypeFromFile(file);
+		let targetTag: string;
+
+		switch (noteType) {
+			case "fleeting":
+				targetTag = this.plugin.settings.fleetingNotesTag;
+				break;
+			case "moc":
+				targetTag = this.plugin.settings.mocsTag;
+				break;
+			case "index":
+				targetTag = this.plugin.settings.indexesTag;
+				break;
+			default: // zettel
+				targetTag = this.plugin.settings.zettelTag;
+		}
+
+		// Check if file already has the target tag
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const inlineTags =
+			cache?.tags?.map((t) => t.tag.replace("#", "")) || [];
+		const frontmatterTags = cache?.frontmatter?.tags || [];
+
+		const allTags = [
+			...inlineTags,
+			...(Array.isArray(frontmatterTags)
+				? frontmatterTags
+				: [frontmatterTags].filter(Boolean)),
+		].map((t) => String(t).replace("#", ""));
+
+		if (allTags.includes(targetTag)) {
+			return false;
+		}
+
+		// Add the tag to frontmatter
+		await this.plugin.app.fileManager.processFrontMatter(
+			file,
+			(frontmatter) => {
+				if (!frontmatter.tags) {
+					frontmatter.tags = [];
+				}
+				if (typeof frontmatter.tags === "string") {
+					frontmatter.tags = [frontmatter.tags];
+				}
+				if (!frontmatter.tags.includes(targetTag)) {
+					frontmatter.tags.push(targetTag);
+				}
+			},
+		);
+
+		return true;
+	}
+
+	/**
 	 * Extracts zettel ID from filename
 	 * Looks for timestamp-based ID with optional hierarchy at the start of filename
+	 * Supports separator format: "z20241118123456789⁝ Title" extracts "z20241118123456789"
 	 */
 	private extractZettelId(filename: string): string | null {
-		// Match timestamp pattern (13+ digits to handle various formats) with optional alternating letters/numbers
-		// Examples: 2025111321511, 20251114154532123, 20251114154532123a, 20251114154532123a1
-		const match = filename.match(/^(\d{13,}(?:[a-z]+|\d+)*)/);
-		return match ? match[1] : null;
+		// First, strip any separator and title portion
+		const separator = this.plugin.settings.zettelIdSeparator;
+		let idPortion = filename;
+
+		// Check if filename contains the separator
+		const separatorIndex = filename.indexOf(separator);
+		if (separatorIndex !== -1) {
+			idPortion = filename.substring(0, separatorIndex);
+		}
+
+		// Match optional prefix followed by timestamp pattern (13+ digits) with optional alternating letters/numbers
+		// Examples: "20241118123456789", "Z20241118123456789a", "f20241118123456789a1"
+		const match = idPortion.match(/^([A-Za-z]*)(\d{13,}(?:[a-z]+|\d+)*)/);
+		if (match) {
+			// Return prefix + timestamp + hierarchy
+			return match[1] + match[2];
+		}
+		return null;
 	}
 
 	/**
 	 * Generates a child zettel ID based on parent ID
 	 * Alternates between letters and numbers: 123 -> 123a -> 123a1 -> 123a1a -> 123a1a1
+	 * Letters expand: a-z, then aa-zz, then aaa-zzz, etc.
+	 * Numbers continue incrementing: 1, 2, 3... 9, 10, 11, etc.
 	 * If moving an existing file and there's a collision, uses file's creation date or generates new ID
 	 */
 	private async generateChildZettelId(
@@ -1341,27 +2526,33 @@ export class CommandManager {
 		const shouldUseLetter = this.shouldUseLetterForChild(parentId);
 
 		if (shouldUseLetter) {
-			// Find all children with letters (e.g., 123a, 123b, 123c)
+			// Find all children with letters (e.g., 123a, 123b, 123z, 123aa, 123ab, etc.)
 			const childPattern = new RegExp(
-				`^${this.escapeRegex(parentId)}([a-z])(?![a-z0-9])`,
+				`^${this.escapeRegex(parentId)}([a-z]+)(?![a-z0-9])`,
 			);
-			let maxLetter = "";
+			let maxLetterSequence = "";
 
 			for (const file of files) {
 				const match = file.basename.match(childPattern);
 				if (match) {
-					const letter = match[1];
-					if (!maxLetter || letter > maxLetter) {
-						maxLetter = letter;
+					const letterSeq = match[1];
+					if (
+						!maxLetterSequence ||
+						this.compareLetterSequences(
+							letterSeq,
+							maxLetterSequence,
+						) > 0
+					) {
+						maxLetterSequence = letterSeq;
 					}
 				}
 			}
 
-			// Return next available letter (a if none exist, otherwise increment)
-			const nextLetter = maxLetter
-				? String.fromCharCode(maxLetter.charCodeAt(0) + 1)
+			// Return next available letter sequence
+			const nextLetterSequence = maxLetterSequence
+				? this.incrementLetterSequence(maxLetterSequence)
 				: "a";
-			return `${parentId}${nextLetter}`;
+			return `${parentId}${nextLetterSequence}`;
 		} else {
 			// Find all children with numbers (e.g., 123a1, 123a2, 123a3)
 			const childPattern = new RegExp(
@@ -1385,27 +2576,85 @@ export class CommandManager {
 	}
 
 	/**
+	 * Compares two letter sequences (e.g., "a" vs "z", "z" vs "aa", "az" vs "ba")
+	 * Returns: negative if seq1 < seq2, 0 if equal, positive if seq1 > seq2
+	 */
+	private compareLetterSequences(seq1: string, seq2: string): number {
+		// First compare by length - longer sequences come after shorter ones
+		if (seq1.length !== seq2.length) {
+			return seq1.length - seq2.length;
+		}
+
+		// Same length - compare alphabetically
+		return seq1.localeCompare(seq2);
+	}
+
+	/**
+	 * Increments a letter sequence: a->b, z->aa, az->ba, zz->aaa
+	 */
+	private incrementLetterSequence(seq: string): string {
+		const chars = seq.split("");
+		let carry = true;
+
+		// Start from the rightmost character
+		for (let i = chars.length - 1; i >= 0 && carry; i--) {
+			if (chars[i] === "z") {
+				chars[i] = "a";
+				// carry remains true
+			} else {
+				chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
+				carry = false;
+			}
+		}
+
+		// If we still have a carry, we need to add a new 'a' at the beginning
+		if (carry) {
+			chars.unshift("a");
+		}
+
+		return chars.join("");
+	}
+
+	/**
+	 * Converts a letter sequence to a number: a->1, b->2, z->26, aa->27, ab->28, etc.
+	 * This is like base-26 but starting from 1 instead of 0
+	 */
+	private letterSequenceToNumber(seq: string): number {
+		let result = 0;
+		const base = 26;
+
+		for (let i = 0; i < seq.length; i++) {
+			const charValue = seq.charCodeAt(i) - 96; // a->1, b->2, ... z->26
+			result = result * base + charValue;
+		}
+
+		return result;
+	}
+
+	/**
 	 * Determines if the next child should use a letter or number
-	 * Alternates based on hierarchy depth
+	 * Root children (first level) always use letters
+	 * After that, alternates: letters -> numbers -> letters -> numbers
 	 */
 	private shouldUseLetterForChild(parentId: string): boolean {
+		// Strip prefix to work with timestamp and hierarchy only
+		const idWithoutPrefix = this.stripPrefix(parentId);
+
 		// Remove the timestamp portion (first 13+ digits)
-		const hierarchyPart = parentId.replace(/^\d{13,}/, "");
+		const hierarchyPart = idWithoutPrefix.replace(/^\d{13,}/, "");
 
 		if (!hierarchyPart) {
-			// No hierarchy yet, first level should use letters
+			// No hierarchy yet, first level (direct children of root) should use letters
 			return true;
 		}
 
-		// Count the depth by counting letters and numbers
-		const letterMatches = hierarchyPart.match(/[a-z]/g);
-		const numberMatches = hierarchyPart.match(/\d+/g);
+		// Parse hierarchy into segments to count depth
+		const segments = this.parseHierarchySegments(hierarchyPart);
 
-		const letterCount = letterMatches ? letterMatches.length : 0;
-		const numberCount = numberMatches ? numberMatches.length : 0;
-
-		// If counts are equal, use letter; otherwise use number
-		return letterCount === numberCount;
+		// After letters (level 1), alternate between numbers and letters
+		// Odd depth (1, 3, 5...) = letters
+		// Even depth (2, 4, 6...) = numbers
+		return segments.length % 2 === 1;
 	}
 
 	/**
@@ -1413,6 +2662,146 @@ export class CommandManager {
 	 */
 	private escapeRegex(str: string): string {
 		return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	}
+
+	/**
+	 * Gets all descendants of a zettel (files whose IDs start with the given ID)
+	 */
+	private getAllDescendants(zettelId: string): TFile[] {
+		const allFiles = this.plugin.app.vault.getMarkdownFiles();
+		const descendants: TFile[] = [];
+
+		for (const file of allFiles) {
+			const fileId = this.extractZettelId(file.basename);
+			if (!fileId) continue;
+
+			// Check if this file's ID starts with the given zettel ID
+			// and is not the exact same file
+			if (fileId.startsWith(zettelId) && fileId !== zettelId) {
+				descendants.push(file);
+			}
+		}
+
+		// Sort by ID length (shortest first) to rename from closest descendants to furthest
+		descendants.sort((a, b) => {
+			const aId = this.extractZettelId(a.basename) || "";
+			const bId = this.extractZettelId(b.basename) || "";
+			return aId.length - bId.length;
+		});
+
+		return descendants;
+	}
+
+	/**
+	 * Transforms a descendant ID when its ancestor is moved to a new parent
+	 * Recalculates hierarchy to maintain alternating letter/number pattern
+	 *
+	 * Example:
+	 *   20241118123456789 → 20241118999999999a
+	 *   20241118123456789a → 20241118999999999a1
+	 *   20241118123456789a1 → 20241118999999999a1a
+	 */
+	private transformDescendantId(
+		descendantId: string,
+		oldAncestorId: string,
+		newAncestorId: string,
+	): string {
+		// Extract the timestamp part (first 13+ digits)
+		const timestampMatch = descendantId.match(/^(\d{13,})/);
+		if (!timestampMatch) return descendantId;
+
+		const timestamp = timestampMatch[1];
+
+		// Get the hierarchy parts
+		const descendantHierarchy = descendantId.substring(timestamp.length);
+		const oldAncestorHierarchy = oldAncestorId.substring(timestamp.length);
+		const newAncestorHierarchy = newAncestorId.substring(timestamp.length);
+
+		// The descendant's hierarchy should start with the old ancestor's hierarchy
+		if (!descendantHierarchy.startsWith(oldAncestorHierarchy)) {
+			return descendantId; // Something's wrong, return unchanged
+		}
+
+		// Get the relative hierarchy (what comes after the ancestor's hierarchy)
+		const relativeHierarchy = descendantHierarchy.substring(
+			oldAncestorHierarchy.length,
+		);
+
+		// Parse the relative hierarchy into segments (letters and numbers)
+		const segments = this.parseHierarchySegments(relativeHierarchy);
+
+		// Build new hierarchy by appending segments with correct alternation
+		let newHierarchy = newAncestorHierarchy;
+
+		for (const segment of segments) {
+			// Determine if next segment should be letter or number based on current hierarchy
+			const shouldUseLetter = this.shouldUseLetterForChild(
+				timestamp + newHierarchy,
+			);
+
+			if (shouldUseLetter) {
+				// Segment should be letter(s)
+				if (/^[a-z]+$/.test(segment)) {
+					newHierarchy += segment;
+				} else {
+					// Segment is a number but we need a letter - convert
+					// For simplicity, map number to letter (1->a, 2->b, etc)
+					const num = parseInt(segment);
+					const letter = String.fromCharCode(96 + num); // 1->a, 2->b, etc
+					newHierarchy += letter;
+				}
+			} else {
+				// Segment should be a number
+				if (/^\d+$/.test(segment)) {
+					newHierarchy += segment;
+				} else {
+					// Segment is letter(s) but we need a number - convert
+					// Convert multi-letter sequences: a->1, b->2, z->26, aa->27, ab->28, etc.
+					const num = this.letterSequenceToNumber(segment);
+					newHierarchy += num;
+				}
+			}
+		}
+
+		return timestamp + newHierarchy;
+	}
+
+	/**
+	 * Parses hierarchy string into individual segments (letters and numbers)
+	 * Example: "a1b2" -> ["a", "1", "b", "2"]
+	 */
+	/**
+	 * Parses a hierarchy string into segments
+	 * Example: "a1b2" -> ["a", "1", "b", "2"]
+	 * Example: "aa1bb2" -> ["aa", "1", "bb", "2"]
+	 */
+	private parseHierarchySegments(hierarchy: string): string[] {
+		const segments: string[] = [];
+		let i = 0;
+
+		while (i < hierarchy.length) {
+			if (/[a-z]/.test(hierarchy[i])) {
+				// Letter segment (can be multiple letters like "aa", "ab", etc.)
+				let letters = "";
+				while (i < hierarchy.length && /[a-z]/.test(hierarchy[i])) {
+					letters += hierarchy[i];
+					i++;
+				}
+				segments.push(letters);
+			} else if (/\d/.test(hierarchy[i])) {
+				// Number segment (can be multiple digits)
+				let num = "";
+				while (i < hierarchy.length && /\d/.test(hierarchy[i])) {
+					num += hierarchy[i];
+					i++;
+				}
+				segments.push(num);
+			} else {
+				i++; // Skip unknown characters
+			}
+		}
+
+		return segments;
 	}
 
 	/**
@@ -1526,6 +2915,9 @@ export class CommandManager {
 			return;
 		}
 
+		// Get all descendants of the current file before renaming
+		const descendants = this.getAllDescendants(currentId);
+
 		// Generate new child ID under previous sibling
 		const folder = file.parent || this.plugin.app.vault.getRoot();
 		let newId = await this.generateChildZettelId(
@@ -1563,7 +2955,26 @@ export class CommandManager {
 			},
 		);
 
-		new Notice(`Indented to ${newId}`);
+		// Now rename all descendants to maintain the hierarchy
+		for (const descendant of descendants) {
+			const descendantId = this.extractZettelId(descendant.basename);
+			if (!descendantId) continue;
+
+			// Transform the descendant ID preserving alternating letter/number pattern
+			const newDescendantId = this.transformDescendantId(
+				descendantId,
+				currentId,
+				newId,
+			);
+
+			const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+			await this.plugin.app.fileManager.renameFile(
+				descendant,
+				descendantNewPath,
+			);
+		}
+
+		new Notice(`Indented ${descendants.length + 1} file(s) to ${newId}`);
 	}
 
 	/**
@@ -1586,6 +2997,9 @@ export class CommandManager {
 
 		// Find the parent file to get grandparent link
 		const parentFile = await this.findZettelById(parentId);
+
+		// Get all descendants of the current file before renaming
+		const descendants = this.getAllDescendants(currentId);
 
 		// Generate new sibling ID at parent's level
 		const folder = file.parent || this.plugin.app.vault.getRoot();
@@ -1631,15 +3045,38 @@ export class CommandManager {
 			);
 		}
 
-		new Notice(`Outdented to ${newId}`);
+		// Now rename all descendants to maintain the hierarchy
+		for (const descendant of descendants) {
+			const descendantId = this.extractZettelId(descendant.basename);
+			if (!descendantId) continue;
+
+			// Transform the descendant ID preserving alternating letter/number pattern
+			const newDescendantId = this.transformDescendantId(
+				descendantId,
+				currentId,
+				newId,
+			);
+
+			const descendantNewPath = `${folder.path}/${newDescendantId}.md`;
+			await this.plugin.app.fileManager.renameFile(
+				descendant,
+				descendantNewPath,
+			);
+		}
+
+		new Notice(`Outdented ${descendants.length + 1} file(s) to ${newId}`);
 	}
 
 	/**
 	 * Gets the parent zettel ID from a child ID
 	 */
 	private getParentZettelId(childId: string): string | null {
+		// Extract and preserve the prefix
+		const prefix = this.getPrefix(childId);
+		const idWithoutPrefix = this.stripPrefix(childId);
+
 		// Remove the timestamp portion to get hierarchy
-		const hierarchyPart = childId.replace(/^(\d{13,})/, "");
+		const hierarchyPart = idWithoutPrefix.replace(/^(\d{13,})/, "");
 
 		if (!hierarchyPart) {
 			// No hierarchy, this is a root zettel
@@ -1648,9 +3085,9 @@ export class CommandManager {
 
 		// Remove the last segment (letter or number)
 		const parentHierarchy = hierarchyPart.replace(/[a-z]+$|[0-9]+$/, "");
-		const timestamp = childId.match(/^(\d{13,})/)?.[1];
+		const timestamp = idWithoutPrefix.match(/^(\d{13,})/)?.[1];
 
-		return timestamp ? timestamp + parentHierarchy : null;
+		return timestamp ? prefix + timestamp + parentHierarchy : null;
 	}
 
 	/**
@@ -1747,9 +3184,9 @@ export class CommandManager {
 
 			// Check if this is a direct child (not a grandchild or deeper)
 			if (shouldUseLetter) {
-				// Direct child should be a single letter only
-				// Examples: "a", "b", "z" but not "ab", "a1", "a1a"
-				if (/^[a-z]$/.test(suffix)) {
+				// Direct child should be letters only (one or more)
+				// Examples: "a", "b", "z", "aa", "ab", "zz" but not "a1", "aa1", "a1a"
+				if (/^[a-z]+$/.test(suffix)) {
 					children.push(file);
 				}
 			} else {
@@ -1800,15 +3237,21 @@ export class CommandManager {
 		let parentId: string;
 		let siblingPattern: RegExp;
 
-		// Check if the last character is a letter or part of a number sequence
+		// Check if the last portion is letters or numbers
 		const lastChar = hierarchyPart.charAt(hierarchyPart.length - 1);
 
 		if (/[a-z]/.test(lastChar)) {
-			// Last character is a letter, so siblings have letter suffixes
-			parentId = timestamp + hierarchyPart.slice(0, -1);
-			siblingPattern = new RegExp(
-				`^${this.escapeRegex(parentId)}[a-z](?![a-z0-9])`,
-			);
+			// Last portion is letters - find where the letter sequence starts
+			const letterMatch = hierarchyPart.match(/([a-z]+)$/);
+			if (letterMatch) {
+				parentId =
+					timestamp + hierarchyPart.slice(0, -letterMatch[1].length);
+				siblingPattern = new RegExp(
+					`^${this.escapeRegex(parentId)}[a-z]+(?![a-z0-9])`,
+				);
+			} else {
+				return siblings; // Invalid format
+			}
 		} else {
 			// Last part is a number sequence
 			const numberMatch = hierarchyPart.match(/(\d+)$/);
@@ -2021,6 +3464,22 @@ export class CommandManager {
 	}
 
 	/**
+	 * Removes the parent link from a file's frontmatter
+	 */
+	private async removeParentLinkFromFile(file: TFile): Promise<void> {
+		try {
+			await this.plugin.app.fileManager.processFrontMatter(
+				file,
+				(frontmatter) => {
+					delete frontmatter.up;
+				},
+			);
+		} catch (error) {
+			console.error("Error removing parent link:", error);
+		}
+	}
+
+	/**
 	 * Gets the target folder for new notes based on settings
 	 */
 	private getTargetFolder(location: string): TFolder {
@@ -2053,7 +3512,10 @@ export class CommandManager {
 	/**
 	 * Generates a zettel ID based on the format in settings
 	 */
-	private generateZettelId(customFormat?: string): string {
+	private generateZettelId(
+		noteType: "zettel" | "fleeting" | "moc" | "index" = "zettel",
+		customFormat?: string,
+	): string {
 		const format =
 			customFormat || this.plugin.settings.zettelIdFormat || "YYYYMMDDHHmmss";
 		const now = new Date();
@@ -2078,7 +3540,141 @@ export class CommandManager {
 		id = id.replace(/ss/g, seconds);
 		id = id.replace(/SSS/g, milliseconds);
 
+		// Add prefix if enabled for this note type
+		const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType);
+		if (shouldUsePrefix) {
+			const prefix = this.getPrefixForNoteType(noteType);
+			id = prefix + id;
+		}
+
 		return id;
+	}
+
+	/**
+	 * Gets the prefix for a given note type
+	 */
+	private getPrefixForNoteType(
+		noteType: "zettel" | "fleeting" | "moc" | "index",
+	): string {
+		switch (noteType) {
+			case "zettel":
+				return this.plugin.settings.zettelPrefix;
+			case "fleeting":
+				return this.plugin.settings.fleetingNotesPrefix;
+			case "moc":
+				return this.plugin.settings.mocsPrefix;
+			case "index":
+				return this.plugin.settings.indexesPrefix;
+		}
+	}
+
+	/**
+	 * Checks if prefix should be used for a given note type
+	 */
+	private shouldUsePrefixForNoteType(
+		noteType: "zettel" | "fleeting" | "moc" | "index",
+	): boolean {
+		switch (noteType) {
+			case "zettel":
+				return this.plugin.settings.useZettelPrefix;
+			case "fleeting":
+				return this.plugin.settings.useFleetingNotesPrefix;
+			case "moc":
+				return this.plugin.settings.useMocsPrefix;
+			case "index":
+				return this.plugin.settings.useIndexesPrefix;
+		}
+	}
+
+	/**
+	 * Determines note type from file tags
+	 */
+	private getNoteTypeFromFile(
+		file: TFile,
+	): "zettel" | "fleeting" | "moc" | "index" {
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const tags = cache?.tags?.map((t) => t.tag.replace("#", "")) || [];
+		const frontmatterTags = cache?.frontmatter?.tags || [];
+
+		// Combine both tag sources
+		const allTags = [
+			...tags,
+			...(Array.isArray(frontmatterTags)
+				? frontmatterTags
+				: [frontmatterTags].filter(Boolean)),
+		].map((t) => String(t).replace("#", ""));
+
+		// Check for note type tags
+		if (allTags.includes(this.plugin.settings.fleetingNotesTag)) {
+			return "fleeting";
+		}
+		if (allTags.includes(this.plugin.settings.mocsTag)) {
+			return "moc";
+		}
+		if (allTags.includes(this.plugin.settings.indexesTag)) {
+			return "index";
+		}
+		// Default to zettel
+		return "zettel";
+	}
+
+	/**
+	 * Strips prefix from a zettel ID to get the timestamp and hierarchy only
+	 * Example: "Z20241118123456789a" -> "20241118123456789a"
+	 */
+	private stripPrefix(zettelId: string): string {
+		// Remove any leading letters (prefix)
+		return zettelId.replace(/^[A-Za-z]+/, "");
+	}
+
+	/**
+	 * Gets the prefix from a zettel ID
+	 * Example: "Z20241118123456789a" -> "Z"
+	 */
+	private getPrefix(zettelId: string): string {
+		const match = zettelId.match(/^([A-Za-z]+)/);
+		return match ? match[1] : "";
+	}
+
+	/**
+	 * Gets the title from file metadata (frontmatter title or first alias)
+	 * Returns empty string if no title or aliases found
+	 */
+	private getTitleFromFile(file: TFile): string {
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+
+		// Check frontmatter title first
+		if (cache?.frontmatter?.title) {
+			return cache.frontmatter.title;
+		}
+
+		// Check aliases (use first alias if available)
+		const aliases = cache?.frontmatter?.aliases;
+		if (aliases) {
+			if (Array.isArray(aliases) && aliases.length > 0) {
+				return String(aliases[0]);
+			} else if (typeof aliases === "string" && aliases.trim()) {
+				return aliases;
+			}
+		}
+
+		return "";
+	}
+
+	/**
+	 * Builds the full zettel filename with separator and title
+	 * Format: "prefix + timestamp + hierarchy + separator + title"
+	 * Example: "z20241118123456789⁝ My Note Title"
+	 * Only applies separator format if useSeparatorFormat is enabled
+	 */
+	private buildZettelFilename(zettelId: string, title: string): string {
+		const { useSeparatorFormat, zettelIdSeparator } = this.plugin.settings;
+
+		if (useSeparatorFormat && title) {
+			return `${zettelId}${zettelIdSeparator}${title}`;
+		}
+
+		return zettelId;
 	}
 
 	/**
@@ -2441,7 +4037,7 @@ export class CommandManager {
 		let childPattern: RegExp;
 		if (shouldUseLetter) {
 			childPattern = new RegExp(
-				`^${this.escapeRegex(parentId)}[a-z](?![a-z0-9])`,
+				`^${this.escapeRegex(parentId)}[a-z]+(?![a-z0-9])`,
 			);
 		} else {
 			childPattern = new RegExp(
@@ -3658,7 +5254,7 @@ export class CommandManager {
 					) as TFolder)
 				: this.plugin.app.vault.getRoot();
 
-		const zettelId = this.generateZettelId(box.zettelIdFormat);
+		const zettelId = this.generateZettelId("zettel", box.zettelIdFormat);
 		const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
 		const filename = `${prefix}${zettelId}`;
 		const path = `${folder.path}/${filename}.md`;
@@ -3701,7 +5297,7 @@ export class CommandManager {
 							) as TFolder)
 						: this.plugin.app.vault.getRoot();
 
-				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const zettelId = this.generateZettelId("zettel", box.zettelIdFormat);
 				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
 				const filename =
 					box.useSeparatorFormat && title
@@ -3756,7 +5352,7 @@ export class CommandManager {
 							) as TFolder)
 						: this.plugin.app.vault.getRoot();
 
-				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const zettelId = this.generateZettelId("zettel", box.zettelIdFormat);
 				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
 				const filename =
 					box.useSeparatorFormat && title
@@ -3819,7 +5415,7 @@ export class CommandManager {
 							) as TFolder)
 						: this.plugin.app.vault.getRoot();
 
-				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const zettelId = this.generateZettelId("zettel", box.zettelIdFormat);
 				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
 				const filename =
 					box.useSeparatorFormat && title
@@ -3979,7 +5575,7 @@ export class CommandManager {
 					: this.plugin.app.vault.getRoot();
 
 		const title = "";
-		const zettelId = this.generateZettelId(box.zettelIdFormat);
+		const zettelId = this.generateZettelId("zettel", box.zettelIdFormat);
 		const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
 
 		let filename: string;
@@ -4056,7 +5652,7 @@ export class CommandManager {
 								) as TFolder)
 							: this.plugin.app.vault.getRoot();
 
-				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const zettelId = this.generateZettelId("zettel", box.zettelIdFormat);
 				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
 
 				let filename: string;
@@ -4139,7 +5735,7 @@ export class CommandManager {
 								) as TFolder)
 							: this.plugin.app.vault.getRoot();
 
-				const zettelId = this.generateZettelId(box.zettelIdFormat);
+				const zettelId = this.generateZettelId("zettel", box.zettelIdFormat);
 				const prefix = box.zettelPrefix ? `${box.zettelPrefix}-` : "";
 
 				let filename: string;

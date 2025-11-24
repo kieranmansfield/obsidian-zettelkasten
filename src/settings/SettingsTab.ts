@@ -199,7 +199,6 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 										this.plugin.settings.zettelsLocation ||
 										"",
 									// Copy zettel settings
-									zettelPrefix: "",
 									zettelIdFormat:
 										this.plugin.settings.zettelIdFormat,
 								useSeparatorFormat:
@@ -215,8 +214,11 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 										this.plugin.settings.addTitleToFilename,
 									zettelTag: this.plugin.settings.zettelTag,
 									enableSequenceReorder:
-										this.plugin.settings
-											.enableSequenceReorder,
+									this.plugin.settings.enableSequenceReorder,
+									useZettelPrefix:
+										this.plugin.settings.useZettelPrefix,
+									zettelPrefix:
+										this.plugin.settings.zettelPrefix,
 									// Copy fleeting notes settings
 									enableFleetingNotes:
 										this.plugin.settings
@@ -238,6 +240,10 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 											.fleetingNotesFilenameFormat,
 									fleetingNotesTag:
 										this.plugin.settings.fleetingNotesTag,
+									useFleetingNotesPrefix:
+										this.plugin.settings.useFleetingNotesPrefix,
+									fleetingNotesPrefix:
+										this.plugin.settings.fleetingNotesPrefix,
 									// Copy MOCs settings
 									enableMocs: this.plugin.settings.enableMocs,
 									mocsUseSeparateLocation:
@@ -252,6 +258,10 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 									mocsFilenameFormat:
 										this.plugin.settings.mocsFilenameFormat,
 									mocsTag: this.plugin.settings.mocsTag,
+									useMocsPrefix:
+										this.plugin.settings.useMocsPrefix,
+									mocsPrefix:
+										this.plugin.settings.mocsPrefix,
 									// Copy indexes settings
 									enableIndexes:
 										this.plugin.settings.enableIndexes,
@@ -269,6 +279,10 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 										this.plugin.settings
 											.indexesFilenameFormat,
 									indexesTag: this.plugin.settings.indexesTag,
+									useIndexesPrefix:
+										this.plugin.settings.useIndexesPrefix,
+									indexesPrefix:
+										this.plugin.settings.indexesPrefix,
 									// Command opt-in defaults
 									enableIndividualCommands: {
 										quickZettel: true, // Enabled by default
@@ -422,7 +436,6 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							name: "New Box",
 							type: "folder",
 							folderPath: "",
-							zettelPrefix: "",
 							// Zettel settings defaults
 							zettelIdFormat: "YYYYMMDDHHmmssSSS",
 						useSeparatorFormat: false,
@@ -432,6 +445,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							addTitleToFilename: true,
 							zettelTag: "zettel",
 							enableSequenceReorder: false,
+						useZettelPrefix: false,
+						zettelPrefix: "",
 							// Fleeting notes defaults
 							enableFleetingNotes: true,
 							fleetingNotesUseSeparateLocation: false,
@@ -440,6 +455,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							fleetingNotesUseZettelId: true,
 							fleetingNotesFilenameFormat: "",
 							fleetingNotesTag: "fleeting",
+						useFleetingNotesPrefix: false,
+						fleetingNotesPrefix: "",
 							// MOCs defaults
 							enableMocs: true,
 							mocsUseSeparateLocation: false,
@@ -448,6 +465,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							mocsUseZettelId: false,
 							mocsFilenameFormat: "{{title}} MOC",
 							mocsTag: "moc",
+						useMocsPrefix: false,
+						mocsPrefix: "",
 							// Indexes defaults
 							enableIndexes: true,
 							indexesUseSeparateLocation: false,
@@ -456,6 +475,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							indexesUseZettelId: false,
 							indexesFilenameFormat: "{{title}} Index",
 							indexesTag: "index",
+						useIndexesPrefix: false,
+						indexesPrefix: "",
 							// Command opt-in defaults
 							enableIndividualCommands: {
 								quickZettel: true, // Enabled by default
@@ -1765,7 +1786,41 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		// Zettel ID Separator
+		// Use Separator Format
+		new Setting(containerEl)
+			.setName("Use separator format")
+			.setDesc(
+				"Include title in filename with separator (e.g., z20241118123456789⁝ My Note Title)",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.useSeparatorFormat)
+					.onChange(async (value) => {
+						this.plugin.settings.useSeparatorFormat = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		// Zettel ID Separator (shown when separator format is enabled)
+		if (this.plugin.settings.useSeparatorFormat) {
+			new Setting(containerEl)
+				.setName("Zettel ID separator")
+				.setDesc(
+					"Character(s) separating the zettel ID from the title",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("⁝ ")
+						.setValue(this.plugin.settings.zettelIdSeparator)
+						.onChange(async (value) => {
+							this.plugin.settings.zettelIdSeparator = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		// Zettel ID Separator (commented out - replaced above)
 		// new Setting(containerEl)
 		// 	.setName("Zettel ID separator")
 		// 	.setDesc("Character(s) separating the zettel ID from the title")
@@ -1868,6 +1923,38 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		// Add Alpha label to the name
 		const nameEl = sequenceReorderSetting.nameEl;
 		nameEl.innerHTML = "Enable sequence reorder <strong>(Alpha)</strong>";
+
+		// Use Zettel Prefix Toggle
+		new Setting(containerEl)
+			.setName("Use zettel prefix")
+			.setDesc(
+				"Add a prefix to the beginning of zettel IDs (e.g., z20241119123456789)",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.useZettelPrefix)
+					.onChange(async (value) => {
+						this.plugin.settings.useZettelPrefix = value;
+						await this.plugin.saveSettings();
+						this.display(); // Refresh to show/hide prefix settings
+					}),
+			);
+
+		if (this.plugin.settings.useZettelPrefix) {
+			// Zettel Prefix
+			new Setting(containerEl)
+				.setName("Zettel prefix")
+				.setDesc("Prefix character(s) for zettel notes")
+				.addText((text) =>
+					text
+						.setPlaceholder("Z")
+						.setValue(this.plugin.settings.zettelPrefix)
+						.onChange(async (value) => {
+							this.plugin.settings.zettelPrefix = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 	}
 
 	private displayFleetingSettings(containerEl: HTMLElement): void {
@@ -2016,6 +2103,39 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						});
 				});
+
+			// Use Fleeting Notes Prefix Toggle
+			new Setting(containerEl)
+				.setName("Use fleeting notes prefix")
+				.setDesc(
+					"Add a prefix to the beginning of fleeting note IDs (e.g., f20241119123456789)",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.useFleetingNotesPrefix)
+						.onChange(async (value) => {
+							this.plugin.settings.useFleetingNotesPrefix = value;
+							await this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+
+			// Fleeting Notes Prefix (shown when prefix is enabled)
+			if (this.plugin.settings.useFleetingNotesPrefix) {
+				new Setting(containerEl)
+					.setName("Fleeting notes prefix")
+					.setDesc("Prefix character(s) for fleeting notes")
+					.addText((text) =>
+						text
+							.setPlaceholder("f")
+							.setValue(this.plugin.settings.fleetingNotesPrefix)
+							.onChange(async (value) => {
+								this.plugin.settings.fleetingNotesPrefix =
+									value;
+								await this.plugin.saveSettings();
+							}),
+					);
+			}
 		}
 	}
 
@@ -2151,6 +2271,38 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						});
 				});
+
+			// Use MOCs Prefix Toggle
+			new Setting(containerEl)
+				.setName("Use MOCs prefix")
+				.setDesc(
+					"Add a prefix to the beginning of MOC IDs (e.g., m20241119123456789)",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.useMocsPrefix)
+						.onChange(async (value) => {
+							this.plugin.settings.useMocsPrefix = value;
+							await this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+
+			// MOCs Prefix (shown when prefix is enabled)
+			if (this.plugin.settings.useMocsPrefix) {
+				new Setting(containerEl)
+					.setName("MOCs prefix")
+					.setDesc("Prefix character(s) for MOCs")
+					.addText((text) =>
+						text
+							.setPlaceholder("m")
+							.setValue(this.plugin.settings.mocsPrefix)
+							.onChange(async (value) => {
+								this.plugin.settings.mocsPrefix = value;
+								await this.plugin.saveSettings();
+							}),
+					);
+			}
 		}
 	}
 
@@ -2291,6 +2443,38 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						});
 				});
+
+			// Use Indexes Prefix Toggle
+			new Setting(containerEl)
+				.setName("Use indexes prefix")
+				.setDesc(
+					"Add a prefix to the beginning of index IDs (e.g., i20241119123456789)",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.useIndexesPrefix)
+						.onChange(async (value) => {
+							this.plugin.settings.useIndexesPrefix = value;
+							await this.plugin.saveSettings();
+							this.display();
+						}),
+				);
+
+			// Indexes Prefix (shown when prefix is enabled)
+			if (this.plugin.settings.useIndexesPrefix) {
+				new Setting(containerEl)
+					.setName("Indexes prefix")
+					.setDesc("Prefix character(s) for indexes")
+					.addText((text) =>
+						text
+							.setPlaceholder("i")
+							.setValue(this.plugin.settings.indexesPrefix)
+							.onChange(async (value) => {
+								this.plugin.settings.indexesPrefix = value;
+								await this.plugin.saveSettings();
+							}),
+					);
+			}
 		}
 	}
 }
