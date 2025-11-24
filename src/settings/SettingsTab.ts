@@ -177,7 +177,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 
 		// Enable Boxes
 		new Setting(containerEl)
-			.setName("Enable boxes")
+			.setName("Enable boxes (Beta)")
 			.setDesc(
 				"Enable multiple zettelkasten boxes within your vault. Each box can be folder-based or tag-based.",
 			)
@@ -201,8 +201,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 									// Copy zettel settings
 									zettelIdFormat:
 										this.plugin.settings.zettelIdFormat,
-								useSeparatorFormat:
-									this.plugin.settings.useSeparatorFormat,
+									useSeparatorFormat:
+										this.plugin.settings.useSeparatorFormat,
 									zettelIdSeparator:
 										this.plugin.settings.zettelIdSeparator,
 									zettelIdMatchingMode:
@@ -214,7 +214,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 										this.plugin.settings.addTitleToFilename,
 									zettelTag: this.plugin.settings.zettelTag,
 									enableSequenceReorder:
-									this.plugin.settings.enableSequenceReorder,
+										this.plugin.settings
+											.enableSequenceReorder,
 									useZettelPrefix:
 										this.plugin.settings.useZettelPrefix,
 									zettelPrefix:
@@ -241,9 +242,11 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 									fleetingNotesTag:
 										this.plugin.settings.fleetingNotesTag,
 									useFleetingNotesPrefix:
-										this.plugin.settings.useFleetingNotesPrefix,
+										this.plugin.settings
+											.useFleetingNotesPrefix,
 									fleetingNotesPrefix:
-										this.plugin.settings.fleetingNotesPrefix,
+										this.plugin.settings
+											.fleetingNotesPrefix,
 									// Copy MOCs settings
 									enableMocs: this.plugin.settings.enableMocs,
 									mocsUseSeparateLocation:
@@ -260,8 +263,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 									mocsTag: this.plugin.settings.mocsTag,
 									useMocsPrefix:
 										this.plugin.settings.useMocsPrefix,
-									mocsPrefix:
-										this.plugin.settings.mocsPrefix,
+									mocsPrefix: this.plugin.settings.mocsPrefix,
 									// Copy indexes settings
 									enableIndexes:
 										this.plugin.settings.enableIndexes,
@@ -438,15 +440,15 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							folderPath: "",
 							// Zettel settings defaults
 							zettelIdFormat: "YYYYMMDDHHmmssSSS",
-						useSeparatorFormat: false,
+							useSeparatorFormat: false,
 							zettelIdSeparator: " ",
 							zettelIdMatchingMode: "separator",
 							noteTemplatePath: "",
 							addTitleToFilename: true,
 							zettelTag: "zettel",
 							enableSequenceReorder: false,
-						useZettelPrefix: false,
-						zettelPrefix: "",
+							useZettelPrefix: false,
+							zettelPrefix: "",
 							// Fleeting notes defaults
 							enableFleetingNotes: true,
 							fleetingNotesUseSeparateLocation: false,
@@ -455,8 +457,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							fleetingNotesUseZettelId: true,
 							fleetingNotesFilenameFormat: "",
 							fleetingNotesTag: "fleeting",
-						useFleetingNotesPrefix: false,
-						fleetingNotesPrefix: "",
+							useFleetingNotesPrefix: false,
+							fleetingNotesPrefix: "",
 							// MOCs defaults
 							enableMocs: true,
 							mocsUseSeparateLocation: false,
@@ -465,8 +467,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							mocsUseZettelId: false,
 							mocsFilenameFormat: "{{title}} MOC",
 							mocsTag: "moc",
-						useMocsPrefix: false,
-						mocsPrefix: "",
+							useMocsPrefix: false,
+							mocsPrefix: "",
 							// Indexes defaults
 							enableIndexes: true,
 							indexesUseSeparateLocation: false,
@@ -475,8 +477,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							indexesUseZettelId: false,
 							indexesFilenameFormat: "{{title}} Index",
 							indexesTag: "index",
-						useIndexesPrefix: false,
-						indexesPrefix: "",
+							useIndexesPrefix: false,
+							indexesPrefix: "",
 							// Command opt-in defaults
 							enableIndividualCommands: {
 								quickZettel: true, // Enabled by default
@@ -1806,9 +1808,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		if (this.plugin.settings.useSeparatorFormat) {
 			new Setting(containerEl)
 				.setName("Zettel ID separator")
-				.setDesc(
-					"Character(s) separating the zettel ID from the title",
-				)
+				.setDesc("Character(s) separating the zettel ID from the title")
 				.addText((text) =>
 					text
 						.setPlaceholder("⁝ ")
