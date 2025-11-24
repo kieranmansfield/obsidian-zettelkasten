@@ -84,6 +84,12 @@ export interface Box {
 		createMoc: boolean;
 		openIndex: boolean;
 		createIndex: boolean;
+		fixFilenames: boolean;
+		batchFixFilenames: boolean;
+		fixMocFilename: boolean;
+		batchFixMocFilenames: boolean;
+		fixIndexFilename: boolean;
+		batchFixIndexFilenames: boolean;
 	};
 }
 

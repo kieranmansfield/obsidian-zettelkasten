@@ -59,6 +59,12 @@ export default class ZettelkastenPlugin extends Plugin {
 						createMoc: false,
 						openIndex: false,
 						createIndex: false,
+						fixFilenames: false,
+						batchFixFilenames: false,
+						fixMocFilename: false,
+						batchFixMocFilenames: false,
+						fixIndexFilename: false,
+						batchFixIndexFilenames: false,
 					};
 					needsSave = true;
 				} else if (

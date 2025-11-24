@@ -37,6 +37,11 @@ export class CommandManager {
 				this.registerBoxCommandPalette(box);
 			});
 
+			// Register fix filename command palette for each box
+			this.plugin.settings.boxes.forEach((box) => {
+				this.registerBoxFixFilenameCommandPalette(box);
+			});
+
 			// Register individual commands if enabled
 			this.plugin.settings.boxes.forEach((box) => {
 				this.registerBoxIndividualCommands(box);
@@ -111,6 +116,25 @@ export class CommandManager {
 	}
 
 	/**
+	 * Registers fix filename command palette for a specific box
+	 */
+	private registerBoxFixFilenameCommandPalette(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-fix-filename-palette`,
+			name: `${box.name}: Fix Filenames`,
+			icon: "file-check",
+			callback: () => {
+				const commands = this.getBoxFixFilenameCommands(box);
+				new BoxCommandPaletteModal(
+					this.plugin.app,
+					`${box.name} - Fix Filenames`,
+					commands,
+				).open();
+			},
+		});
+	}
+
+	/**
 	 * Registers individual commands for a specific box (opt-in)
 	 */
 	private registerBoxIndividualCommands(box: Box): void {
@@ -154,6 +178,20 @@ export class CommandManager {
 		if (box.enableIndexes) {
 			if (cmds.openIndex) this.registerBoxOpenIndexCommand(box);
 			if (cmds.createIndex) this.registerBoxCreateIndexCommand(box);
+		}
+
+		// Fix filename commands
+		if (cmds.fixFilenames) this.registerBoxFixFilenamesCommand(box);
+		if (cmds.batchFixFilenames) this.registerBoxBatchFixFilenamesCommand(box);
+
+		if (box.enableMocs) {
+			if (cmds.fixMocFilename) this.registerBoxFixMocFilenameCommand(box);
+			if (cmds.batchFixMocFilenames) this.registerBoxBatchFixMocFilenamesCommand(box);
+		}
+
+		if (box.enableIndexes) {
+			if (cmds.fixIndexFilename) this.registerBoxFixIndexFilenameCommand(box);
+			if (cmds.batchFixIndexFilenames) this.registerBoxBatchFixIndexFilenamesCommand(box);
 		}
 	} /**
 	 * Gets the list of commands for a box (for the command palette)
@@ -216,6 +254,60 @@ export class CommandManager {
 				name: "Create Index",
 				icon: "file-plus",
 				callback: () => this.createIndexForBox(box),
+			});
+		}
+
+		return commands;
+	}
+
+	/**
+	 * Gets the list of fix filename commands for a box (for the fix filename command palette)
+	 */
+	private getBoxFixFilenameCommands(box: Box): BoxCommand[] {
+		const commands: BoxCommand[] = [
+			{
+				id: "fix-filenames",
+				name: "Fix Filenames (Current File)",
+				icon: "file-check",
+				callback: () => this.fixFilenamesForBox(box),
+			},
+			{
+				id: "batch-fix-filenames",
+				name: "Batch Fix Filenames",
+				icon: "folder-check",
+				callback: () => this.batchFixFilenamesForBox(box),
+			},
+		];
+
+		if (box.enableMocs) {
+			commands.push({
+				id: "fix-moc-filename",
+				name: "Fix MOC Filename (Current File)",
+				icon: "file-check",
+				callback: () => this.fixMocFilenameForBox(box),
+			});
+
+			commands.push({
+				id: "batch-fix-moc-filenames",
+				name: "Batch Fix MOC Filenames",
+				icon: "folder-check",
+				callback: () => this.batchFixMocFilenamesForBox(box),
+			});
+		}
+
+		if (box.enableIndexes) {
+			commands.push({
+				id: "fix-index-filename",
+				name: "Fix Index Filename (Current File)",
+				icon: "file-check",
+				callback: () => this.fixIndexFilenameForBox(box),
+			});
+
+			commands.push({
+				id: "batch-fix-index-filenames",
+				name: "Batch Fix Index Filenames",
+				icon: "folder-check",
+				callback: () => this.batchFixIndexFilenamesForBox(box),
 			});
 		}
 
@@ -5769,5 +5861,362 @@ export class CommandManager {
 			},
 			true,
 		).open();
+	}
+
+	/**
+	 * Registers "Fix Filenames" command for a specific box
+	 */
+	private registerBoxFixFilenamesCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-fix-filenames`,
+			name: `${box.name}: Fix Filenames (Current File)`,
+			icon: "file-check",
+			callback: () => this.fixFilenamesForBox(box),
+		});
+	}
+
+	/**
+	 * Registers "Batch Fix Filenames" command for a specific box
+	 */
+	private registerBoxBatchFixFilenamesCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-batch-fix-filenames`,
+			name: `${box.name}: Batch Fix Filenames`,
+			icon: "folder-check",
+			callback: () => this.batchFixFilenamesForBox(box),
+		});
+	}
+
+	/**
+	 * Registers "Fix MOC Filename" command for a specific box
+	 */
+	private registerBoxFixMocFilenameCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-fix-moc-filename`,
+			name: `${box.name}: Fix MOC Filename (Current File)`,
+			icon: "file-check",
+			callback: () => this.fixMocFilenameForBox(box),
+		});
+	}
+
+	/**
+	 * Registers "Batch Fix MOC Filenames" command for a specific box
+	 */
+	private registerBoxBatchFixMocFilenamesCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-batch-fix-moc-filenames`,
+			name: `${box.name}: Batch Fix MOC Filenames`,
+			icon: "folder-check",
+			callback: () => this.batchFixMocFilenamesForBox(box),
+		});
+	}
+
+	/**
+	 * Registers "Fix Index Filename" command for a specific box
+	 */
+	private registerBoxFixIndexFilenameCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-fix-index-filename`,
+			name: `${box.name}: Fix Index Filename (Current File)`,
+			icon: "file-check",
+			callback: () => this.fixIndexFilenameForBox(box),
+		});
+	}
+
+	/**
+	 * Registers "Batch Fix Index Filenames" command for a specific box
+	 */
+	private registerBoxBatchFixIndexFilenamesCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-batch-fix-index-filenames`,
+			name: `${box.name}: Batch Fix Index Filenames`,
+			icon: "folder-check",
+			callback: () => this.batchFixIndexFilenamesForBox(box),
+		});
+	}
+
+	/**
+	 * Fix filenames for a box (current file and its siblings/descendants)
+	 */
+	private async fixFilenamesForBox(box: Box): Promise<void> {
+		try {
+			const activeFile = this.plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice("No active file.");
+				return;
+			}
+
+			const currentId = this.extractZettelId(activeFile.basename);
+			if (!currentId) {
+				new Notice("Active file is not a zettel.");
+				return;
+			}
+
+			const allFiles = this.plugin.app.vault.getMarkdownFiles();
+			const zettels: TFile[] = [];
+
+			// Find all files with zettel IDs
+			for (const file of allFiles) {
+				const id = this.extractZettelId(file.basename);
+				if (id) {
+					zettels.push(file);
+				}
+			}
+
+			// Build parent-child relationships
+			const childrenMap = new Map<string, TFile[]>();
+
+			for (const file of zettels) {
+				const id = this.extractZettelId(file.basename)!;
+				const parentId = this.getParentZettelId(id);
+
+				if (parentId) {
+					if (!childrenMap.has(parentId)) {
+						childrenMap.set(parentId, []);
+					}
+					childrenMap.get(parentId)!.push(file);
+				}
+			}
+
+			// Find siblings of the current zettel
+			const siblings = await this.findSiblingZettels(currentId);
+			const siblingsToProcess = siblings.filter(
+				(s) => this.extractZettelId(s.basename) !== null,
+			);
+
+			let fixedCount = 0;
+
+			// Process each sibling and its descendants
+			for (const siblingFile of siblingsToProcess) {
+				const count = await this.fixZettelFilenameRecursive(
+					siblingFile,
+					childrenMap,
+				);
+				fixedCount += count;
+			}
+
+			if (fixedCount > 0) {
+				new Notice(
+					`Fixed ${fixedCount} filename(s) to consistent length.`,
+				);
+			} else {
+				new Notice("All filenames are already correct.");
+			}
+		} catch (error) {
+			new Notice(`Error fixing filenames: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Batch fix filenames for a box (all files in a folder)
+	 */
+	private async batchFixFilenamesForBox(box: Box): Promise<void> {
+		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+			try {
+				const allFiles =
+					this.plugin.app.vault.getMarkdownFiles().filter(
+						(file) => file.path.startsWith(folder.path),
+					);
+
+				const zettels = allFiles.filter((file) =>
+					this.extractZettelId(file.basename),
+				);
+
+				if (zettels.length === 0) {
+					new Notice("No zettels found in this folder.");
+					return;
+				}
+
+				// Build parent-child relationships
+				const childrenMap = new Map<string, TFile[]>();
+
+				for (const file of zettels) {
+					const id = this.extractZettelId(file.basename)!;
+					const parentId = this.getParentZettelId(id);
+
+					if (parentId) {
+						if (!childrenMap.has(parentId)) {
+							childrenMap.set(parentId, []);
+						}
+						childrenMap.get(parentId)!.push(file);
+					}
+				}
+
+				// Find root zettels (those without parents)
+				const rootZettels = zettels.filter((file) => {
+					const id = this.extractZettelId(file.basename);
+					if (!id) return false;
+					const parentId = this.getParentZettelId(id);
+					return !parentId;
+				});
+
+				let fixedCount = 0;
+
+				// Process each root and its descendants
+				for (const rootFile of rootZettels) {
+					const count = await this.fixZettelFilenameRecursive(
+						rootFile,
+						childrenMap,
+					);
+					fixedCount += count;
+				}
+
+				const folderDisplay =
+					folder.path === "/" ? "root" : folder.path;
+				if (fixedCount > 0) {
+					new Notice(
+						`Fixed ${fixedCount} filename(s) in ${folderDisplay}.`,
+					);
+				} else {
+					new Notice(
+						`All filenames in ${folderDisplay} are already correct.`,
+					);
+				}
+			} catch (error) {
+				new Notice(`Error fixing filenames: ${error.message}`);
+			}
+		}).open();
+	}
+
+	/**
+	 * Fix MOC filename for a box (current file)
+	 */
+	private async fixMocFilenameForBox(box: Box): Promise<void> {
+		try {
+			const activeFile = this.plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice("No active file.");
+				return;
+			}
+
+			const noteType = this.getNoteTypeFromFile(activeFile);
+			if (noteType !== "moc") {
+				new Notice("Active file is not a MOC.");
+				return;
+			}
+
+			const fixed = await this.fixMocFilename(activeFile);
+			if (fixed) {
+				new Notice("MOC filename fixed.");
+			} else {
+				new Notice("MOC filename is already correct.");
+			}
+		} catch (error) {
+			new Notice(`Error fixing MOC filename: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Batch fix MOC filenames for a box (all MOCs in a folder)
+	 */
+	private async batchFixMocFilenamesForBox(box: Box): Promise<void> {
+		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+			try {
+				const allFiles =
+					this.plugin.app.vault.getMarkdownFiles().filter(
+						(file) => file.path.startsWith(folder.path),
+					);
+
+				let fixedCount = 0;
+				for (const file of allFiles) {
+					const noteType = this.getNoteTypeFromFile(file);
+					if (noteType !== "moc") {
+						continue;
+					}
+
+					const fixed = await this.fixMocFilename(file);
+					if (fixed) {
+						fixedCount++;
+					}
+				}
+
+				const folderDisplay =
+					folder.path === "/" ? "root" : folder.path;
+				if (fixedCount > 0) {
+					new Notice(
+						`Fixed ${fixedCount} MOC filename(s) in ${folderDisplay}.`,
+					);
+				} else {
+					new Notice(
+						`All MOC filenames in ${folderDisplay} are already correct.`,
+					);
+				}
+			} catch (error) {
+				new Notice(
+					`Error fixing MOC filenames: ${error.message}`,
+				);
+			}
+		}).open();
+	}
+
+	/**
+	 * Fix Index filename for a box (current file)
+	 */
+	private async fixIndexFilenameForBox(box: Box): Promise<void> {
+		try {
+			const activeFile = this.plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice("No active file.");
+				return;
+			}
+
+			const noteType = this.getNoteTypeFromFile(activeFile);
+			if (noteType !== "index") {
+				new Notice("Active file is not an Index.");
+				return;
+			}
+
+			const fixed = await this.fixIndexFilename(activeFile);
+			if (fixed) {
+				new Notice("Index filename fixed.");
+			} else {
+				new Notice("Index filename is already correct.");
+			}
+		} catch (error) {
+			new Notice(`Error fixing Index filename: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Batch fix Index filenames for a box (all Indexes in a folder)
+	 */
+	private async batchFixIndexFilenamesForBox(box: Box): Promise<void> {
+		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+			try {
+				const allFiles =
+					this.plugin.app.vault.getMarkdownFiles().filter(
+						(file) => file.path.startsWith(folder.path),
+					);
+
+				let fixedCount = 0;
+				for (const file of allFiles) {
+					const noteType = this.getNoteTypeFromFile(file);
+					if (noteType !== "index") {
+						continue;
+					}
+
+					const fixed = await this.fixIndexFilename(file);
+					if (fixed) {
+						fixedCount++;
+					}
+				}
+
+				const folderDisplay =
+					folder.path === "/" ? "root" : folder.path;
+				if (fixedCount > 0) {
+					new Notice(
+						`Fixed ${fixedCount} Index filename(s) in ${folderDisplay}.`,
+					);
+				} else {
+					new Notice(
+						`All Index filenames in ${folderDisplay} are already correct.`,
+					);
+				}
+			} catch (error) {
+				new Notice(
+					`Error fixing Index filenames: ${error.message}`,
+				);
+			}
+		}).open();
 	}
 }

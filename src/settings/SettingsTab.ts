@@ -313,6 +313,12 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 										createMoc: false,
 										openIndex: false,
 										createIndex: false,
+										fixFilenames: false,
+										batchFixFilenames: false,
+										fixMocFilename: false,
+										batchFixMocFilenames: false,
+										fixIndexFilename: false,
+										batchFixIndexFilenames: false,
 									},
 								};
 								this.plugin.settings.boxes.push(defaultBox);
@@ -507,6 +513,12 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 								createMoc: false,
 								openIndex: false,
 								createIndex: false,
+								fixFilenames: false,
+								batchFixFilenames: false,
+								fixMocFilename: false,
+								batchFixMocFilenames: false,
+								fixIndexFilename: false,
+								batchFixIndexFilenames: false,
 							},
 						};
 						this.plugin.settings.boxes.push(newBox);
