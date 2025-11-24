@@ -73,6 +73,7 @@ export interface Box {
 		goDownLevel: boolean;
 		assignParent: boolean;
 		assignChild: boolean;
+		moveToRoot: boolean;
 		createNote: boolean;
 		createChild: boolean;
 		createSibling: boolean;
@@ -84,6 +85,10 @@ export interface Box {
 		createMoc: boolean;
 		openIndex: boolean;
 		createIndex: boolean;
+		moveToCorrectLocation: boolean;
+		batchMoveToCorrectLocation: boolean;
+		tagAsCorrectType: boolean;
+		batchTagAsCorrectType: boolean;
 		fixFilenames: boolean;
 		batchFixFilenames: boolean;
 		fixMocFilename: boolean;

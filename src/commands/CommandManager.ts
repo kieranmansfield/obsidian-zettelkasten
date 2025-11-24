@@ -158,6 +158,7 @@ export class CommandManager {
 		if (cmds.goDownLevel) this.registerBoxGoDownLevelCommand(box);
 		if (cmds.assignParent) this.registerBoxAssignParentCommand(box);
 		if (cmds.assignChild) this.registerBoxAssignChildCommand(box);
+		if (cmds.moveToRoot) this.registerBoxMoveToRootCommand(box);
 		if (cmds.createNote) this.registerBoxCreateNoteCommand(box);
 		if (cmds.createChild) this.registerBoxCreateChildZettelCommand(box);
 		if (cmds.createSibling) this.registerBoxCreateSiblingZettelCommand(box);
@@ -179,6 +180,12 @@ export class CommandManager {
 			if (cmds.openIndex) this.registerBoxOpenIndexCommand(box);
 			if (cmds.createIndex) this.registerBoxCreateIndexCommand(box);
 		}
+
+		// Utility commands
+		if (cmds.moveToCorrectLocation) this.registerBoxMoveToCorrectLocationCommand(box);
+		if (cmds.batchMoveToCorrectLocation) this.registerBoxBatchMoveToCorrectLocationCommand(box);
+		if (cmds.tagAsCorrectType) this.registerBoxTagAsCorrectTypeCommand(box);
+		if (cmds.batchTagAsCorrectType) this.registerBoxBatchTagAsCorrectTypeCommand(box);
 
 		// Fix filename commands
 		if (cmds.fixFilenames) this.registerBoxFixFilenamesCommand(box);
@@ -5861,6 +5868,377 @@ export class CommandManager {
 			},
 			true,
 		).open();
+	}
+
+	/**
+	 * Registers "Move to Root" command for a specific box
+	 */
+	private registerBoxMoveToRootCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-move-to-root`,
+			name: `${box.name}: Move to Root`,
+			icon: "arrow-up-to-line",
+			callback: () => this.moveToRootForBox(box),
+		});
+	}
+
+	private async moveToRootForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const currentId = this.extractZettelId(activeFile.basename);
+		if (!currentId) {
+			new Notice("Active file is not a zettel");
+			return;
+		}
+
+		const parentId = this.getParentZettelId(currentId);
+		if (!parentId) {
+			new Notice("This zettel is already at the root level");
+			return;
+		}
+
+		// Use the same logic as the global command
+		// Find all descendants of the current zettel
+		const allFiles = this.plugin.app.vault.getMarkdownFiles();
+		const descendants: TFile[] = [];
+
+		for (const file of allFiles) {
+			const id = this.extractZettelId(file.basename);
+			if (id && id.startsWith(currentId) && id !== currentId) {
+				descendants.push(file);
+			}
+		}
+
+		// Generate a new root-level ID
+		const newRootId = this.generateZettelId("zettel", box.zettelIdFormat);
+		const folder = activeFile.parent || this.plugin.app.vault.getRoot();
+
+		// Check if a file with the new ID already exists
+		const existingFile = allFiles.find(
+			(f) => this.extractZettelId(f.basename) === newRootId,
+		);
+		if (existingFile && existingFile.path !== activeFile.path) {
+			new Notice(
+				`A file with ID ${newRootId} already exists. Cannot move to root.`,
+			);
+			return;
+		}
+
+		try {
+			// Rename the active file with the new root ID
+			const title = this.getTitleFromFile(activeFile);
+			const newFilename = this.buildZettelFilename(newRootId, title);
+			const newPath = `${folder.path}/${newFilename}.md`;
+			await this.plugin.app.fileManager.renameFile(activeFile, newPath);
+
+			// Remove parent link from file (move to root)
+			await this.removeParentLinkFromFile(activeFile);
+
+			// Now rename all descendants to maintain the hierarchy
+			for (const descendant of descendants) {
+				const descendantId = this.extractZettelId(
+					descendant.basename,
+				);
+				if (!descendantId) continue;
+
+				// Transform the descendant ID preserving alternating letter/number pattern
+				const newDescendantId = this.transformDescendantId(
+					descendantId,
+					currentId,
+					newRootId,
+				);
+
+				const descendantTitle = this.getTitleFromFile(descendant);
+				const descendantNewFilename = this.buildZettelFilename(
+					newDescendantId,
+					descendantTitle,
+				);
+				const descendantFolder =
+					descendant.parent || this.plugin.app.vault.getRoot();
+				const descendantNewPath = `${descendantFolder.path}/${descendantNewFilename}.md`;
+				await this.plugin.app.fileManager.renameFile(
+					descendant,
+					descendantNewPath,
+				);
+			}
+
+			new Notice(
+				`Moved to root and renamed ${descendants.length + 1} file(s) to: ${newRootId}`,
+			);
+
+			// Keep the file open after rename
+			await this.plugin.app.workspace.getLeaf().openFile(activeFile);
+		} catch (error) {
+			new Notice(`Error moving to root: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Registers "Move to Correct Location" command for a specific box
+	 */
+	private registerBoxMoveToCorrectLocationCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-move-to-correct-location`,
+			name: `${box.name}: Move to Correct Location`,
+			icon: "folder-input",
+			callback: () => this.moveToCorrectLocationForBox(box),
+		});
+	}
+
+	private async moveToCorrectLocationForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const noteType = this.getNoteTypeFromFile(activeFile);
+		const targetFolder = this.getTargetFolderForNoteType(noteType, box);
+
+		if (!targetFolder) {
+			new Notice(`Cannot determine target location for ${noteType} notes`);
+			return;
+		}
+
+		if (activeFile.parent?.path === targetFolder.path) {
+			new Notice("File is already in the correct location");
+			return;
+		}
+
+		try {
+			const newPath = `${targetFolder.path}/${activeFile.name}`;
+			await this.plugin.app.fileManager.renameFile(activeFile, newPath);
+			new Notice(`Moved ${activeFile.basename} to ${targetFolder.path}`);
+		} catch (error) {
+			new Notice(`Error moving file: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Registers "Batch Move to Correct Location" command for a specific box
+	 */
+	private registerBoxBatchMoveToCorrectLocationCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-batch-move-to-correct-location`,
+			name: `${box.name}: Batch Move to Correct Location`,
+			icon: "folder-input",
+			callback: () => this.batchMoveToCorrectLocationForBox(box),
+		});
+	}
+
+	private async batchMoveToCorrectLocationForBox(box: Box): Promise<void> {
+		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+			try {
+				const allFiles = this.plugin.app.vault
+					.getMarkdownFiles()
+					.filter((file) => file.path.startsWith(folder.path));
+
+				let movedCount = 0;
+
+				for (const file of allFiles) {
+					const noteType = this.getNoteTypeFromFile(file);
+					const targetFolder = this.getTargetFolderForNoteType(
+						noteType,
+						box,
+					);
+
+					if (
+						targetFolder &&
+						file.parent?.path !== targetFolder.path
+					) {
+						const newPath = `${targetFolder.path}/${file.name}`;
+						await this.plugin.app.fileManager.renameFile(
+							file,
+							newPath,
+						);
+						movedCount++;
+					}
+				}
+
+				if (movedCount > 0) {
+					new Notice(`Moved ${movedCount} file(s) to correct locations`);
+				} else {
+					new Notice("All files are already in correct locations");
+				}
+			} catch (error) {
+				new Notice(`Error moving files: ${error.message}`);
+			}
+		}).open();
+	}
+
+	/**
+	 * Registers "Tag as Correct Type" command for a specific box
+	 */
+	private registerBoxTagAsCorrectTypeCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-tag-as-correct-type`,
+			name: `${box.name}: Tag as Correct Type`,
+			icon: "tag",
+			callback: () => this.tagAsCorrectTypeForBox(box),
+		});
+	}
+
+	private async tagAsCorrectTypeForBox(box: Box): Promise<void> {
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice("No active file");
+			return;
+		}
+
+		const noteType = this.getNoteTypeFromFile(activeFile);
+		const correctTag = this.getTagForNoteType(noteType, box);
+
+		if (!correctTag) {
+			new Notice(`Cannot determine tag for ${noteType} notes`);
+			return;
+		}
+
+		try {
+			await this.plugin.app.fileManager.processFrontMatter(
+				activeFile,
+				(frontmatter) => {
+					if (!frontmatter.tags) {
+						frontmatter.tags = [];
+					}
+					if (!Array.isArray(frontmatter.tags)) {
+						frontmatter.tags = [frontmatter.tags];
+					}
+					if (!frontmatter.tags.includes(correctTag)) {
+						frontmatter.tags.push(correctTag);
+					}
+				},
+			);
+			new Notice(`Tagged ${activeFile.basename} as ${correctTag}`);
+		} catch (error) {
+			new Notice(`Error tagging file: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Registers "Batch Tag as Correct Type" command for a specific box
+	 */
+	private registerBoxBatchTagAsCorrectTypeCommand(box: Box): void {
+		this.plugin.addCommand({
+			id: `box-${box.id}-batch-tag-as-correct-type`,
+			name: `${box.name}: Batch Tag as Correct Type`,
+			icon: "tag",
+			callback: () => this.batchTagAsCorrectTypeForBox(box),
+		});
+	}
+
+	private async batchTagAsCorrectTypeForBox(box: Box): Promise<void> {
+		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+			try {
+				const allFiles = this.plugin.app.vault
+					.getMarkdownFiles()
+					.filter((file) => file.path.startsWith(folder.path));
+
+				let taggedCount = 0;
+
+				for (const file of allFiles) {
+					const noteType = this.getNoteTypeFromFile(file);
+					const correctTag = this.getTagForNoteType(noteType, box);
+
+					if (correctTag) {
+						await this.plugin.app.fileManager.processFrontMatter(
+							file,
+							(frontmatter) => {
+								if (!frontmatter.tags) {
+									frontmatter.tags = [];
+								}
+								if (!Array.isArray(frontmatter.tags)) {
+									frontmatter.tags = [frontmatter.tags];
+								}
+								if (!frontmatter.tags.includes(correctTag)) {
+									frontmatter.tags.push(correctTag);
+									taggedCount++;
+								}
+							},
+						);
+					}
+				}
+
+				if (taggedCount > 0) {
+					new Notice(`Tagged ${taggedCount} file(s) with correct types`);
+				} else {
+					new Notice("All files already have correct tags");
+				}
+			} catch (error) {
+				new Notice(`Error tagging files: ${error.message}`);
+			}
+		}).open();
+	}
+
+	/**
+	 * Helper method to get target folder for a note type in a box
+	 */
+	private getTargetFolderForNoteType(
+		noteType: string,
+		box: Box,
+	): TFolder | null {
+		let targetPath: string | null = null;
+
+		switch (noteType) {
+			case "zettel":
+				targetPath =
+					box.type === "folder"
+						? box.folderPath || null
+						: null;
+				break;
+			case "fleeting":
+				targetPath =
+					box.enableFleetingNotes &&
+					box.fleetingNotesUseSeparateLocation
+						? box.fleetingNotesLocation
+						: box.type === "folder"
+							? box.folderPath || null
+							: null;
+				break;
+			case "moc":
+				targetPath =
+					box.enableMocs && box.mocsUseSeparateLocation
+						? box.mocsLocation
+						: box.type === "folder"
+							? box.folderPath || null
+							: null;
+				break;
+			case "index":
+				targetPath =
+					box.enableIndexes && box.indexesUseSeparateLocation
+						? box.indexesLocation
+						: box.type === "folder"
+							? box.folderPath || null
+							: null;
+				break;
+		}
+
+		if (!targetPath) return null;
+
+		const folder =
+			this.plugin.app.vault.getAbstractFileByPath(targetPath);
+		return folder instanceof TFolder ? folder : null;
+	}
+
+	/**
+	 * Helper method to get tag for a note type in a box
+	 */
+	private getTagForNoteType(noteType: string, box: Box): string | null {
+		switch (noteType) {
+			case "zettel":
+				return box.zettelTag;
+			case "fleeting":
+				return box.enableFleetingNotes ? box.fleetingNotesTag : null;
+			case "moc":
+				return box.enableMocs ? box.mocsTag : null;
+			case "index":
+				return box.enableIndexes ? box.indexesTag : null;
+			default:
+				return null;
+		}
 	}
 
 	/**
