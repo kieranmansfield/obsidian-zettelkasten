@@ -1601,7 +1601,7 @@ export class CommandManager {
 				file.path === normalizedFolderPath
 			);
 		} else if (box.type === "tag" && box.tagName) {
-			// For tag-based boxes, check if file has the tag
+			// For tag-based boxes, check if file has the tag or a nested tag
 			const cache = this.plugin.app.metadataCache.getFileCache(file);
 			const inlineTags =
 				cache?.tags?.map((t) => t.tag.replace("#", "")) || [];
@@ -1614,7 +1614,21 @@ export class CommandManager {
 					: [frontmatterTags].filter(Boolean)),
 			].map((t) => String(t).replace("#", ""));
 
-			return allTags.includes(box.tagName);
+			const normalizedBoxTag = box.tagName.replace("#", "");
+
+			// Check for exact match or nested tag match
+			// e.g., box tag "box/web-dev" should match "box/web-dev/NuxtJS"
+			return allTags.some((tag) => {
+				// Exact match
+				if (tag === normalizedBoxTag) {
+					return true;
+				}
+				// Nested tag match (tag starts with box tag + "/")
+				if (tag.startsWith(normalizedBoxTag + "/")) {
+					return true;
+				}
+				return false;
+			});
 		}
 
 		return false;
