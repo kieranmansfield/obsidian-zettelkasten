@@ -11,6 +11,7 @@ export interface ZettelkastenPluginSettings {
 	zettelsUseSeparateLocation: boolean;
 	zettelsLocation: string;
 	zettelIdFormat: string;
+	useSeparatorFormat: boolean;
 	zettelIdSeparator: string;
 	zettelIdMatchingMode: ZettelIdMatchingMode;
 	noteTemplatePath: string;
@@ -62,7 +63,8 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	zettelsUseSeparateLocation: false,
 	zettelsLocation: "",
 	zettelIdFormat: "YYYYMMDDHHmmssSSS",
-	zettelIdSeparator: " ",
+	useSeparatorFormat: false,
+	zettelIdSeparator: "⁝ ",
 	zettelIdMatchingMode: "separator",
 	noteTemplatePath: "",
 	addTitleToFilename: true,

@@ -216,7 +216,41 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		// Zettel ID Separator
+		// Use Separator Format
+		new Setting(containerEl)
+			.setName("Use separator format")
+			.setDesc(
+				"Include title in filename with separator (e.g., z20241118123456789⁝ My Note Title)",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.useSeparatorFormat)
+					.onChange(async (value) => {
+						this.plugin.settings.useSeparatorFormat = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		// Zettel ID Separator (shown when separator format is enabled)
+		if (this.plugin.settings.useSeparatorFormat) {
+			new Setting(containerEl)
+				.setName("Zettel ID separator")
+				.setDesc(
+					"Character(s) separating the zettel ID from the title",
+				)
+				.addText((text) =>
+					text
+						.setPlaceholder("⁝ ")
+						.setValue(this.plugin.settings.zettelIdSeparator)
+						.onChange(async (value) => {
+							this.plugin.settings.zettelIdSeparator = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		// Zettel ID Separator (commented out - replaced above)
 		// new Setting(containerEl)
 		// 	.setName("Zettel ID separator")
 		// 	.setDesc("Character(s) separating the zettel ID from the title")

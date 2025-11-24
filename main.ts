@@ -29,6 +29,12 @@ export default class ZettelkastenPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			await this.loadData(),
 		);
+
+		// Ensure zettelIdSeparator has a value (fallback to default if empty)
+		if (!this.settings.zettelIdSeparator) {
+			this.settings.zettelIdSeparator = DEFAULT_SETTINGS.zettelIdSeparator;
+		}
+
 		console.log("Loaded settings:", JSON.stringify(this.settings, null, 2));
 	}
 

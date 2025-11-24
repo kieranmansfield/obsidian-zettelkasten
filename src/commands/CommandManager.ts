@@ -49,6 +49,10 @@ export class CommandManager {
 		this.registerCreateMocCommand();
 		this.registerOpenIndexCommand();
 		this.registerCreateIndexCommand();
+		this.registerMoveToCorrectLocationCommand();
+		this.registerBatchMoveToCorrectLocationCommand();
+		this.registerTagAsCorrectTypeCommand();
+		this.registerBatchTagAsCorrectTypeCommand();
 	}
 
 	/**
@@ -1329,17 +1333,21 @@ export class CommandManager {
 
 		let count = 0;
 
-		// Check if this file needs fixing
-		if (currentId !== normalizedId) {
+		// Build the full filename with separator and title
+		const title = this.getTitleFromFile(file);
+		const newFilename = this.buildZettelFilename(normalizedId, title);
+
+		// Check if this file needs fixing (compare full filename, not just ID)
+		if (file.basename !== newFilename) {
 			const folder = file.parent || this.plugin.app.vault.getRoot();
-			const newPath = `${folder.path}/${normalizedId}.md`;
+			const newPath = `${folder.path}/${newFilename}.md`;
 
 			// Check if target path already exists
 			const existing =
 				this.plugin.app.vault.getAbstractFileByPath(newPath);
 			if (existing && existing !== file) {
 				console.warn(
-					`Cannot fix ${file.basename}: ${normalizedId}.md already exists`,
+					`Cannot fix ${file.basename}: ${newFilename}.md already exists`,
 				);
 			} else {
 				await this.plugin.app.fileManager.renameFile(file, newPath);
@@ -1955,13 +1963,396 @@ export class CommandManager {
 	}
 
 	/**
+	 * Registers the "Move to Correct Location" command
+	 * Moves the current file to its correct folder based on note type
+	 * Only active when at least one note type has separate location enabled
+	 */
+	private registerMoveToCorrectLocationCommand(): void {
+		this.plugin.addCommand({
+			id: "move-to-correct-location",
+			name: "Move to Correct Location",
+			icon: "folder-input",
+			checkCallback: (checking: boolean) => {
+				// Only show command if at least one note type has separate location enabled
+				const hasSeparateLocations =
+					this.plugin.settings.zettelsUseSeparateLocation ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
+
+				if (!hasSeparateLocations) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				this.executeMoveToCorrectLocationCommand();
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Executes the move to correct location command logic
+	 */
+	private async executeMoveToCorrectLocationCommand(): Promise<void> {
+		try {
+			const activeFile = this.plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice("No active file.");
+				return;
+			}
+
+			const moved = await this.moveFileToCorrectLocation(activeFile);
+			if (moved) {
+				new Notice("File moved to correct location.");
+			} else {
+				new Notice("File is already in the correct location.");
+			}
+		} catch (error) {
+			new Notice(`Error moving file: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Registers the "Batch Move to Correct Location" command
+	 * Moves all files in a selected folder to their correct locations based on note type
+	 * Only active when at least one note type has separate location enabled
+	 */
+	private registerBatchMoveToCorrectLocationCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-move-to-correct-location",
+			name: "Batch Move to Correct Location (Select Folder)",
+			icon: "folders",
+			checkCallback: (checking: boolean) => {
+				// Only show command if at least one note type has separate location enabled
+				const hasSeparateLocations =
+					this.plugin.settings.zettelsUseSeparateLocation ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
+
+				if (!hasSeparateLocations) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				this.executeBatchMoveToCorrectLocationCommand();
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Executes the batch move to correct location command logic
+	 */
+	private async executeBatchMoveToCorrectLocationCommand(): Promise<void> {
+		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+			try {
+				const allFiles = this.plugin.app.vault.getMarkdownFiles();
+				let movedCount = 0;
+
+				for (const file of allFiles) {
+					// Check if file is within the selected folder
+					if (!this.isFileInFolder(file, folder)) {
+						continue;
+					}
+
+					// Skip ignored folders
+					if (this.shouldIgnoreFile(file)) {
+						continue;
+					}
+
+					const moved = await this.moveFileToCorrectLocation(file);
+					if (moved) {
+						movedCount++;
+					}
+				}
+
+				const folderDisplay =
+					folder.path === "/" ? "root" : folder.path;
+				if (movedCount > 0) {
+					new Notice(
+						`Moved ${movedCount} file(s) from ${folderDisplay}.`,
+					);
+				} else {
+					new Notice(
+						`All files in ${folderDisplay} are already in correct locations.`,
+					);
+				}
+			} catch (error) {
+				new Notice(`Error moving files: ${error.message}`);
+			}
+		}).open();
+	}
+
+	/**
+	 * Moves a file to its correct location based on note type
+	 * Returns true if the file was moved, false if already correct
+	 */
+	private async moveFileToCorrectLocation(file: TFile): Promise<boolean> {
+		const noteType = this.getNoteTypeFromFile(file);
+		let targetFolder: TFolder;
+
+		switch (noteType) {
+			case "fleeting":
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.fleetingNotesUseSeparateLocation,
+					this.plugin.settings.fleetingNotesLocation,
+				);
+				break;
+			case "moc":
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.mocsUseSeparateLocation,
+					this.plugin.settings.mocsLocation,
+				);
+				break;
+			case "index":
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.indexesUseSeparateLocation,
+					this.plugin.settings.indexesLocation,
+				);
+				break;
+			default: // zettel
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.zettelsUseSeparateLocation,
+					this.plugin.settings.zettelsLocation,
+				);
+		}
+
+		// Check if file is already in the correct folder
+		const currentFolder = file.parent;
+		if (currentFolder && currentFolder.path === targetFolder.path) {
+			return false;
+		}
+
+		// Move the file
+		const newPath = `${targetFolder.path}/${file.name}`;
+
+		// Check if target path already exists
+		const existing = this.plugin.app.vault.getAbstractFileByPath(newPath);
+		if (existing && existing !== file) {
+			console.warn(
+				`Cannot move ${file.basename}: ${file.name} already exists in target folder`,
+			);
+			return false;
+		}
+
+		await this.plugin.app.fileManager.renameFile(file, newPath);
+		return true;
+	}
+
+	/**
+	 * Registers the "Tag as Correct Type" command
+	 * Adds the correct tag to the current file based on its note type
+	 * Only active when at least one note type has separate location enabled
+	 */
+	private registerTagAsCorrectTypeCommand(): void {
+		this.plugin.addCommand({
+			id: "tag-as-correct-type",
+			name: "Tag as Correct Type",
+			icon: "tag",
+			checkCallback: (checking: boolean) => {
+				// Only show command if at least one note type has separate location enabled
+				const hasSeparateLocations =
+					this.plugin.settings.zettelsUseSeparateLocation ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
+
+				if (!hasSeparateLocations) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				this.executeTagAsCorrectTypeCommand();
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Executes the tag as correct type command logic
+	 */
+	private async executeTagAsCorrectTypeCommand(): Promise<void> {
+		try {
+			const activeFile = this.plugin.app.workspace.getActiveFile();
+			if (!activeFile) {
+				new Notice("No active file.");
+				return;
+			}
+
+			const tagged = await this.tagFileAsCorrectType(activeFile);
+			if (tagged) {
+				new Notice("File tagged with correct type.");
+			} else {
+				new Notice("File already has the correct tag.");
+			}
+		} catch (error) {
+			new Notice(`Error tagging file: ${error.message}`);
+		}
+	}
+
+	/**
+	 * Registers the "Batch Tag as Correct Type" command
+	 * Adds correct tags to all files in a selected folder based on note type
+	 * Only active when at least one note type has separate location enabled
+	 */
+	private registerBatchTagAsCorrectTypeCommand(): void {
+		this.plugin.addCommand({
+			id: "batch-tag-as-correct-type",
+			name: "Batch Tag as Correct Type (Select Folder)",
+			icon: "tags",
+			checkCallback: (checking: boolean) => {
+				// Only show command if at least one note type has separate location enabled
+				const hasSeparateLocations =
+					this.plugin.settings.zettelsUseSeparateLocation ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
+
+				if (!hasSeparateLocations) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				this.executeBatchTagAsCorrectTypeCommand();
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Executes the batch tag as correct type command logic
+	 */
+	private async executeBatchTagAsCorrectTypeCommand(): Promise<void> {
+		new FolderSuggestModal(this.plugin, async (folder: TFolder) => {
+			try {
+				const allFiles = this.plugin.app.vault.getMarkdownFiles();
+				let taggedCount = 0;
+
+				for (const file of allFiles) {
+					// Check if file is within the selected folder
+					if (!this.isFileInFolder(file, folder)) {
+						continue;
+					}
+
+					// Skip ignored folders
+					if (this.shouldIgnoreFile(file)) {
+						continue;
+					}
+
+					const tagged = await this.tagFileAsCorrectType(file);
+					if (tagged) {
+						taggedCount++;
+					}
+				}
+
+				const folderDisplay =
+					folder.path === "/" ? "root" : folder.path;
+				if (taggedCount > 0) {
+					new Notice(
+						`Tagged ${taggedCount} file(s) in ${folderDisplay}.`,
+					);
+				} else {
+					new Notice(
+						`All files in ${folderDisplay} already have correct tags.`,
+					);
+				}
+			} catch (error) {
+				new Notice(`Error tagging files: ${error.message}`);
+			}
+		}).open();
+	}
+
+	/**
+	 * Tags a file with the correct note type tag based on its current type
+	 * Returns true if a tag was added, false if already correct
+	 */
+	private async tagFileAsCorrectType(file: TFile): Promise<boolean> {
+		const noteType = this.getNoteTypeFromFile(file);
+		let targetTag: string;
+
+		switch (noteType) {
+			case "fleeting":
+				targetTag = this.plugin.settings.fleetingNotesTag;
+				break;
+			case "moc":
+				targetTag = this.plugin.settings.mocsTag;
+				break;
+			case "index":
+				targetTag = this.plugin.settings.indexesTag;
+				break;
+			default: // zettel
+				targetTag = this.plugin.settings.zettelTag;
+		}
+
+		// Check if file already has the target tag
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const inlineTags =
+			cache?.tags?.map((t) => t.tag.replace("#", "")) || [];
+		const frontmatterTags = cache?.frontmatter?.tags || [];
+
+		const allTags = [
+			...inlineTags,
+			...(Array.isArray(frontmatterTags)
+				? frontmatterTags
+				: [frontmatterTags].filter(Boolean)),
+		].map((t) => String(t).replace("#", ""));
+
+		if (allTags.includes(targetTag)) {
+			return false;
+		}
+
+		// Add the tag to frontmatter
+		await this.plugin.app.fileManager.processFrontMatter(
+			file,
+			(frontmatter) => {
+				if (!frontmatter.tags) {
+					frontmatter.tags = [];
+				}
+				if (typeof frontmatter.tags === "string") {
+					frontmatter.tags = [frontmatter.tags];
+				}
+				if (!frontmatter.tags.includes(targetTag)) {
+					frontmatter.tags.push(targetTag);
+				}
+			},
+		);
+
+		return true;
+	}
+
+	/**
 	 * Extracts zettel ID from filename
 	 * Looks for timestamp-based ID with optional hierarchy at the start of filename
+	 * Supports separator format: "z20241118123456789⁝ Title" extracts "z20241118123456789"
 	 */
 	private extractZettelId(filename: string): string | null {
+		// First, strip any separator and title portion
+		const separator = this.plugin.settings.zettelIdSeparator;
+		let idPortion = filename;
+
+		// Check if filename contains the separator
+		const separatorIndex = filename.indexOf(separator);
+		if (separatorIndex !== -1) {
+			idPortion = filename.substring(0, separatorIndex);
+		}
+
 		// Match optional prefix followed by timestamp pattern (13+ digits) with optional alternating letters/numbers
 		// Examples: "20241118123456789", "Z20241118123456789a", "f20241118123456789a1"
-		const match = filename.match(/^([A-Za-z]*)(\d{13,}(?:[a-z]+|\d+)*)/);
+		const match = idPortion.match(/^([A-Za-z]*)(\d{13,}(?:[a-z]+|\d+)*)/);
 		if (match) {
 			// Return prefix + timestamp + hierarchy
 			return match[1] + match[2];
@@ -3093,6 +3484,47 @@ export class CommandManager {
 	private getPrefix(zettelId: string): string {
 		const match = zettelId.match(/^([A-Za-z]+)/);
 		return match ? match[1] : "";
+	}
+
+	/**
+	 * Gets the title from file metadata (frontmatter title or first alias)
+	 * Returns empty string if no title or aliases found
+	 */
+	private getTitleFromFile(file: TFile): string {
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+
+		// Check frontmatter title first
+		if (cache?.frontmatter?.title) {
+			return cache.frontmatter.title;
+		}
+
+		// Check aliases (use first alias if available)
+		const aliases = cache?.frontmatter?.aliases;
+		if (aliases) {
+			if (Array.isArray(aliases) && aliases.length > 0) {
+				return String(aliases[0]);
+			} else if (typeof aliases === "string" && aliases.trim()) {
+				return aliases;
+			}
+		}
+
+		return "";
+	}
+
+	/**
+	 * Builds the full zettel filename with separator and title
+	 * Format: "prefix + timestamp + hierarchy + separator + title"
+	 * Example: "z20241118123456789⁝ My Note Title"
+	 * Only applies separator format if useSeparatorFormat is enabled
+	 */
+	private buildZettelFilename(zettelId: string, title: string): string {
+		const { useSeparatorFormat, zettelIdSeparator } = this.plugin.settings;
+
+		if (useSeparatorFormat && title) {
+			return `${zettelId}${zettelIdSeparator}${title}`;
+		}
+
+		return zettelId;
 	}
 
 	/**
