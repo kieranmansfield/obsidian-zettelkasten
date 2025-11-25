@@ -19,26 +19,6 @@ export class CommandManager {
 	constructor(private plugin: ZettelkastenPlugin) {}
 
 	/**
-	 * Gets the box that a file belongs to based on folder or tag
-	 */
-	private getBoxForFile(file: TFile): Box {
-		for (const box of this.plugin.settings.boxes) {
-			if (this.fileMatchesBox(file, box)) {
-				return box;
-			}
-		}
-		// Default to first box if no match
-		return this.plugin.settings.boxes[0];
-	}
-
-	/**
-	 * Gets the default (first) box
-	 */
-	private getDefaultBox(): Box {
-		return this.plugin.settings.boxes[0];
-	}
-
-	/**
 	 * Reloads all commands by re-registering them
 	 */
 	reloadCommands(): void {
@@ -50,56 +30,43 @@ export class CommandManager {
 	 * This allows dynamic addition of boxes without requiring restart
 	 */
 	refreshBoxCommands(): void {
-		if (
-			true &&
-			this.plugin.settings.boxes.length > 0
-		) {
-			// Register commands for any new boxes
-			this.plugin.settings.boxes.forEach((box) => {
-				if (!this.registeredBoxIds.has(box.id)) {
-					this.registerBoxCommandPalette(box);
-					this.registerBoxFixFilenameCommandPalette(box);
-					this.registerBoxIndividualCommands(box);
-					this.registeredBoxIds.add(box.id);
-				}
-			});
-		}
+		// Register commands for any new boxes
+		this.plugin.settings.boxes.forEach((box) => {
+			if (!this.registeredBoxIds.has(box.id)) {
+				this.registerBoxCommandPalette(box);
+				this.registerBoxFixFilenameCommandPalette(box);
+				this.registerBoxIndividualCommands(box);
+				this.registeredBoxIds.add(box.id);
+			}
+		});
 	}
 
 	/**
-	 * Registers all commands with the plugin
+	 * Registers all commands with the plugin (boxes are always enabled)
 	 */
 	registerCommands(): void {
-		// Check if boxes are enabled
-		if (
-			true &&
-			this.plugin.settings.boxes.length > 0
-		) {
-			// Register command palette for each box
-			this.plugin.settings.boxes.forEach((box) => {
-				this.registerBoxCommandPalette(box);
-				this.registeredBoxIds.add(box.id);
-			});
+		// Register command palette for each box
+		this.plugin.settings.boxes.forEach((box) => {
+			this.registerBoxCommandPalette(box);
+			this.registeredBoxIds.add(box.id);
+		});
 
-			// Register fix filename command palette for each box
-			this.plugin.settings.boxes.forEach((box) => {
-				this.registerBoxFixFilenameCommandPalette(box);
-			});
+		// Register fix filename command palette for each box
+		this.plugin.settings.boxes.forEach((box) => {
+			this.registerBoxFixFilenameCommandPalette(box);
+		});
 
-			// Register individual commands if enabled
-			this.plugin.settings.boxes.forEach((box) => {
-				this.registerBoxIndividualCommands(box);
-			});
-		} else {
-			// Register global commands (when boxes disabled)
-			this.registerGlobalCommands();
-		}
+		// Register individual commands if enabled
+		this.plugin.settings.boxes.forEach((box) => {
+			this.registerBoxIndividualCommands(box);
+		});
 	}
 
 	/**
-	 * Registers global commands (when boxes are disabled)
+	 * DEPRECATED: Global commands removed - boxes are always enabled
+	 * This method is kept for reference but should not be called
 	 */
-	private registerGlobalCommands(): void {
+	private registerGlobalCommands_DEPRECATED(): void {
 		this.registerOpenZettelCommand();
 		this.registerOpenParentZettelCommand();
 		this.registerOpenChildZettelCommand();
@@ -523,7 +490,7 @@ export class CommandManager {
 			name: "Open Fleeting Note",
 			icon: "file-text",
 			checkCallback: (checking: boolean) => {
-				if (!this.getDefaultBox().enableFleetingNotes) {
+				if (!this.plugin.settings.enableFleetingNotes) {
 					return false;
 				}
 
@@ -559,7 +526,7 @@ export class CommandManager {
 			name: "Open MOC",
 			icon: "file-stack",
 			checkCallback: (checking: boolean) => {
-				if (!this.getDefaultBox().enableMocs) {
+				if (!this.plugin.settings.enableMocs) {
 					return false;
 				}
 
@@ -596,7 +563,7 @@ export class CommandManager {
 			name: "Open Index",
 			icon: "list",
 			checkCallback: (checking: boolean) => {
-				if (!this.getDefaultBox().enableIndexes) {
+				if (!this.plugin.settings.enableIndexes) {
 					return false;
 				}
 
@@ -822,10 +789,11 @@ export class CommandManager {
 										this.getAllDescendants(currentId);
 
 									// Get the folder where zettels are stored
-					const folder = this.getNoteTypeFolder(
-						"zettel",
-						this.getDefaultBox(),
-					);
+									const folder = this.getNoteTypeFolder(
+										this.plugin.settings
+											.zettelsUseSeparateLocation,
+										this.getDefaultBox().folderPath,
+									);
 
 									// Generate new child ID based on parent for the active file
 									const newChildId =
@@ -961,10 +929,11 @@ export class CommandManager {
 										this.getAllDescendants(currentChildId);
 
 									// Get the folder where zettels are stored
-					const folder = this.getNoteTypeFolder(
-						"zettel",
-						this.getDefaultBox(),
-					);
+									const folder = this.getNoteTypeFolder(
+										this.plugin.settings
+											.zettelsUseSeparateLocation,
+										this.getDefaultBox().folderPath,
+									);
 
 									// Generate new child ID based on current file (parent)
 									const newChildId =
@@ -1064,7 +1033,10 @@ export class CommandManager {
 						const descendants = this.getAllDescendants(currentId);
 
 						// Get the folder where zettels are stored
-						const folder = this.getNoteTypeFolder("zettel", this.getDefaultBox());
+						const folder = this.getNoteTypeFolder(
+							false  // Deprecated: use box folderPath,
+							this.getDefaultBox().folderPath,
+						);
 
 						// Generate new root ID based on file's creation date
 						const creationTime = activeFile.stat.ctime;
@@ -1597,6 +1569,29 @@ export class CommandManager {
 	}
 
 	/**
+	 * Gets the box that a file belongs to
+	 * Returns the first matching box, or the first box if no match
+	 */
+	private getBoxForFile(file: TFile): Box {
+		// Find first box that matches this file
+		for (const box of this.plugin.settings.boxes) {
+			if (this.fileMatchesBox(file, box)) {
+				return box;
+			}
+		}
+		// Fallback to first box if no match
+		return this.plugin.settings.boxes[0];
+	}
+
+	/**
+	 * Gets the default box (first box in the list)
+	 * Used as fallback when no specific box is provided
+	 */
+	private getDefaultBox(): Box {
+		return this.plugin.settings.boxes[0];
+	}
+
+	/**
 	 * Helper method to check if a file is a zettel based on tags
 	 */
 	private isZettelByTag(file: TFile, box?: Box): boolean {
@@ -1834,7 +1829,10 @@ export class CommandManager {
 					this.plugin.app,
 					notesMap,
 					async (title: string) => {
-						const folder = this.getNoteTypeFolder("zettel", this.getDefaultBox());
+						const folder = this.getNoteTypeFolder(
+							false  // Deprecated: use box folderPath,
+							this.getDefaultBox().folderPath,
+						);
 						const zettelId = this.generateZettelId();
 						const filename = zettelId;
 						const path = `${folder.path}/${filename}.md`;
@@ -1897,7 +1895,10 @@ export class CommandManager {
 					this.plugin.app,
 					notesMap,
 					async (title: string, existingFile?: TFile) => {
-						const folder = this.getNoteTypeFolder("zettel", this.getDefaultBox());
+						const folder = this.getNoteTypeFolder(
+							false  // Deprecated: use box folderPath,
+							this.getDefaultBox().folderPath,
+						);
 
 						// Generate child zettel ID
 						const childId = await this.generateChildZettelId(
@@ -2011,7 +2012,10 @@ export class CommandManager {
 					this.plugin.app,
 					notesMap,
 					async (title: string, existingFile?: TFile) => {
-						const folder = this.getNoteTypeFolder("zettel", this.getDefaultBox());
+						const folder = this.getNoteTypeFolder(
+							false  // Deprecated: use box folderPath,
+							this.getDefaultBox().folderPath,
+						);
 
 						let siblingId: string;
 
@@ -2176,13 +2180,16 @@ export class CommandManager {
 			name: "Create Fleeting Note",
 			icon: "file-plus",
 			callback: async () => {
-				if (!this.getDefaultBox().enableFleetingNotes) {
+				if (!this.plugin.settings.enableFleetingNotes) {
 					new Notice("Fleeting notes are disabled");
 					return;
 				}
 
 				const title = ""; // Empty title for fleeting notes
-				const folder = this.getNoteTypeFolder("fleeting", this.getDefaultBox());
+				const folder = this.getNoteTypeFolder(
+					this.plugin.settings.fleetingNotesUseSeparateLocation,
+					this.plugin.settings.fleetingNotesLocation,
+				);
 				const filename = this.buildFleetingFilename(title);
 				const path = `${folder.path}/${filename}.md`;
 
@@ -2193,7 +2200,7 @@ export class CommandManager {
 					() => {
 						new Notice("Created fleeting note");
 					},
-					this.getDefaultBox().fleetingNotesTemplatePath,
+					this.plugin.settings.fleetingNotesTemplatePath,
 				);
 				try {
 					await creator.create();
@@ -2213,7 +2220,7 @@ export class CommandManager {
 			name: "Create MOC",
 			icon: "file-plus",
 			checkCallback: (checking: boolean) => {
-				if (!this.getDefaultBox().enableMocs) {
+				if (!this.plugin.settings.enableMocs) {
 					return false;
 				}
 
@@ -2228,10 +2235,11 @@ export class CommandManager {
 							this.plugin.app,
 							notesMap,
 							async (title: string) => {
-							const folder = this.getNoteTypeFolder(
-								"moc",
-								this.getDefaultBox(),
-							);
+								const folder = this.getNoteTypeFolder(
+									this.plugin.settings
+										.mocsUseSeparateLocation,
+									this.plugin.settings.mocsLocation,
+								);
 								const filename = this.buildMocFilename(title);
 								const path = `${folder.path}/${filename}.md`;
 
@@ -2242,7 +2250,7 @@ export class CommandManager {
 									() => {
 										new Notice(`Created MOC: ${title}`);
 									},
-									this.getDefaultBox().mocsTemplatePath,
+									this.plugin.settings.mocsTemplatePath,
 								);
 								try {
 									await creator.create();
@@ -2268,7 +2276,7 @@ export class CommandManager {
 			name: "Create Index",
 			icon: "file-plus",
 			checkCallback: (checking: boolean) => {
-				if (!this.getDefaultBox().enableIndexes) {
+				if (!this.plugin.settings.enableIndexes) {
 					return false;
 				}
 
@@ -2283,10 +2291,11 @@ export class CommandManager {
 							this.plugin.app,
 							notesMap,
 							async (title: string) => {
-							const folder = this.getNoteTypeFolder(
-								"index",
-								this.getDefaultBox(),
-							);
+								const folder = this.getNoteTypeFolder(
+									this.plugin.settings
+										.indexesUseSeparateLocation,
+									this.plugin.settings.indexesLocation,
+								);
 								const filename = this.buildIndexFilename(title);
 								const path = `${folder.path}/${filename}.md`;
 
@@ -2297,7 +2306,7 @@ export class CommandManager {
 									() => {
 										new Notice(`Created index: ${title}`);
 									},
-									this.getDefaultBox().indexesTemplatePath,
+									this.plugin.settings.indexesTemplatePath,
 								);
 								try {
 									await creator.create();
@@ -2329,10 +2338,10 @@ export class CommandManager {
 			checkCallback: (checking: boolean) => {
 				// Only show command if at least one note type has separate location enabled
 				const hasSeparateLocations =
-					this.getDefaultBox().folderPath !== "" ||
-					this.getDefaultBox().fleetingNotesUseSeparateLocation ||
-					this.getDefaultBox().mocsUseSeparateLocation ||
-					this.getDefaultBox().indexesUseSeparateLocation;
+					false  // Deprecated: use box folderPath ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
 
 				if (!hasSeparateLocations) {
 					return false;
@@ -2383,10 +2392,10 @@ export class CommandManager {
 			checkCallback: (checking: boolean) => {
 				// Only show command if at least one note type has separate location enabled
 				const hasSeparateLocations =
-					this.getDefaultBox().folderPath !== "" ||
-					this.getDefaultBox().fleetingNotesUseSeparateLocation ||
-					this.getDefaultBox().mocsUseSeparateLocation ||
-					this.getDefaultBox().indexesUseSeparateLocation;
+					false  // Deprecated: use box folderPath ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
 
 				if (!hasSeparateLocations) {
 					return false;
@@ -2455,16 +2464,28 @@ export class CommandManager {
 
 		switch (noteType) {
 			case "fleeting":
-				targetFolder = this.getNoteTypeFolder("fleeting", this.getDefaultBox());
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.fleetingNotesUseSeparateLocation,
+					this.plugin.settings.fleetingNotesLocation,
+				);
 				break;
 			case "moc":
-				targetFolder = this.getNoteTypeFolder("moc", this.getDefaultBox());
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.mocsUseSeparateLocation,
+					this.plugin.settings.mocsLocation,
+				);
 				break;
 			case "index":
-				targetFolder = this.getNoteTypeFolder("index", this.getDefaultBox());
+				targetFolder = this.getNoteTypeFolder(
+					this.plugin.settings.indexesUseSeparateLocation,
+					this.plugin.settings.indexesLocation,
+				);
 				break;
 			default: // zettel
-				targetFolder = this.getNoteTypeFolder("zettel", this.getDefaultBox());
+				targetFolder = this.getNoteTypeFolder(
+					false  // Deprecated: use box folderPath,
+					this.getDefaultBox().folderPath,
+				);
 		}
 
 		// Check if file is already in the correct folder
@@ -2502,10 +2523,10 @@ export class CommandManager {
 			checkCallback: (checking: boolean) => {
 				// Only show command if at least one note type has separate location enabled
 				const hasSeparateLocations =
-					this.getDefaultBox().folderPath !== "" ||
-					this.getDefaultBox().fleetingNotesUseSeparateLocation ||
-					this.getDefaultBox().mocsUseSeparateLocation ||
-					this.getDefaultBox().indexesUseSeparateLocation;
+					false  // Deprecated: use box folderPath ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
 
 				if (!hasSeparateLocations) {
 					return false;
@@ -2556,10 +2577,10 @@ export class CommandManager {
 			checkCallback: (checking: boolean) => {
 				// Only show command if at least one note type has separate location enabled
 				const hasSeparateLocations =
-					this.getDefaultBox().folderPath !== "" ||
-					this.getDefaultBox().fleetingNotesUseSeparateLocation ||
-					this.getDefaultBox().mocsUseSeparateLocation ||
-					this.getDefaultBox().indexesUseSeparateLocation;
+					false  // Deprecated: use box folderPath ||
+					this.plugin.settings.fleetingNotesUseSeparateLocation ||
+					this.plugin.settings.mocsUseSeparateLocation ||
+					this.plugin.settings.indexesUseSeparateLocation;
 
 				if (!hasSeparateLocations) {
 					return false;
@@ -3692,32 +3713,14 @@ export class CommandManager {
 	 * Gets the target folder for a specific note type, respecting separate location settings
 	 */
 	private getNoteTypeFolder(
-		noteType: "zettel" | "fleeting" | "moc" | "index",
-		box: Box,
+		useSeparateLocation: boolean,
+		separateLocation: string,
 	): TFolder {
-		let targetLocation = "";
-
-		switch (noteType) {
-			case "fleeting":
-				targetLocation = box.fleetingNotesUseSeparateLocation
-					? box.fleetingNotesLocation
-					: box.folderPath || "";
-				break;
-			case "moc":
-				targetLocation = box.mocsUseSeparateLocation
-					? box.mocsLocation
-					: box.folderPath || "";
-				break;
-			case "index":
-				targetLocation = box.indexesUseSeparateLocation
-					? box.indexesLocation
-					: box.folderPath || "";
-				break;
-			default: // zettel
-				targetLocation = box.folderPath || "";
-				break;
-		}
-
+		// When separate location is enabled, use that location (even if empty = vault root)
+		// When disabled, use the default newNoteLocation
+		const targetLocation = useSeparateLocation
+			? separateLocation
+			: this.plugin.settings.newNoteLocation;
 		return this.getTargetFolder(targetLocation);
 	}
 
@@ -3854,7 +3857,7 @@ export class CommandManager {
 					hasNoteTypePrefix = this.getDefaultBox().useMocsPrefix;
 					break;
 				case "index":
-					hasNoteTypePrefix = this.getDefaultBox().useIndexesPrefix;
+					hasNoteTypePrefix = this.plugin.settings.useIndexesPrefix;
 					break;
 			}
 		}
@@ -3881,10 +3884,11 @@ export class CommandManager {
 				: [frontmatterTags].filter(Boolean)),
 		].map((t) => String(t).replace("#", ""));
 
-		// Get tags from box or global settings
-		const fleetingTag = box?.fleetingNotesTag ?? this.getDefaultBox().fleetingNotesTag;
-		const mocTag = box?.mocsTag ?? this.getDefaultBox().mocsTag;
-		const indexTag = box?.indexesTag ?? this.getDefaultBox().indexesTag;
+		// Get tags from box or default box
+		const defaultBox = this.getDefaultBox();
+		const fleetingTag = box?.fleetingNotesTag ?? defaultBox.fleetingNotesTag;
+		const mocTag = box?.mocsTag ?? defaultBox.mocsTag;
+		const indexTag = box?.indexesTag ?? defaultBox.indexesTag;
 
 		// Check for note type tags
 		if (allTags.includes(fleetingTag)) {

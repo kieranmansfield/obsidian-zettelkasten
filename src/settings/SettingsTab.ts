@@ -64,16 +64,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 
 		const tabs = [
 			{ id: "general", name: "General" },
-			...(this.plugin.settings.enableBoxes
+			...(true
 				? [{ id: "boxes", name: "Boxes" }]
 				: []),
-			...(this.plugin.settings.enableBoxes
+			...(true
 				? this.plugin.settings.boxes.map((box) => ({
 						id: `box-${box.id}`,
 						name: box.name,
 					}))
 				: []),
-			...(!this.plugin.settings.enableBoxes
+			...(!true
 				? [
 						{ id: "zettel", name: "Zettel" },
 						{ id: "fleeting", name: "Fleeting Notes" },
@@ -183,10 +183,10 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			)
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.enableBoxes)
+					.setValue(true)
 					.onChange(async (value) => {
-						const wasEnabled = this.plugin.settings.enableBoxes;
-						this.plugin.settings.enableBoxes = value;
+						const wasEnabled = true;
+						// Boxes are always enabled
 
 						if (value && !wasEnabled) {
 							// Enabling boxes: migrate current settings to a default box if no boxes exist
@@ -196,96 +196,82 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 									name: "Default Box",
 									type: "folder",
 									folderPath:
-										this.plugin.settings.zettelsLocation ||
+										this.plugin.settings.boxes[0].folderPath ||
 										"",
 									// Box prefix defaults
 									useBoxPrefix: false,
 									boxPrefix: "",
 									// Copy zettel settings
 									zettelIdFormat:
-										this.plugin.settings.zettelIdFormat,
+										this.plugin.settings.boxes[0].zettelIdFormat,
 									useSeparatorFormat:
-										this.plugin.settings.useSeparatorFormat,
+										this.plugin.settings.boxes[0].useSeparatorFormat,
 									zettelIdSeparator:
-										this.plugin.settings.zettelIdSeparator,
+										this.plugin.settings.boxes[0].zettelIdSeparator,
 									zettelIdMatchingMode:
-										this.plugin.settings
-											.zettelIdMatchingMode,
+										this.plugin.settings.boxes[0].zettelIdMatchingMode,
 									noteTemplatePath:
-										this.plugin.settings.noteTemplatePath,
-									zettelTag: this.plugin.settings.zettelTag,
+										this.plugin.settings.boxes[0].noteTemplatePath,
+									zettelTag: this.plugin.settings.boxes[0].zettelTag,
 									enableSequenceReorder:
-										this.plugin.settings
-											.enableSequenceReorder,
+										this.plugin.settings.boxes[0].enableSequenceReorder,
 									useZettelPrefix:
-										this.plugin.settings.useZettelPrefix,
+										this.plugin.settings.boxes[0].useZettelPrefix,
 									zettelPrefix:
-										this.plugin.settings.zettelPrefix,
+										this.plugin.settings.boxes[0].zettelPrefix,
 									// Copy fleeting notes settings
 									enableFleetingNotes:
-										this.plugin.settings
-											.enableFleetingNotes,
+										this.plugin.settings.boxes[0].enableFleetingNotes,
 									fleetingNotesUseSeparateLocation:
-										this.plugin.settings
-											.fleetingNotesUseSeparateLocation,
+										this.plugin.settings.boxes[0].fleetingNotesUseSeparateLocation,
 									fleetingNotesLocation:
-										this.plugin.settings
-											.fleetingNotesLocation,
+										this.plugin.settings.boxes[0].fleetingNotesLocation,
 									fleetingNotesTemplatePath:
-										this.plugin.settings
-											.fleetingNotesTemplatePath,
+										this.plugin.settings.boxes[0].fleetingNotesTemplatePath,
 									fleetingNotesUseZettelId:
-										this.plugin.settings
-											.fleetingNotesUseZettelId,
+										this.plugin.settings.boxes[0].fleetingNotesUseZettelId,
 									fleetingNotesFilenameFormat:
-										this.plugin.settings
-											.fleetingNotesFilenameFormat,
+										this.plugin.settings.boxes[0].fleetingNotesFilenameFormat,
 									fleetingNotesTag:
-										this.plugin.settings.fleetingNotesTag,
+										this.plugin.settings.boxes[0].fleetingNotesTag,
 									useFleetingNotesPrefix:
-										this.plugin.settings
-											.useFleetingNotesPrefix,
+										this.plugin.settings.boxes[0].useFleetingNotesPrefix,
 									fleetingNotesPrefix:
-										this.plugin.settings
-											.fleetingNotesPrefix,
+										this.plugin.settings.boxes[0].fleetingNotesPrefix,
 									// Copy MOCs settings
-									enableMocs: this.plugin.settings.enableMocs,
+									enableMocs: this.plugin.settings.boxes[0].enableMocs,
 									mocsUseSeparateLocation:
-										this.plugin.settings
-											.mocsUseSeparateLocation,
+										this.plugin.settings.boxes[0].mocsUseSeparateLocation,
 									mocsLocation:
-										this.plugin.settings.mocsLocation,
+										this.plugin.settings.boxes[0].mocsLocation,
 									mocsTemplatePath:
-										this.plugin.settings.mocsTemplatePath,
+										this.plugin.settings.boxes[0].mocsTemplatePath,
 									mocsUseZettelId:
-										this.plugin.settings.mocsUseZettelId,
+										this.plugin.settings.boxes[0].mocsUseZettelId,
 									mocsFilenameFormat:
-										this.plugin.settings.mocsFilenameFormat,
-									mocsTag: this.plugin.settings.mocsTag,
+										this.plugin.settings.boxes[0].mocsFilenameFormat,
+									mocsTag: this.plugin.settings.boxes[0].mocsTag,
 									useMocsPrefix:
-										this.plugin.settings.useMocsPrefix,
-									mocsPrefix: this.plugin.settings.mocsPrefix,
+										this.plugin.settings.boxes[0].useMocsPrefix,
+									mocsPrefix: this.plugin.settings.boxes[0].mocsPrefix,
 									// Copy indexes settings
 									enableIndexes:
-										this.plugin.settings.enableIndexes,
+										this.plugin.settings.boxes[0].enableIndexes,
 									indexesUseSeparateLocation:
-										this.plugin.settings
-											.indexesUseSeparateLocation,
+										this.plugin.settings.boxes[0].indexesUseSeparateLocation,
 									indexesLocation:
-										this.plugin.settings.indexesLocation,
+										this.plugin.settings.boxes[0].indexesLocation,
 									indexesTemplatePath:
-										this.plugin.settings
-											.indexesTemplatePath,
+										this.plugin.settings.boxes[0].indexesTemplatePath,
 									indexesUseZettelId:
-										this.plugin.settings.indexesUseZettelId,
+										this.plugin.settings.boxes[0].indexesUseZettelId,
 									indexesFilenameFormat:
-										this.plugin.settings
-											.indexesFilenameFormat,
-									indexesTag: this.plugin.settings.indexesTag,
+										this.plugin.settings.boxes[0].indexesFilenameFormat,
+									indexesTag: this.plugin.settings.boxes[0].indexesTag,
 									useIndexesPrefix:
-										this.plugin.settings.useIndexesPrefix,
+										this.plugin.settings.boxes[0].useIndexesPrefix,
 									indexesPrefix:
-										this.plugin.settings.indexesPrefix,
+										this.plugin.settings.boxes[0].indexesPrefix,
 									// Command opt-in defaults
 									enableIndividualCommands: {
 										quickZettel: true, // Enabled by default
@@ -334,66 +320,65 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							if (this.plugin.settings.boxes.length === 1) {
 								const box = this.plugin.settings.boxes[0];
 								// Copy zettel settings back
-								this.plugin.settings.zettelIdFormat =
+								this.plugin.settings.boxes[0].zettelIdFormat =
 									box.zettelIdFormat;
-								this.plugin.settings.zettelIdSeparator =
+								this.plugin.settings.boxes[0].zettelIdSeparator =
 									box.zettelIdSeparator;
-								this.plugin.settings.zettelIdMatchingMode =
+								this.plugin.settings.boxes[0].zettelIdMatchingMode =
 									box.zettelIdMatchingMode;
-								this.plugin.settings.noteTemplatePath =
+								this.plugin.settings.boxes[0].noteTemplatePath =
 									box.noteTemplatePath;
-								this.plugin.settings.zettelTag = box.zettelTag;
-								this.plugin.settings.enableSequenceReorder =
+								this.plugin.settings.boxes[0].zettelTag = box.zettelTag;
+								this.plugin.settings.boxes[0].enableSequenceReorder =
 									box.enableSequenceReorder;
 								if (box.type === "folder") {
-									this.plugin.settings.zettelsUseSeparateLocation =
-										!!box.folderPath;
-									this.plugin.settings.zettelsLocation =
+									// Zettels don't have separate location
+									this.plugin.settings.boxes[0].folderPath =
 										box.folderPath || "";
 								}
 								// Copy fleeting notes settings back
-								this.plugin.settings.enableFleetingNotes =
+								this.plugin.settings.boxes[0].enableFleetingNotes =
 									box.enableFleetingNotes;
-								this.plugin.settings.fleetingNotesUseSeparateLocation =
+								this.plugin.settings.boxes[0].fleetingNotesUseSeparateLocation =
 									box.fleetingNotesUseSeparateLocation;
-								this.plugin.settings.fleetingNotesLocation =
+								this.plugin.settings.boxes[0].fleetingNotesLocation =
 									box.fleetingNotesLocation;
-								this.plugin.settings.fleetingNotesTemplatePath =
+								this.plugin.settings.boxes[0].fleetingNotesTemplatePath =
 									box.fleetingNotesTemplatePath;
-								this.plugin.settings.fleetingNotesUseZettelId =
+								this.plugin.settings.boxes[0].fleetingNotesUseZettelId =
 									box.fleetingNotesUseZettelId;
-								this.plugin.settings.fleetingNotesFilenameFormat =
+								this.plugin.settings.boxes[0].fleetingNotesFilenameFormat =
 									box.fleetingNotesFilenameFormat;
-								this.plugin.settings.fleetingNotesTag =
+								this.plugin.settings.boxes[0].fleetingNotesTag =
 									box.fleetingNotesTag;
 								// Copy MOCs settings back
-								this.plugin.settings.enableMocs =
+								this.plugin.settings.boxes[0].enableMocs =
 									box.enableMocs;
-								this.plugin.settings.mocsUseSeparateLocation =
+								this.plugin.settings.boxes[0].mocsUseSeparateLocation =
 									box.mocsUseSeparateLocation;
-								this.plugin.settings.mocsLocation =
+								this.plugin.settings.boxes[0].mocsLocation =
 									box.mocsLocation;
-								this.plugin.settings.mocsTemplatePath =
+								this.plugin.settings.boxes[0].mocsTemplatePath =
 									box.mocsTemplatePath;
-								this.plugin.settings.mocsUseZettelId =
+								this.plugin.settings.boxes[0].mocsUseZettelId =
 									box.mocsUseZettelId;
-								this.plugin.settings.mocsFilenameFormat =
+								this.plugin.settings.boxes[0].mocsFilenameFormat =
 									box.mocsFilenameFormat;
-								this.plugin.settings.mocsTag = box.mocsTag;
+								this.plugin.settings.boxes[0].mocsTag = box.mocsTag;
 								// Copy indexes settings back
-								this.plugin.settings.enableIndexes =
+								this.plugin.settings.boxes[0].enableIndexes =
 									box.enableIndexes;
-								this.plugin.settings.indexesUseSeparateLocation =
+								this.plugin.settings.boxes[0].indexesUseSeparateLocation =
 									box.indexesUseSeparateLocation;
-								this.plugin.settings.indexesLocation =
+								this.plugin.settings.boxes[0].indexesLocation =
 									box.indexesLocation;
-								this.plugin.settings.indexesTemplatePath =
+								this.plugin.settings.boxes[0].indexesTemplatePath =
 									box.indexesTemplatePath;
-								this.plugin.settings.indexesUseZettelId =
+								this.plugin.settings.boxes[0].indexesUseZettelId =
 									box.indexesUseZettelId;
-								this.plugin.settings.indexesFilenameFormat =
+								this.plugin.settings.boxes[0].indexesFilenameFormat =
 									box.indexesFilenameFormat;
-								this.plugin.settings.indexesTag =
+								this.plugin.settings.boxes[0].indexesTag =
 									box.indexesTag;
 							}
 						}
@@ -1832,16 +1817,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			)
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.zettelsUseSeparateLocation)
+					.setValue(false)
 					.onChange(async (value) => {
-						this.plugin.settings.zettelsUseSeparateLocation = value;
+						// Zettels dont have separate location toggle
 						await this.plugin.saveSettings();
 						this.display(); // Refresh to show/hide location field
 					}),
 			);
 
 		// Zettels Location (shown when using separate location)
-		if (this.plugin.settings.zettelsUseSeparateLocation) {
+		if (false) {
 			new Setting(containerEl)
 				.setName("Zettels location")
 				.setDesc(
@@ -1850,14 +1835,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.zettelsLocation = value;
+						this.plugin.settings.boxes[0].folderPath = value;
 						await this.plugin.saveSettings();
 					};
 					new FolderSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("path/to/zettels")
-						.setValue(this.plugin.settings.zettelsLocation)
+						.setValue(this.plugin.settings.boxes[0].folderPath || "")
 						.onChange(async (value) => {
-							this.plugin.settings.zettelsLocation = value;
+							this.plugin.settings.boxes[0].folderPath = value;
 							await this.plugin.saveSettings();
 						});
 				});
@@ -1872,9 +1857,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			.addText((text) =>
 				text
 					.setPlaceholder("YYYYMMDDHHmm")
-					.setValue(this.plugin.settings.zettelIdFormat)
+					.setValue(this.plugin.settings.boxes[0].zettelIdFormat)
 					.onChange(async (value) => {
-						this.plugin.settings.zettelIdFormat = value;
+						this.plugin.settings.boxes[0].zettelIdFormat = value;
 						await this.plugin.saveSettings();
 					}),
 			);
@@ -1887,25 +1872,25 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			)
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.useSeparatorFormat)
+					.setValue(this.plugin.settings.boxes[0].useSeparatorFormat)
 					.onChange(async (value) => {
-						this.plugin.settings.useSeparatorFormat = value;
+						this.plugin.settings.boxes[0].useSeparatorFormat = value;
 						await this.plugin.saveSettings();
 						this.display();
 					}),
 			);
 
 		// Zettel ID Separator (shown when separator format is enabled)
-		if (this.plugin.settings.useSeparatorFormat) {
+		if (this.plugin.settings.boxes[0].useSeparatorFormat) {
 			new Setting(containerEl)
 				.setName("Zettel ID separator")
 				.setDesc("Character(s) separating the zettel ID from the title")
 				.addText((text) =>
 					text
 						.setPlaceholder("⁝ ")
-						.setValue(this.plugin.settings.zettelIdSeparator?.trim() ? this.plugin.settings.zettelIdSeparator : "⁝ ")
+						.setValue(this.plugin.settings.boxes[0].zettelIdSeparator?.trim() ? this.plugin.settings.boxes[0].zettelIdSeparator : "⁝ ")
 						.onChange(async (value) => {
-							this.plugin.settings.zettelIdSeparator = value;
+							this.plugin.settings.boxes[0].zettelIdSeparator = value;
 							await this.plugin.saveSettings();
 						}),
 				);
@@ -1918,9 +1903,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		// 	.addText((text) =>
 		// 		text
 		// 			.setPlaceholder(" ")
-		// 			.setValue(this.plugin.settings.zettelIdSeparator)
+		// 			.setValue(this.plugin.settings.boxes[0].zettelIdSeparator)
 		// 			.onChange(async (value) => {
-		// 				this.plugin.settings.zettelIdSeparator = value;
+		// 				this.plugin.settings.boxes[0].zettelIdSeparator = value;
 		// 				await this.plugin.saveSettings();
 		// 			}),
 		// 	);
@@ -1936,9 +1921,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		// 			.addOption("strict", "Strict")
 		// 			.addOption("separator", "Separator")
 		// 			.addOption("fuzzy", "Fuzzy")
-		// 			.setValue(this.plugin.settings.zettelIdMatchingMode)
+		// 			.setValue(this.plugin.settings.boxes[0].zettelIdMatchingMode)
 		// 			.onChange(async (value) => {
-		// 				this.plugin.settings.zettelIdMatchingMode =
+		// 				this.plugin.settings.boxes[0].zettelIdMatchingMode =
 		// 					value as any;
 		// 				await this.plugin.saveSettings();
 		// 			}),
@@ -1953,14 +1938,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			.addText((text) => {
 				const onSelect = async (value: string) => {
 					text.setValue(value);
-					this.plugin.settings.noteTemplatePath = value;
+					this.plugin.settings.boxes[0].noteTemplatePath = value;
 					await this.plugin.saveSettings();
 				};
 				new FileSuggest(this.app, text.inputEl, onSelect);
 				text.setPlaceholder("templates/zettel-template.md")
-					.setValue(this.plugin.settings.noteTemplatePath)
+					.setValue(this.plugin.settings.boxes[0].noteTemplatePath)
 					.onChange(async (value) => {
-						this.plugin.settings.noteTemplatePath = value;
+						this.plugin.settings.boxes[0].noteTemplatePath = value;
 						await this.plugin.saveSettings();
 					});
 			});
@@ -1972,14 +1957,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			.addText((text) => {
 				const onSelect = async (value: string) => {
 					text.setValue(value);
-					this.plugin.settings.zettelTag = value;
+					this.plugin.settings.boxes[0].zettelTag = value;
 					await this.plugin.saveSettings();
 				};
 				new TagSuggest(this.app, text.inputEl, onSelect);
 				text.setPlaceholder("zettel")
-					.setValue(this.plugin.settings.zettelTag)
+					.setValue(this.plugin.settings.boxes[0].zettelTag)
 					.onChange(async (value) => {
-						this.plugin.settings.zettelTag = value;
+						this.plugin.settings.boxes[0].zettelTag = value;
 						await this.plugin.saveSettings();
 					});
 			});
@@ -2004,9 +1989,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 
 		sequenceReorderSetting.addToggle((toggle) =>
 			toggle
-				.setValue(this.plugin.settings.enableSequenceReorder)
+				.setValue(this.plugin.settings.boxes[0].enableSequenceReorder)
 				.onChange(async (value) => {
-					this.plugin.settings.enableSequenceReorder = value;
+					this.plugin.settings.boxes[0].enableSequenceReorder = value;
 					await this.plugin.saveSettings();
 				}),
 		);
@@ -2023,15 +2008,15 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			)
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.useZettelPrefix)
+					.setValue(this.plugin.settings.boxes[0].useZettelPrefix)
 					.onChange(async (value) => {
-						this.plugin.settings.useZettelPrefix = value;
+						this.plugin.settings.boxes[0].useZettelPrefix = value;
 						await this.plugin.saveSettings();
 						this.display(); // Refresh to show/hide prefix settings
 					}),
 			);
 
-		if (this.plugin.settings.useZettelPrefix) {
+		if (this.plugin.settings.boxes[0].useZettelPrefix) {
 			// Zettel Prefix
 			new Setting(containerEl)
 				.setName("Zettel prefix")
@@ -2039,9 +2024,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) =>
 					text
 						.setPlaceholder("Z")
-						.setValue(this.plugin.settings.zettelPrefix)
+						.setValue(this.plugin.settings.boxes[0].zettelPrefix)
 						.onChange(async (value) => {
-							this.plugin.settings.zettelPrefix = value;
+							this.plugin.settings.boxes[0].zettelPrefix = value;
 							await this.plugin.saveSettings();
 						}),
 				);
@@ -2062,15 +2047,15 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			.setDesc("Enable commands for creating and opening fleeting notes")
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.enableFleetingNotes)
+					.setValue(this.plugin.settings.boxes[0].enableFleetingNotes)
 					.onChange(async (value) => {
-						this.plugin.settings.enableFleetingNotes = value;
+						this.plugin.settings.boxes[0].enableFleetingNotes = value;
 						await this.plugin.saveSettings();
 						this.display(); // Refresh to show/hide settings
 					}),
 			);
 
-		if (this.plugin.settings.enableFleetingNotes) {
+		if (this.plugin.settings.boxes[0].enableFleetingNotes) {
 			// Use Separate Location Toggle
 			new Setting(containerEl)
 				.setName("Use separate location")
@@ -2080,11 +2065,10 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addToggle((toggle) =>
 					toggle
 						.setValue(
-							this.plugin.settings
-								.fleetingNotesUseSeparateLocation,
+							this.plugin.settings.boxes[0].fleetingNotesUseSeparateLocation,
 						)
 						.onChange(async (value) => {
-							this.plugin.settings.fleetingNotesUseSeparateLocation =
+							this.plugin.settings.boxes[0].fleetingNotesUseSeparateLocation =
 								value;
 							await this.plugin.saveSettings();
 							this.display(); // Refresh to show/hide location field
@@ -2092,7 +2076,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				);
 
 			// Fleeting Notes Location (shown when using separate location)
-			if (this.plugin.settings.fleetingNotesUseSeparateLocation) {
+			if (this.plugin.settings.boxes[0].fleetingNotesUseSeparateLocation) {
 				new Setting(containerEl)
 					.setName("Fleeting notes location")
 					.setDesc(
@@ -2101,16 +2085,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					.addText((text) => {
 						const onSelect = async (value: string) => {
 							text.setValue(value);
-							this.plugin.settings.fleetingNotesLocation = value;
+							this.plugin.settings.boxes[0].fleetingNotesLocation = value;
 							await this.plugin.saveSettings();
 						};
 						new FolderSuggest(this.app, text.inputEl, onSelect);
 						text.setPlaceholder("path/to/fleeting")
 							.setValue(
-								this.plugin.settings.fleetingNotesLocation,
+								this.plugin.settings.boxes[0].fleetingNotesLocation,
 							)
 							.onChange(async (value) => {
-								this.plugin.settings.fleetingNotesLocation =
+								this.plugin.settings.boxes[0].fleetingNotesLocation =
 									value;
 								await this.plugin.saveSettings();
 							});
@@ -2124,16 +2108,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.fleetingNotesTemplatePath = value;
+						this.plugin.settings.boxes[0].fleetingNotesTemplatePath = value;
 						await this.plugin.saveSettings();
 					};
 					new FileSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("templates/fleeting-note.md")
 						.setValue(
-							this.plugin.settings.fleetingNotesTemplatePath,
+							this.plugin.settings.boxes[0].fleetingNotesTemplatePath,
 						)
 						.onChange(async (value) => {
-							this.plugin.settings.fleetingNotesTemplatePath =
+							this.plugin.settings.boxes[0].fleetingNotesTemplatePath =
 								value;
 							await this.plugin.saveSettings();
 						});
@@ -2145,9 +2129,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.setDesc("Use the zettel ID format for fleeting note filenames")
 				.addToggle((toggle) =>
 					toggle
-						.setValue(this.plugin.settings.fleetingNotesUseZettelId)
+						.setValue(this.plugin.settings.boxes[0].fleetingNotesUseZettelId)
 						.onChange(async (value) => {
-							this.plugin.settings.fleetingNotesUseZettelId =
+							this.plugin.settings.boxes[0].fleetingNotesUseZettelId =
 								value;
 							await this.plugin.saveSettings();
 							this.display(); // Refresh to show/hide format field
@@ -2155,7 +2139,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				);
 
 			// Fleeting Notes Filename Format (shown when not using zettel ID)
-			if (!this.plugin.settings.fleetingNotesUseZettelId) {
+			if (!this.plugin.settings.boxes[0].fleetingNotesUseZettelId) {
 				new Setting(containerEl)
 					.setName("Filename format")
 					.setDesc(
@@ -2165,11 +2149,10 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						text
 							.setPlaceholder("{{title}}")
 							.setValue(
-								this.plugin.settings
-									.fleetingNotesFilenameFormat,
+								this.plugin.settings.boxes[0].fleetingNotesFilenameFormat,
 							)
 							.onChange(async (value) => {
-								this.plugin.settings.fleetingNotesFilenameFormat =
+								this.plugin.settings.boxes[0].fleetingNotesFilenameFormat =
 									value;
 								await this.plugin.saveSettings();
 							}),
@@ -2183,14 +2166,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.fleetingNotesTag = value;
+						this.plugin.settings.boxes[0].fleetingNotesTag = value;
 						await this.plugin.saveSettings();
 					};
 					new TagSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("fleeting")
-						.setValue(this.plugin.settings.fleetingNotesTag)
+						.setValue(this.plugin.settings.boxes[0].fleetingNotesTag)
 						.onChange(async (value) => {
-							this.plugin.settings.fleetingNotesTag = value;
+							this.plugin.settings.boxes[0].fleetingNotesTag = value;
 							await this.plugin.saveSettings();
 						});
 				});
@@ -2203,25 +2186,25 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				)
 				.addToggle((toggle) =>
 					toggle
-						.setValue(this.plugin.settings.useFleetingNotesPrefix)
+						.setValue(this.plugin.settings.boxes[0].useFleetingNotesPrefix)
 						.onChange(async (value) => {
-							this.plugin.settings.useFleetingNotesPrefix = value;
+							this.plugin.settings.boxes[0].useFleetingNotesPrefix = value;
 							await this.plugin.saveSettings();
 							this.display();
 						}),
 				);
 
 			// Fleeting Notes Prefix (shown when prefix is enabled)
-			if (this.plugin.settings.useFleetingNotesPrefix) {
+			if (this.plugin.settings.boxes[0].useFleetingNotesPrefix) {
 				new Setting(containerEl)
 					.setName("Fleeting notes prefix")
 					.setDesc("Prefix character(s) for fleeting notes")
 					.addText((text) =>
 						text
 							.setPlaceholder("f")
-							.setValue(this.plugin.settings.fleetingNotesPrefix)
+							.setValue(this.plugin.settings.boxes[0].fleetingNotesPrefix)
 							.onChange(async (value) => {
-								this.plugin.settings.fleetingNotesPrefix =
+								this.plugin.settings.boxes[0].fleetingNotesPrefix =
 									value;
 								await this.plugin.saveSettings();
 							}),
@@ -2244,15 +2227,15 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			.setDesc("Enable commands for creating and opening MOCs")
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.enableMocs)
+					.setValue(this.plugin.settings.boxes[0].enableMocs)
 					.onChange(async (value) => {
-						this.plugin.settings.enableMocs = value;
+						this.plugin.settings.boxes[0].enableMocs = value;
 						await this.plugin.saveSettings();
 						this.display(); // Refresh to show/hide settings
 					}),
 			);
 
-		if (this.plugin.settings.enableMocs) {
+		if (this.plugin.settings.boxes[0].enableMocs) {
 			// Use Separate Location Toggle
 			new Setting(containerEl)
 				.setName("Use separate location")
@@ -2261,9 +2244,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				)
 				.addToggle((toggle) =>
 					toggle
-						.setValue(this.plugin.settings.mocsUseSeparateLocation)
+						.setValue(this.plugin.settings.boxes[0].mocsUseSeparateLocation)
 						.onChange(async (value) => {
-							this.plugin.settings.mocsUseSeparateLocation =
+							this.plugin.settings.boxes[0].mocsUseSeparateLocation =
 								value;
 							await this.plugin.saveSettings();
 							this.display(); // Refresh to show/hide location field
@@ -2271,7 +2254,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				);
 
 			// MOCs Location (shown when using separate location)
-			if (this.plugin.settings.mocsUseSeparateLocation) {
+			if (this.plugin.settings.boxes[0].mocsUseSeparateLocation) {
 				new Setting(containerEl)
 					.setName("MOCs location")
 					.setDesc(
@@ -2280,14 +2263,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					.addText((text) => {
 						const onSelect = async (value: string) => {
 							text.setValue(value);
-							this.plugin.settings.mocsLocation = value;
+							this.plugin.settings.boxes[0].mocsLocation = value;
 							await this.plugin.saveSettings();
 						};
 						new FolderSuggest(this.app, text.inputEl, onSelect);
 						text.setPlaceholder("path/to/mocs")
-							.setValue(this.plugin.settings.mocsLocation)
+							.setValue(this.plugin.settings.boxes[0].mocsLocation)
 							.onChange(async (value) => {
-								this.plugin.settings.mocsLocation = value;
+								this.plugin.settings.boxes[0].mocsLocation = value;
 								await this.plugin.saveSettings();
 							});
 					});
@@ -2300,14 +2283,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.mocsTemplatePath = value;
+						this.plugin.settings.boxes[0].mocsTemplatePath = value;
 						await this.plugin.saveSettings();
 					};
 					new FileSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("templates/moc.md")
-						.setValue(this.plugin.settings.mocsTemplatePath)
+						.setValue(this.plugin.settings.boxes[0].mocsTemplatePath)
 						.onChange(async (value) => {
-							this.plugin.settings.mocsTemplatePath = value;
+							this.plugin.settings.boxes[0].mocsTemplatePath = value;
 							await this.plugin.saveSettings();
 						});
 				});
@@ -2318,16 +2301,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.setDesc("Use the zettel ID format for MOC filenames")
 				.addToggle((toggle) =>
 					toggle
-						.setValue(this.plugin.settings.mocsUseZettelId)
+						.setValue(this.plugin.settings.boxes[0].mocsUseZettelId)
 						.onChange(async (value) => {
-							this.plugin.settings.mocsUseZettelId = value;
+							this.plugin.settings.boxes[0].mocsUseZettelId = value;
 							await this.plugin.saveSettings();
 							this.display(); // Refresh to show/hide format field
 						}),
 				);
 
 			// MOCs Filename Format (shown when not using zettel ID)
-			if (!this.plugin.settings.mocsUseZettelId) {
+			if (!this.plugin.settings.boxes[0].mocsUseZettelId) {
 				new Setting(containerEl)
 					.setName("Filename format")
 					.setDesc(
@@ -2336,9 +2319,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					.addText((text) =>
 						text
 							.setPlaceholder("{{title}} MOC")
-							.setValue(this.plugin.settings.mocsFilenameFormat)
+							.setValue(this.plugin.settings.boxes[0].mocsFilenameFormat)
 							.onChange(async (value) => {
-								this.plugin.settings.mocsFilenameFormat = value;
+								this.plugin.settings.boxes[0].mocsFilenameFormat = value;
 								await this.plugin.saveSettings();
 							}),
 					);
@@ -2351,14 +2334,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.mocsTag = value;
+						this.plugin.settings.boxes[0].mocsTag = value;
 						await this.plugin.saveSettings();
 					};
 					new TagSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("moc")
-						.setValue(this.plugin.settings.mocsTag)
+						.setValue(this.plugin.settings.boxes[0].mocsTag)
 						.onChange(async (value) => {
-							this.plugin.settings.mocsTag = value;
+							this.plugin.settings.boxes[0].mocsTag = value;
 							await this.plugin.saveSettings();
 						});
 				});
@@ -2371,25 +2354,25 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				)
 				.addToggle((toggle) =>
 					toggle
-						.setValue(this.plugin.settings.useMocsPrefix)
+						.setValue(this.plugin.settings.boxes[0].useMocsPrefix)
 						.onChange(async (value) => {
-							this.plugin.settings.useMocsPrefix = value;
+							this.plugin.settings.boxes[0].useMocsPrefix = value;
 							await this.plugin.saveSettings();
 							this.display();
 						}),
 				);
 
 			// MOCs Prefix (shown when prefix is enabled)
-			if (this.plugin.settings.useMocsPrefix) {
+			if (this.plugin.settings.boxes[0].useMocsPrefix) {
 				new Setting(containerEl)
 					.setName("MOCs prefix")
 					.setDesc("Prefix character(s) for MOCs")
 					.addText((text) =>
 						text
 							.setPlaceholder("m")
-							.setValue(this.plugin.settings.mocsPrefix)
+							.setValue(this.plugin.settings.boxes[0].mocsPrefix)
 							.onChange(async (value) => {
-								this.plugin.settings.mocsPrefix = value;
+								this.plugin.settings.boxes[0].mocsPrefix = value;
 								await this.plugin.saveSettings();
 							}),
 					);
@@ -2411,15 +2394,15 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			.setDesc("Enable commands for creating and opening indexes")
 			.addToggle((toggle) =>
 				toggle
-					.setValue(this.plugin.settings.enableIndexes)
+					.setValue(this.plugin.settings.boxes[0].enableIndexes)
 					.onChange(async (value) => {
-						this.plugin.settings.enableIndexes = value;
+						this.plugin.settings.boxes[0].enableIndexes = value;
 						await this.plugin.saveSettings();
 						this.display(); // Refresh to show/hide settings
 					}),
 			);
 
-		if (this.plugin.settings.enableIndexes) {
+		if (this.plugin.settings.boxes[0].enableIndexes) {
 			// Use Separate Location Toggle
 			new Setting(containerEl)
 				.setName("Use separate location")
@@ -2429,10 +2412,10 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addToggle((toggle) =>
 					toggle
 						.setValue(
-							this.plugin.settings.indexesUseSeparateLocation,
+							this.plugin.settings.boxes[0].indexesUseSeparateLocation,
 						)
 						.onChange(async (value) => {
-							this.plugin.settings.indexesUseSeparateLocation =
+							this.plugin.settings.boxes[0].indexesUseSeparateLocation =
 								value;
 							await this.plugin.saveSettings();
 							this.display(); // Refresh to show/hide location field
@@ -2440,7 +2423,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				);
 
 			// Indexes Location (shown when using separate location)
-			if (this.plugin.settings.indexesUseSeparateLocation) {
+			if (this.plugin.settings.boxes[0].indexesUseSeparateLocation) {
 				new Setting(containerEl)
 					.setName("Indexes location")
 					.setDesc(
@@ -2449,14 +2432,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					.addText((text) => {
 						const onSelect = async (value: string) => {
 							text.setValue(value);
-							this.plugin.settings.indexesLocation = value;
+							this.plugin.settings.boxes[0].indexesLocation = value;
 							await this.plugin.saveSettings();
 						};
 						new FolderSuggest(this.app, text.inputEl, onSelect);
 						text.setPlaceholder("path/to/indexes")
-							.setValue(this.plugin.settings.indexesLocation)
+							.setValue(this.plugin.settings.boxes[0].indexesLocation)
 							.onChange(async (value) => {
-								this.plugin.settings.indexesLocation = value;
+								this.plugin.settings.boxes[0].indexesLocation = value;
 								await this.plugin.saveSettings();
 							});
 					});
@@ -2469,14 +2452,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.indexesTemplatePath = value;
+						this.plugin.settings.boxes[0].indexesTemplatePath = value;
 						await this.plugin.saveSettings();
 					};
 					new FileSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("templates/index.md")
-						.setValue(this.plugin.settings.indexesTemplatePath)
+						.setValue(this.plugin.settings.boxes[0].indexesTemplatePath)
 						.onChange(async (value) => {
-							this.plugin.settings.indexesTemplatePath = value;
+							this.plugin.settings.boxes[0].indexesTemplatePath = value;
 							await this.plugin.saveSettings();
 						});
 				});
@@ -2487,16 +2470,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.setDesc("Use the zettel ID format for index filenames")
 				.addToggle((toggle) =>
 					toggle
-						.setValue(this.plugin.settings.indexesUseZettelId)
+						.setValue(this.plugin.settings.boxes[0].indexesUseZettelId)
 						.onChange(async (value) => {
-							this.plugin.settings.indexesUseZettelId = value;
+							this.plugin.settings.boxes[0].indexesUseZettelId = value;
 							await this.plugin.saveSettings();
 							this.display(); // Refresh to show/hide format field
 						}),
 				);
 
 			// Indexes Filename Format (shown when not using zettel ID)
-			if (!this.plugin.settings.indexesUseZettelId) {
+			if (!this.plugin.settings.boxes[0].indexesUseZettelId) {
 				new Setting(containerEl)
 					.setName("Filename format")
 					.setDesc(
@@ -2506,10 +2489,10 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						text
 							.setPlaceholder("{{title}} Index")
 							.setValue(
-								this.plugin.settings.indexesFilenameFormat,
+								this.plugin.settings.boxes[0].indexesFilenameFormat,
 							)
 							.onChange(async (value) => {
-								this.plugin.settings.indexesFilenameFormat =
+								this.plugin.settings.boxes[0].indexesFilenameFormat =
 									value;
 								await this.plugin.saveSettings();
 							}),
@@ -2523,14 +2506,14 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.indexesTag = value;
+						this.plugin.settings.boxes[0].indexesTag = value;
 						await this.plugin.saveSettings();
 					};
 					new TagSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("index")
-						.setValue(this.plugin.settings.indexesTag)
+						.setValue(this.plugin.settings.boxes[0].indexesTag)
 						.onChange(async (value) => {
-							this.plugin.settings.indexesTag = value;
+							this.plugin.settings.boxes[0].indexesTag = value;
 							await this.plugin.saveSettings();
 						});
 				});
@@ -2543,25 +2526,25 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				)
 				.addToggle((toggle) =>
 					toggle
-						.setValue(this.plugin.settings.useIndexesPrefix)
+						.setValue(this.plugin.settings.boxes[0].useIndexesPrefix)
 						.onChange(async (value) => {
-							this.plugin.settings.useIndexesPrefix = value;
+							this.plugin.settings.boxes[0].useIndexesPrefix = value;
 							await this.plugin.saveSettings();
 							this.display();
 						}),
 				);
 
 			// Indexes Prefix (shown when prefix is enabled)
-			if (this.plugin.settings.useIndexesPrefix) {
+			if (this.plugin.settings.boxes[0].useIndexesPrefix) {
 				new Setting(containerEl)
 					.setName("Indexes prefix")
 					.setDesc("Prefix character(s) for indexes")
 					.addText((text) =>
 						text
 							.setPlaceholder("i")
-							.setValue(this.plugin.settings.indexesPrefix)
+							.setValue(this.plugin.settings.boxes[0].indexesPrefix)
 							.onChange(async (value) => {
-								this.plugin.settings.indexesPrefix = value;
+								this.plugin.settings.boxes[0].indexesPrefix = value;
 								await this.plugin.saveSettings();
 							}),
 					);

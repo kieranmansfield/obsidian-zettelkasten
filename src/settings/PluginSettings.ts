@@ -103,70 +103,26 @@ export interface Box {
 
 // Plugin settings interface
 export interface ZettelkastenPluginSettings {
-	// General settings
+	// General settings (truly global)
 	ignoredFolders: string[];
 	newNoteLocation: string;
-	enableBoxes: boolean;
 
-	// Boxes settings
+	// Boxes settings (boxes are always enabled)
 	boxes: Box[];
-
-	// Zettel settings
-	zettelsUseSeparateLocation: boolean;
-	zettelsLocation: string;
-	zettelIdFormat: string;
-	useSeparatorFormat: boolean;
-	zettelIdSeparator: string;
-	zettelIdMatchingMode: ZettelIdMatchingMode;
-	noteTemplatePath: string;
-	zettelTag: string;
-	enableSequenceReorder: boolean;
-	useZettelPrefix: boolean;
-	zettelPrefix: string;
-
-	// Fleeting notes settings
-	enableFleetingNotes: boolean;
-	fleetingNotesUseSeparateLocation: boolean;
-	fleetingNotesLocation: string;
-	fleetingNotesTemplatePath: string;
-	fleetingNotesUseZettelId: boolean;
-	fleetingNotesFilenameFormat: string;
-	fleetingNotesTag: string;
-	useFleetingNotesPrefix: boolean;
-	fleetingNotesPrefix: string;
-
-	// MOCs settings
-	enableMocs: boolean;
-	mocsUseSeparateLocation: boolean;
-	mocsLocation: string;
-	mocsTemplatePath: string;
-	mocsUseZettelId: boolean;
-	mocsFilenameFormat: string;
-	mocsTag: string;
-	useMocsPrefix: boolean;
-	mocsPrefix: string;
-
-	// Indexes settings
-	enableIndexes: boolean;
-	indexesUseSeparateLocation: boolean;
-	indexesLocation: string;
-	indexesTemplatePath: string;
-	indexesUseZettelId: boolean;
-	indexesFilenameFormat: string;
-	indexesTag: string;
-	useIndexesPrefix: boolean;
-	indexesPrefix: string;
 }
 
-// Default settings values
-export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
-	ignoredFolders: ["templates", "scripts"],
+// Default box configuration
+export const DEFAULT_BOX: Box = {
+	id: "default",
+	name: "Default Box",
+	type: "folder",
+	folderPath: "",
 
-	newNoteLocation: "",
-	enableBoxes: false,
-	boxes: [],
-	zettelsUseSeparateLocation: false,
-	zettelsLocation: "",
+	// Box prefix defaults
+	useBoxPrefix: false,
+	boxPrefix: "",
+
+	// Zettel settings
 	zettelIdFormat: "YYYYMMDDHHmmssSSS",
 	useSeparatorFormat: false,
 	zettelIdSeparator: "⁝ ",
@@ -177,33 +133,84 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	useZettelPrefix: false,
 	zettelPrefix: "z",
 
-	fleetingNotesLocation: "",
+	// Fleeting notes settings
+	enableFleetingNotes: true,
 	fleetingNotesUseSeparateLocation: false,
+	fleetingNotesLocation: "",
 	fleetingNotesTemplatePath: "",
 	fleetingNotesUseZettelId: true,
 	fleetingNotesFilenameFormat: "",
 	fleetingNotesTag: "fleeting",
-	enableFleetingNotes: true,
 	useFleetingNotesPrefix: false,
 	fleetingNotesPrefix: "f",
 
-	mocsLocation: "",
+	// MOCs settings
+	enableMocs: true,
 	mocsUseSeparateLocation: false,
+	mocsLocation: "",
 	mocsTemplatePath: "",
 	mocsUseZettelId: false,
 	mocsFilenameFormat: "{{title}} MOC",
 	mocsTag: "moc",
-	enableMocs: true,
 	useMocsPrefix: false,
 	mocsPrefix: "m",
 
-	indexesLocation: "",
+	// Indexes settings
+	enableIndexes: true,
 	indexesUseSeparateLocation: false,
+	indexesLocation: "",
 	indexesTemplatePath: "",
 	indexesUseZettelId: false,
 	indexesFilenameFormat: "{{title}} Index",
 	indexesTag: "index",
-	enableIndexes: true,
 	useIndexesPrefix: false,
 	indexesPrefix: "i",
+
+	// Command opt-in defaults (command palette is always shown)
+	enableIndividualCommands: {
+		quickZettel: true,
+		openZettel: false,
+		openParent: false,
+		openChild: false,
+		openSibling: false,
+		navigator: false,
+		reorderSequence: false,
+		nextSequence: false,
+		previousSequence: false,
+		nextChild: false,
+		previousChild: false,
+		goUpLevel: false,
+		goDownLevel: false,
+		assignParent: false,
+		assignChild: false,
+		moveToRoot: false,
+		createNote: false,
+		createChild: false,
+		createSibling: false,
+		indent: false,
+		outdent: false,
+		openFleeting: false,
+		createFleeting: false,
+		openMoc: false,
+		createMoc: false,
+		openIndex: false,
+		createIndex: false,
+		moveToCorrectLocation: false,
+		batchMoveToCorrectLocation: false,
+		tagAsCorrectType: false,
+		batchTagAsCorrectType: false,
+		fixFilenames: false,
+		batchFixFilenames: false,
+		fixMocFilename: false,
+		batchFixMocFilenames: false,
+		fixIndexFilename: false,
+		batchFixIndexFilenames: false,
+	},
+};
+
+// Default settings values
+export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
+	ignoredFolders: ["templates", "scripts"],
+	newNoteLocation: "",
+	boxes: [{ ...DEFAULT_BOX }], // Always start with a default box
 };

@@ -3,6 +3,8 @@ import { CommandManager } from "./src/commands/CommandManager";
 import {
 	ZettelkastenPluginSettings,
 	DEFAULT_SETTINGS,
+	DEFAULT_BOX,
+	Box,
 } from "./src/settings/PluginSettings";
 import { ZettelkastenSettingTab } from "./src/settings/SettingsTab";
 
@@ -24,131 +26,119 @@ export default class ZettelkastenPlugin extends Plugin {
 	onunload() {}
 
 	async loadSettings() {
-		const loadedData = await this.loadData();
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
+		const loadedData = (await this.loadData()) as any;
+		let needsSave = false;
 
-		// Migration: Add enableIndividualCommands and useSeparatorFormat to existing boxes
-		if (this.settings.boxes && this.settings.boxes.length > 0) {
-			let needsSave = false;
-			this.settings.boxes.forEach((box) => {
-				if (!box.enableIndividualCommands) {
-					box.enableIndividualCommands = {
-						quickZettel: true, // Enabled by default
-						openZettel: false,
-						openParent: false,
-						openChild: false,
-						openSibling: false,
-						navigator: false,
-						reorderSequence: false,
-						nextSequence: false,
-						previousSequence: false,
-						nextChild: false,
-						previousChild: false,
-						goUpLevel: false,
-						goDownLevel: false,
-						assignParent: false,
-						assignChild: false,
-						moveToRoot: false,
-						createNote: false,
-						createChild: false,
-						createSibling: false,
-						indent: false,
-						outdent: false,
-						openFleeting: false,
-						createFleeting: false,
-						openMoc: false,
-						createMoc: false,
-						openIndex: false,
-						createIndex: false,
-						moveToCorrectLocation: false,
-						batchMoveToCorrectLocation: false,
-						tagAsCorrectType: false,
-						batchTagAsCorrectType: false,
-						fixFilenames: false,
-						batchFixFilenames: false,
-						fixMocFilename: false,
-						batchFixMocFilenames: false,
-						fixIndexFilename: false,
-						batchFixIndexFilenames: false,
-					};
-					needsSave = true;
-				} else if (
-					box.enableIndividualCommands.quickZettel === undefined
-				) {
-					// Add quickZettel to existing enableIndividualCommands
-					box.enableIndividualCommands.quickZettel = true;
-					needsSave = true;
-				}
+		// Start with default settings
+		this.settings = Object.assign({}, DEFAULT_SETTINGS);
 
-				// Add useSeparatorFormat if missing
-				if (box.useSeparatorFormat === undefined) {
-					box.useSeparatorFormat = false;
-					needsSave = true;
-				}
-
-				// Ensure zettelIdSeparator has a default value if empty/missing
-				if (!box.zettelIdSeparator) {
-					box.zettelIdSeparator = "⁝ ";
-					needsSave = true;
-				}
-
-				// Add box prefix settings if missing
-				if (box.useBoxPrefix === undefined) {
-					box.useBoxPrefix = false;
-					needsSave = true;
-				}
-				if (box.boxPrefix === undefined) {
-					box.boxPrefix = "";
-					needsSave = true;
-				}
-
-				// Add prefix settings to existing boxes if missing
-				if (box.useZettelPrefix === undefined) {
-					box.useZettelPrefix = false;
-					needsSave = true;
-				}
-				if (!box.zettelPrefix) {
-					box.zettelPrefix = "";
-					needsSave = true;
-				}
-				if (box.useFleetingNotesPrefix === undefined) {
-					box.useFleetingNotesPrefix = false;
-					needsSave = true;
-				}
-				if (!box.fleetingNotesPrefix) {
-					box.fleetingNotesPrefix = "";
-					needsSave = true;
-				}
-				if (box.useMocsPrefix === undefined) {
-					box.useMocsPrefix = false;
-					needsSave = true;
-				}
-				if (!box.mocsPrefix) {
-					box.mocsPrefix = "";
-					needsSave = true;
-				}
-				if (box.useIndexesPrefix === undefined) {
-					box.useIndexesPrefix = false;
-					needsSave = true;
-				}
-				if (!box.indexesPrefix) {
-					box.indexesPrefix = "";
-					needsSave = true;
-				}
-			});
-
-			// Save migrated settings
-			if (needsSave) {
-				await this.saveSettings();
+		// Migrate general settings
+		if (loadedData) {
+			if (loadedData.ignoredFolders) {
+				this.settings.ignoredFolders = loadedData.ignoredFolders;
+			}
+			if (loadedData.newNoteLocation !== undefined) {
+				this.settings.newNoteLocation = loadedData.newNoteLocation;
 			}
 		}
 
-		// Ensure global zettelIdSeparator has a value (fallback to default if empty)
-		if (!this.settings.zettelIdSeparator) {
-			this.settings.zettelIdSeparator = DEFAULT_SETTINGS.zettelIdSeparator;
+		// Migrate boxes or create from old global settings
+		if (loadedData?.boxes && loadedData.boxes.length > 0) {
+			// Boxes exist - migrate them
+			this.settings.boxes = loadedData.boxes.map((box: any) =>
+				this.migrateBox(box),
+			);
+		} else if (loadedData && loadedData.enableBoxes === false) {
+			// Old system with boxes disabled - migrate global settings to a default box
+			const migratedBox: Box = {
+				...DEFAULT_BOX,
+				id: "default",
+				name: "Default Box",
+				folderPath: loadedData.zettelsLocation || "",
+
+				// Migrate zettel settings
+				zettelIdFormat: loadedData.zettelIdFormat || DEFAULT_BOX.zettelIdFormat,
+				useSeparatorFormat: loadedData.useSeparatorFormat ?? DEFAULT_BOX.useSeparatorFormat,
+				zettelIdSeparator: loadedData.zettelIdSeparator || DEFAULT_BOX.zettelIdSeparator,
+				zettelIdMatchingMode: loadedData.zettelIdMatchingMode || DEFAULT_BOX.zettelIdMatchingMode,
+				noteTemplatePath: loadedData.noteTemplatePath || "",
+				zettelTag: loadedData.zettelTag || DEFAULT_BOX.zettelTag,
+				enableSequenceReorder: loadedData.enableSequenceReorder ?? DEFAULT_BOX.enableSequenceReorder,
+				useZettelPrefix: loadedData.useZettelPrefix ?? DEFAULT_BOX.useZettelPrefix,
+				zettelPrefix: loadedData.zettelPrefix || DEFAULT_BOX.zettelPrefix,
+
+				// Migrate fleeting notes settings
+				enableFleetingNotes: loadedData.enableFleetingNotes ?? DEFAULT_BOX.enableFleetingNotes,
+				fleetingNotesUseSeparateLocation: loadedData.fleetingNotesUseSeparateLocation ?? DEFAULT_BOX.fleetingNotesUseSeparateLocation,
+				fleetingNotesLocation: loadedData.fleetingNotesLocation || "",
+				fleetingNotesTemplatePath: loadedData.fleetingNotesTemplatePath || "",
+				fleetingNotesUseZettelId: loadedData.fleetingNotesUseZettelId ?? DEFAULT_BOX.fleetingNotesUseZettelId,
+				fleetingNotesFilenameFormat: loadedData.fleetingNotesFilenameFormat || "",
+				fleetingNotesTag: loadedData.fleetingNotesTag || DEFAULT_BOX.fleetingNotesTag,
+				useFleetingNotesPrefix: loadedData.useFleetingNotesPrefix ?? DEFAULT_BOX.useFleetingNotesPrefix,
+				fleetingNotesPrefix: loadedData.fleetingNotesPrefix || DEFAULT_BOX.fleetingNotesPrefix,
+
+				// Migrate MOCs settings
+				enableMocs: loadedData.enableMocs ?? DEFAULT_BOX.enableMocs,
+				mocsUseSeparateLocation: loadedData.mocsUseSeparateLocation ?? DEFAULT_BOX.mocsUseSeparateLocation,
+				mocsLocation: loadedData.mocsLocation || "",
+				mocsTemplatePath: loadedData.mocsTemplatePath || "",
+				mocsUseZettelId: loadedData.mocsUseZettelId ?? DEFAULT_BOX.mocsUseZettelId,
+				mocsFilenameFormat: loadedData.mocsFilenameFormat || DEFAULT_BOX.mocsFilenameFormat,
+				mocsTag: loadedData.mocsTag || DEFAULT_BOX.mocsTag,
+				useMocsPrefix: loadedData.useMocsPrefix ?? DEFAULT_BOX.useMocsPrefix,
+				mocsPrefix: loadedData.mocsPrefix || DEFAULT_BOX.mocsPrefix,
+
+				// Migrate indexes settings
+				enableIndexes: loadedData.enableIndexes ?? DEFAULT_BOX.enableIndexes,
+				indexesUseSeparateLocation: loadedData.indexesUseSeparateLocation ?? DEFAULT_BOX.indexesUseSeparateLocation,
+				indexesLocation: loadedData.indexesLocation || "",
+				indexesTemplatePath: loadedData.indexesTemplatePath || "",
+				indexesUseZettelId: loadedData.indexesUseZettelId ?? DEFAULT_BOX.indexesUseZettelId,
+				indexesFilenameFormat: loadedData.indexesFilenameFormat || DEFAULT_BOX.indexesFilenameFormat,
+				indexesTag: loadedData.indexesTag || DEFAULT_BOX.indexesTag,
+				useIndexesPrefix: loadedData.useIndexesPrefix ?? DEFAULT_BOX.useIndexesPrefix,
+				indexesPrefix: loadedData.indexesPrefix || DEFAULT_BOX.indexesPrefix,
+			};
+			this.settings.boxes = [migratedBox];
+			needsSave = true;
+		} else {
+			// No settings file or empty - use defaults (already has default box)
+			needsSave = true;
+		}
+
+		// Ensure at least one box exists
+		if (this.settings.boxes.length === 0) {
+			this.settings.boxes = [{ ...DEFAULT_BOX }];
+			needsSave = true;
+		}
+
+		// Save if we migrated or added defaults
+		if (needsSave) {
+			await this.saveSettings();
 		}
 
 		console.log("Loaded settings:", JSON.stringify(this.settings, null, 2));
+	}
+
+	/**
+	 * Migrates a box from old format to current format
+	 */
+	private migrateBox(box: any): Box {
+		const migratedBox: Box = Object.assign({}, DEFAULT_BOX, box);
+
+		// Ensure all required fields have defaults
+		if (!migratedBox.enableIndividualCommands) {
+			migratedBox.enableIndividualCommands = DEFAULT_BOX.enableIndividualCommands;
+		}
+		if (migratedBox.useSeparatorFormat === undefined) {
+			migratedBox.useSeparatorFormat = false;
+		}
+		if (!migratedBox.zettelIdSeparator) {
+			migratedBox.zettelIdSeparator = "⁝ ";
+		}
+
+		return migratedBox;
 	}
 
 	async saveSettings() {
