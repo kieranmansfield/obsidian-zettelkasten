@@ -622,17 +622,21 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Box name")
 			.setDesc("A descriptive name for this box")
-			.addText((text) =>
-				text
-					.setPlaceholder("My Zettelkasten")
-					.setValue(box.name)
-					.onChange(async (value) => {
-						this.plugin.settings.boxes[boxIndex].name = value;
-						await this.plugin.saveSettings();
-						// Update tab name
-						this.display();
-					}),
-			);
+		.addText((text) => {
+			text
+				.setPlaceholder("My Zettelkasten")
+				.setValue(box.name)
+				.onChange((value) => {
+					// Update in memory but dont save/refresh yet
+					this.plugin.settings.boxes[boxIndex].name = value;
+				});
+
+			// Save and refresh only when user finishes typing (loses focus)
+			text.inputEl.addEventListener("blur", async () => {
+				await this.plugin.saveSettings();
+				this.display();
+			});
+		});
 
 		// Box type selector
 		new Setting(containerEl)
