@@ -1582,6 +1582,27 @@ export class CommandManager {
 	}
 
 	/**
+	 * Helper method to check if a file is a zettel based on tags
+	 */
+	private isZettelByTag(file: TFile, box?: Box): boolean {
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const inlineTags =
+			cache?.tags?.map((t) => t.tag.replace("#", "")) || [];
+		const frontmatterTags = cache?.frontmatter?.tags || [];
+
+		const allTags = [
+			...inlineTags,
+			...(Array.isArray(frontmatterTags)
+				? frontmatterTags
+				: [frontmatterTags].filter(Boolean)),
+		].map((t) => String(t).replace("#", ""));
+
+		const zettelTag = box?.zettelTag ?? this.plugin.settings.zettelTag;
+
+		return allTags.includes(zettelTag);
+	}
+
+	/**
 	 * Helper method to check if a file belongs to a specific box
 	 */
 	private fileMatchesBox(file: TFile, box: Box): boolean {
@@ -1644,8 +1665,14 @@ export class CommandManager {
 		parentNormalizedId?: string,
 		box?: Box,
 	): Promise<number> {
-		const currentId = this.extractZettelId(file.basename)!;
+		let currentId = this.extractZettelId(file.basename);
 		let normalizedId: string;
+
+		// If file doesn't have an ID yet, generate one
+		if (!currentId) {
+			const noteType = this.getNoteTypeFromFile(file, box);
+			currentId = this.generateZettelId(noteType, box?.zettelIdFormat, box);
+		}
 
 		if (parentNormalizedId) {
 			// If we have a parent that was normalized, we need to rebuild this ID based on the normalized parent
@@ -1662,7 +1689,7 @@ export class CommandManager {
 				parentIdWithoutPrefix.match(/^(\d+)/)?.[1] || "";
 
 			// Determine this file's own prefix based on its note type
-			const noteType = this.getNoteTypeFromFile(file);
+			const noteType = this.getNoteTypeFromFile(file, box);
 			const shouldUsePrefix = this.shouldUsePrefixForNoteType(noteType, box);
 			const desiredPrefix = shouldUsePrefix
 				? this.getPrefixForNoteType(noteType, box)
@@ -3833,6 +3860,7 @@ export class CommandManager {
 	 */
 	private getNoteTypeFromFile(
 		file: TFile,
+		box?: Box,
 	): "zettel" | "fleeting" | "moc" | "index" {
 		const cache = this.plugin.app.metadataCache.getFileCache(file);
 		const tags = cache?.tags?.map((t) => t.tag.replace("#", "")) || [];
@@ -3846,14 +3874,19 @@ export class CommandManager {
 				: [frontmatterTags].filter(Boolean)),
 		].map((t) => String(t).replace("#", ""));
 
+		// Get tags from box or global settings
+		const fleetingTag = box?.fleetingNotesTag ?? this.plugin.settings.fleetingNotesTag;
+		const mocTag = box?.mocsTag ?? this.plugin.settings.mocsTag;
+		const indexTag = box?.indexesTag ?? this.plugin.settings.indexesTag;
+
 		// Check for note type tags
-		if (allTags.includes(this.plugin.settings.fleetingNotesTag)) {
+		if (allTags.includes(fleetingTag)) {
 			return "fleeting";
 		}
-		if (allTags.includes(this.plugin.settings.mocsTag)) {
+		if (allTags.includes(mocTag)) {
 			return "moc";
 		}
-		if (allTags.includes(this.plugin.settings.indexesTag)) {
+		if (allTags.includes(indexTag)) {
 			return "index";
 		}
 		// Default to zettel
@@ -6461,9 +6494,9 @@ export class CommandManager {
 				return;
 			}
 
-			const currentId = this.extractZettelId(activeFile.basename);
-			if (!currentId) {
-				new Notice("Active file is not a zettel.");
+			// Check if active file is a zettel by tag
+			if (!this.isZettelByTag(activeFile, box)) {
+				new Notice("Active file is not a zettel (missing zettel tag).");
 				return;
 			}
 
@@ -6478,41 +6511,56 @@ export class CommandManager {
 			const allFiles = this.plugin.app.vault.getMarkdownFiles();
 			const zettels: TFile[] = [];
 
-			// Find all files with zettel IDs that belong to this box
+			// Find all zettel files (by tag) that belong to this box
 			for (const file of allFiles) {
-				const id = this.extractZettelId(file.basename);
-				if (id && this.fileMatchesBox(file, box)) {
+				if (this.isZettelByTag(file, box) && this.fileMatchesBox(file, box)) {
 					zettels.push(file);
 				}
 			}
 
-			// Build parent-child relationships
+			// Build parent-child relationships (only for files that already have IDs)
 			const childrenMap = new Map<string, TFile[]>();
 
 			for (const file of zettels) {
-				const id = this.extractZettelId(file.basename)!;
-				const parentId = this.getParentZettelId(id);
+				const id = this.extractZettelId(file.basename);
+				if (id) {
+					const parentId = this.getParentZettelId(id);
 
-				if (parentId) {
-					if (!childrenMap.has(parentId)) {
-						childrenMap.set(parentId, []);
+					if (parentId) {
+						if (!childrenMap.has(parentId)) {
+							childrenMap.set(parentId, []);
+						}
+						childrenMap.get(parentId)!.push(file);
 					}
-					childrenMap.get(parentId)!.push(file);
 				}
 			}
 
-			// Find siblings of the current zettel
-			const siblings = await this.findSiblingZettels(currentId);
-			const siblingsToProcess = siblings.filter(
-				(s) => this.extractZettelId(s.basename) !== null,
-			);
-
 			let fixedCount = 0;
 
-			// Process each sibling and its descendants
-			for (const siblingFile of siblingsToProcess) {
+			// Process all zettels in the box
+			const currentId = this.extractZettelId(activeFile.basename);
+			if (currentId) {
+				// If active file has an ID, process it and its siblings
+				const siblings = await this.findSiblingZettels(currentId);
+				const siblingsToProcess = siblings.filter(
+					(s) =>
+						this.isZettelByTag(s, box) &&
+						this.fileMatchesBox(s, box),
+				);
+
+				for (const siblingFile of siblingsToProcess) {
+					const count = await this.fixZettelFilenameRecursive(
+						siblingFile,
+						childrenMap,
+						undefined,
+						box,
+					);
+					fixedCount += count;
+				}
+			} else {
+				// Active file doesn't have an ID yet, just fix it
 				const count = await this.fixZettelFilenameRecursive(
-					siblingFile,
+					activeFile,
 					childrenMap,
 					undefined,
 					box,
@@ -6539,10 +6587,10 @@ export class CommandManager {
 		try {
 			const allFiles = this.plugin.app.vault.getMarkdownFiles();
 
-			// Find all files with zettel IDs that belong to this box
+			// Find all zettel files (by tag) that belong to this box
 			const zettels = allFiles.filter(
 				(file) =>
-					this.extractZettelId(file.basename) &&
+					this.isZettelByTag(file, box) &&
 					this.fileMatchesBox(file, box),
 			);
 
@@ -6551,25 +6599,27 @@ export class CommandManager {
 				return;
 			}
 
-			// Build parent-child relationships
+			// Build parent-child relationships (only for files that have IDs)
 			const childrenMap = new Map<string, TFile[]>();
 
 			for (const file of zettels) {
-				const id = this.extractZettelId(file.basename)!;
-				const parentId = this.getParentZettelId(id);
+				const id = this.extractZettelId(file.basename);
+				if (id) {
+					const parentId = this.getParentZettelId(id);
 
-				if (parentId) {
-					if (!childrenMap.has(parentId)) {
-						childrenMap.set(parentId, []);
+					if (parentId) {
+						if (!childrenMap.has(parentId)) {
+							childrenMap.set(parentId, []);
+						}
+						childrenMap.get(parentId)!.push(file);
 					}
-					childrenMap.get(parentId)!.push(file);
 				}
 			}
 
-			// Find root zettels (those without parents)
+			// Find root zettels (those without parents, or without IDs yet)
 			const rootZettels = zettels.filter((file) => {
 				const id = this.extractZettelId(file.basename);
-				if (!id) return false;
+				if (!id) return true; // Files without IDs are treated as roots
 				const parentId = this.getParentZettelId(id);
 				return !parentId;
 			});
