@@ -183,95 +183,98 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			)
 			.addToggle((toggle) =>
 				toggle
-					.setValue(true)
+					.setValue(this.plugin.settings.enableBoxes)
 					.onChange(async (value) => {
-						const wasEnabled = true;
-						// Boxes are always enabled
+						const wasEnabled = this.plugin.settings.enableBoxes;
+						this.plugin.settings.enableBoxes = value;
+						console.log("Toggle onChange - value:", value, "wasEnabled:", wasEnabled, "boxes.length:", this.plugin.settings.boxes.length);
 
 						if (value && !wasEnabled) {
 							// Enabling boxes: migrate current settings to a default box if no boxes exist
+							console.log("Enabling boxes - boxes.length:", this.plugin.settings.boxes.length);
 							if (this.plugin.settings.boxes.length === 0) {
+								console.log("No boxes exist, creating default box from global settings");
 								const defaultBox: Box = {
 									id: Date.now().toString(),
 									name: "Default Box",
 									type: "folder",
 									folderPath:
-										this.plugin.settings.boxes[0].folderPath ||
+										this.plugin.settings.zettelsLocation ||
 										"",
 									// Box prefix defaults
 									useBoxPrefix: false,
 									boxPrefix: "",
 									// Copy zettel settings
 									zettelIdFormat:
-										this.plugin.settings.boxes[0].zettelIdFormat,
+										this.plugin.settings.zettelIdFormat,
 									useSeparatorFormat:
-										this.plugin.settings.boxes[0].useSeparatorFormat,
+										this.plugin.settings.useSeparatorFormat,
 									zettelIdSeparator:
-										this.plugin.settings.boxes[0].zettelIdSeparator,
+										this.plugin.settings.zettelIdSeparator,
 									zettelIdMatchingMode:
-										this.plugin.settings.boxes[0].zettelIdMatchingMode,
+										this.plugin.settings.zettelIdMatchingMode,
 									noteTemplatePath:
-										this.plugin.settings.boxes[0].noteTemplatePath,
-									zettelTag: this.plugin.settings.boxes[0].zettelTag,
+										this.plugin.settings.noteTemplatePath,
+									zettelTag: this.plugin.settings.zettelTag,
 									enableSequenceReorder:
-										this.plugin.settings.boxes[0].enableSequenceReorder,
+										this.plugin.settings.enableSequenceReorder,
 									useZettelPrefix:
-										this.plugin.settings.boxes[0].useZettelPrefix,
+										this.plugin.settings.useZettelPrefix,
 									zettelPrefix:
-										this.plugin.settings.boxes[0].zettelPrefix,
+										this.plugin.settings.zettelPrefix,
 									// Copy fleeting notes settings
 									enableFleetingNotes:
-										this.plugin.settings.boxes[0].enableFleetingNotes,
+										this.plugin.settings.enableFleetingNotes,
 									fleetingNotesUseSeparateLocation:
-										this.plugin.settings.boxes[0].fleetingNotesUseSeparateLocation,
+										this.plugin.settings.fleetingNotesUseSeparateLocation,
 									fleetingNotesLocation:
-										this.plugin.settings.boxes[0].fleetingNotesLocation,
+										this.plugin.settings.fleetingNotesLocation,
 									fleetingNotesTemplatePath:
-										this.plugin.settings.boxes[0].fleetingNotesTemplatePath,
+										this.plugin.settings.fleetingNotesTemplatePath,
 									fleetingNotesUseZettelId:
-										this.plugin.settings.boxes[0].fleetingNotesUseZettelId,
+										this.plugin.settings.fleetingNotesUseZettelId,
 									fleetingNotesFilenameFormat:
-										this.plugin.settings.boxes[0].fleetingNotesFilenameFormat,
+										this.plugin.settings.fleetingNotesFilenameFormat,
 									fleetingNotesTag:
-										this.plugin.settings.boxes[0].fleetingNotesTag,
+										this.plugin.settings.fleetingNotesTag,
 									useFleetingNotesPrefix:
-										this.plugin.settings.boxes[0].useFleetingNotesPrefix,
+										this.plugin.settings.useFleetingNotesPrefix,
 									fleetingNotesPrefix:
-										this.plugin.settings.boxes[0].fleetingNotesPrefix,
+										this.plugin.settings.fleetingNotesPrefix,
 									// Copy MOCs settings
-									enableMocs: this.plugin.settings.boxes[0].enableMocs,
+									enableMocs: this.plugin.settings.enableMocs,
 									mocsUseSeparateLocation:
-										this.plugin.settings.boxes[0].mocsUseSeparateLocation,
+										this.plugin.settings.mocsUseSeparateLocation,
 									mocsLocation:
-										this.plugin.settings.boxes[0].mocsLocation,
+										this.plugin.settings.mocsLocation,
 									mocsTemplatePath:
-										this.plugin.settings.boxes[0].mocsTemplatePath,
+										this.plugin.settings.mocsTemplatePath,
 									mocsUseZettelId:
-										this.plugin.settings.boxes[0].mocsUseZettelId,
+										this.plugin.settings.mocsUseZettelId,
 									mocsFilenameFormat:
-										this.plugin.settings.boxes[0].mocsFilenameFormat,
-									mocsTag: this.plugin.settings.boxes[0].mocsTag,
+										this.plugin.settings.mocsFilenameFormat,
+									mocsTag: this.plugin.settings.mocsTag,
 									useMocsPrefix:
-										this.plugin.settings.boxes[0].useMocsPrefix,
-									mocsPrefix: this.plugin.settings.boxes[0].mocsPrefix,
+										this.plugin.settings.useMocsPrefix,
+									mocsPrefix: this.plugin.settings.mocsPrefix,
 									// Copy indexes settings
 									enableIndexes:
-										this.plugin.settings.boxes[0].enableIndexes,
+										this.plugin.settings.enableIndexes,
 									indexesUseSeparateLocation:
-										this.plugin.settings.boxes[0].indexesUseSeparateLocation,
+										this.plugin.settings.indexesUseSeparateLocation,
 									indexesLocation:
-										this.plugin.settings.boxes[0].indexesLocation,
+										this.plugin.settings.indexesLocation,
 									indexesTemplatePath:
-										this.plugin.settings.boxes[0].indexesTemplatePath,
+										this.plugin.settings.indexesTemplatePath,
 									indexesUseZettelId:
-										this.plugin.settings.boxes[0].indexesUseZettelId,
+										this.plugin.settings.indexesUseZettelId,
 									indexesFilenameFormat:
-										this.plugin.settings.boxes[0].indexesFilenameFormat,
-									indexesTag: this.plugin.settings.boxes[0].indexesTag,
+										this.plugin.settings.indexesFilenameFormat,
+									indexesTag: this.plugin.settings.indexesTag,
 									useIndexesPrefix:
-										this.plugin.settings.boxes[0].useIndexesPrefix,
+										this.plugin.settings.useIndexesPrefix,
 									indexesPrefix:
-										this.plugin.settings.boxes[0].indexesPrefix,
+										this.plugin.settings.indexesPrefix,
 									// Command opt-in defaults
 									enableIndividualCommands: {
 										quickZettel: true, // Enabled by default
@@ -320,65 +323,65 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							if (this.plugin.settings.boxes.length === 1) {
 								const box = this.plugin.settings.boxes[0];
 								// Copy zettel settings back
-								this.plugin.settings.boxes[0].zettelIdFormat =
+								this.plugin.settings.zettelIdFormat =
 									box.zettelIdFormat;
-								this.plugin.settings.boxes[0].zettelIdSeparator =
+								this.plugin.settings.zettelIdSeparator =
 									box.zettelIdSeparator;
-								this.plugin.settings.boxes[0].zettelIdMatchingMode =
+								this.plugin.settings.zettelIdMatchingMode =
 									box.zettelIdMatchingMode;
-								this.plugin.settings.boxes[0].noteTemplatePath =
+								this.plugin.settings.noteTemplatePath =
 									box.noteTemplatePath;
-								this.plugin.settings.boxes[0].zettelTag = box.zettelTag;
-								this.plugin.settings.boxes[0].enableSequenceReorder =
+								this.plugin.settings.zettelTag = box.zettelTag;
+								this.plugin.settings.enableSequenceReorder =
 									box.enableSequenceReorder;
 								if (box.type === "folder") {
 									// Zettels don't have separate location
-									this.plugin.settings.boxes[0].folderPath =
+									this.plugin.settings.zettelsLocation =
 										box.folderPath || "";
 								}
 								// Copy fleeting notes settings back
-								this.plugin.settings.boxes[0].enableFleetingNotes =
+								this.plugin.settings.enableFleetingNotes =
 									box.enableFleetingNotes;
-								this.plugin.settings.boxes[0].fleetingNotesUseSeparateLocation =
+								this.plugin.settings.fleetingNotesUseSeparateLocation =
 									box.fleetingNotesUseSeparateLocation;
-								this.plugin.settings.boxes[0].fleetingNotesLocation =
+								this.plugin.settings.fleetingNotesLocation =
 									box.fleetingNotesLocation;
-								this.plugin.settings.boxes[0].fleetingNotesTemplatePath =
+								this.plugin.settings.fleetingNotesTemplatePath =
 									box.fleetingNotesTemplatePath;
-								this.plugin.settings.boxes[0].fleetingNotesUseZettelId =
+								this.plugin.settings.fleetingNotesUseZettelId =
 									box.fleetingNotesUseZettelId;
-								this.plugin.settings.boxes[0].fleetingNotesFilenameFormat =
+								this.plugin.settings.fleetingNotesFilenameFormat =
 									box.fleetingNotesFilenameFormat;
-								this.plugin.settings.boxes[0].fleetingNotesTag =
+								this.plugin.settings.fleetingNotesTag =
 									box.fleetingNotesTag;
 								// Copy MOCs settings back
-								this.plugin.settings.boxes[0].enableMocs =
+								this.plugin.settings.enableMocs =
 									box.enableMocs;
-								this.plugin.settings.boxes[0].mocsUseSeparateLocation =
+								this.plugin.settings.mocsUseSeparateLocation =
 									box.mocsUseSeparateLocation;
-								this.plugin.settings.boxes[0].mocsLocation =
+								this.plugin.settings.mocsLocation =
 									box.mocsLocation;
-								this.plugin.settings.boxes[0].mocsTemplatePath =
+								this.plugin.settings.mocsTemplatePath =
 									box.mocsTemplatePath;
-								this.plugin.settings.boxes[0].mocsUseZettelId =
+								this.plugin.settings.mocsUseZettelId =
 									box.mocsUseZettelId;
-								this.plugin.settings.boxes[0].mocsFilenameFormat =
+								this.plugin.settings.mocsFilenameFormat =
 									box.mocsFilenameFormat;
-								this.plugin.settings.boxes[0].mocsTag = box.mocsTag;
+								this.plugin.settings.mocsTag = box.mocsTag;
 								// Copy indexes settings back
-								this.plugin.settings.boxes[0].enableIndexes =
+								this.plugin.settings.enableIndexes =
 									box.enableIndexes;
-								this.plugin.settings.boxes[0].indexesUseSeparateLocation =
+								this.plugin.settings.indexesUseSeparateLocation =
 									box.indexesUseSeparateLocation;
-								this.plugin.settings.boxes[0].indexesLocation =
+								this.plugin.settings.indexesLocation =
 									box.indexesLocation;
-								this.plugin.settings.boxes[0].indexesTemplatePath =
+								this.plugin.settings.indexesTemplatePath =
 									box.indexesTemplatePath;
-								this.plugin.settings.boxes[0].indexesUseZettelId =
+								this.plugin.settings.indexesUseZettelId =
 									box.indexesUseZettelId;
-								this.plugin.settings.boxes[0].indexesFilenameFormat =
+								this.plugin.settings.indexesFilenameFormat =
 									box.indexesFilenameFormat;
-								this.plugin.settings.boxes[0].indexesTag =
+								this.plugin.settings.indexesTag =
 									box.indexesTag;
 							}
 						}

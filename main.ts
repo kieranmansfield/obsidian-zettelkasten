@@ -40,6 +40,121 @@ export default class ZettelkastenPlugin extends Plugin {
 			if (loadedData.newNoteLocation !== undefined) {
 				this.settings.newNoteLocation = loadedData.newNoteLocation;
 			}
+		if (loadedData.enableBoxes !== undefined) {
+			this.settings.enableBoxes = loadedData.enableBoxes;
+		}
+		// Migrate global settings if they exist
+		if (loadedData.zettelsLocation !== undefined) {
+			this.settings.zettelsLocation = loadedData.zettelsLocation;
+		}
+		if (loadedData.zettelIdFormat !== undefined) {
+			this.settings.zettelIdFormat = loadedData.zettelIdFormat;
+		}
+		if (loadedData.useSeparatorFormat !== undefined) {
+			this.settings.useSeparatorFormat = loadedData.useSeparatorFormat;
+		}
+		if (loadedData.zettelIdSeparator !== undefined) {
+			this.settings.zettelIdSeparator = loadedData.zettelIdSeparator;
+		}
+		if (loadedData.zettelIdMatchingMode !== undefined) {
+			this.settings.zettelIdMatchingMode = loadedData.zettelIdMatchingMode;
+		}
+		if (loadedData.noteTemplatePath !== undefined) {
+			this.settings.noteTemplatePath = loadedData.noteTemplatePath;
+		}
+		if (loadedData.zettelTag !== undefined) {
+			this.settings.zettelTag = loadedData.zettelTag;
+		}
+		if (loadedData.enableSequenceReorder !== undefined) {
+			this.settings.enableSequenceReorder = loadedData.enableSequenceReorder;
+		}
+		if (loadedData.useZettelPrefix !== undefined) {
+			this.settings.useZettelPrefix = loadedData.useZettelPrefix;
+		}
+		if (loadedData.zettelPrefix !== undefined) {
+			this.settings.zettelPrefix = loadedData.zettelPrefix;
+		}
+		if (loadedData.enableFleetingNotes !== undefined) {
+			this.settings.enableFleetingNotes = loadedData.enableFleetingNotes;
+		}
+		if (loadedData.fleetingNotesUseSeparateLocation !== undefined) {
+			this.settings.fleetingNotesUseSeparateLocation = loadedData.fleetingNotesUseSeparateLocation;
+		}
+		if (loadedData.fleetingNotesLocation !== undefined) {
+			this.settings.fleetingNotesLocation = loadedData.fleetingNotesLocation;
+		}
+		if (loadedData.fleetingNotesTemplatePath !== undefined) {
+			this.settings.fleetingNotesTemplatePath = loadedData.fleetingNotesTemplatePath;
+		}
+		if (loadedData.fleetingNotesUseZettelId !== undefined) {
+			this.settings.fleetingNotesUseZettelId = loadedData.fleetingNotesUseZettelId;
+		}
+		if (loadedData.fleetingNotesFilenameFormat !== undefined) {
+			this.settings.fleetingNotesFilenameFormat = loadedData.fleetingNotesFilenameFormat;
+		}
+		if (loadedData.fleetingNotesTag !== undefined) {
+			this.settings.fleetingNotesTag = loadedData.fleetingNotesTag;
+		}
+		if (loadedData.useFleetingNotesPrefix !== undefined) {
+			this.settings.useFleetingNotesPrefix = loadedData.useFleetingNotesPrefix;
+		}
+		if (loadedData.fleetingNotesPrefix !== undefined) {
+			this.settings.fleetingNotesPrefix = loadedData.fleetingNotesPrefix;
+		}
+		if (loadedData.enableMocs !== undefined) {
+			this.settings.enableMocs = loadedData.enableMocs;
+		}
+		if (loadedData.mocsUseSeparateLocation !== undefined) {
+			this.settings.mocsUseSeparateLocation = loadedData.mocsUseSeparateLocation;
+		}
+		if (loadedData.mocsLocation !== undefined) {
+			this.settings.mocsLocation = loadedData.mocsLocation;
+		}
+		if (loadedData.mocsTemplatePath !== undefined) {
+			this.settings.mocsTemplatePath = loadedData.mocsTemplatePath;
+		}
+		if (loadedData.mocsUseZettelId !== undefined) {
+			this.settings.mocsUseZettelId = loadedData.mocsUseZettelId;
+		}
+		if (loadedData.mocsFilenameFormat !== undefined) {
+			this.settings.mocsFilenameFormat = loadedData.mocsFilenameFormat;
+		}
+		if (loadedData.mocsTag !== undefined) {
+			this.settings.mocsTag = loadedData.mocsTag;
+		}
+		if (loadedData.useMocsPrefix !== undefined) {
+			this.settings.useMocsPrefix = loadedData.useMocsPrefix;
+		}
+		if (loadedData.mocsPrefix !== undefined) {
+			this.settings.mocsPrefix = loadedData.mocsPrefix;
+		}
+		if (loadedData.enableIndexes !== undefined) {
+			this.settings.enableIndexes = loadedData.enableIndexes;
+		}
+		if (loadedData.indexesUseSeparateLocation !== undefined) {
+			this.settings.indexesUseSeparateLocation = loadedData.indexesUseSeparateLocation;
+		}
+		if (loadedData.indexesLocation !== undefined) {
+			this.settings.indexesLocation = loadedData.indexesLocation;
+		}
+		if (loadedData.indexesTemplatePath !== undefined) {
+			this.settings.indexesTemplatePath = loadedData.indexesTemplatePath;
+		}
+		if (loadedData.indexesUseZettelId !== undefined) {
+			this.settings.indexesUseZettelId = loadedData.indexesUseZettelId;
+		}
+		if (loadedData.indexesFilenameFormat !== undefined) {
+			this.settings.indexesFilenameFormat = loadedData.indexesFilenameFormat;
+		}
+		if (loadedData.indexesTag !== undefined) {
+			this.settings.indexesTag = loadedData.indexesTag;
+		}
+		if (loadedData.useIndexesPrefix !== undefined) {
+			this.settings.useIndexesPrefix = loadedData.useIndexesPrefix;
+		}
+		if (loadedData.indexesPrefix !== undefined) {
+			this.settings.indexesPrefix = loadedData.indexesPrefix;
+		}
 		}
 
 		// Migrate boxes or create from old global settings
