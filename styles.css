@@ -29,7 +29,7 @@ h1.zettelkasten-settings-title {
 /* Settings Section Headers */
 .vertical-tab-content h1,
 .mod-settings h1 {
-	margin-top: 3.5em;
+	margin-top: 0;
 	margin-bottom: 0.5em;
 	padding-top: 1em;
 	font-weight: 500;
@@ -42,15 +42,28 @@ h1.zettelkasten-settings-title {
 	padding-top: 0;
 }
 
+/* Settings Section Spacing */
+.settings-section {
+	margin-bottom: 6vh;
+}
+
+.settings-section:last-child {
+	margin-bottom: 0;
+}
+
 /* Collapsible Section Styling */
 .zettelkasten-collapsible-section {
-	margin-top: 3.5em;
-	margin-bottom: 3.5em;
+	margin-top: 0;
+	margin-bottom: 6vh;
 	border: none;
 }
 
 .zettelkasten-collapsible-section:first-of-type {
 	margin-top: 0;
+}
+
+.zettelkasten-collapsible-section:last-of-type {
+	margin-bottom: 0;
 }
 
 .zettelkasten-collapsible-section summary {

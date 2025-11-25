@@ -99,14 +99,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 	}
 
 	private displayGeneralSettings(containerEl: HTMLElement): void {
-		containerEl.createEl("h1", { text: "General Settings" });
-		containerEl.createEl("p", {
+		const sectionDiv = containerEl.createDiv({ cls: "settings-section" });
+
+		sectionDiv.createEl("h1", { text: "General Settings" });
+		sectionDiv.createEl("p", {
 			text: "Configure general plugin behavior.",
 			cls: "setting-item-description",
 		});
 
 		// New Note Location
-		new Setting(containerEl)
+		new Setting(sectionDiv)
 			.setName("New note location")
 			.setDesc(
 				"Default folder path where new notes will be created (leave empty for vault root)",
@@ -127,7 +129,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			});
 
 		// Ignored Folders
-		const ignoredFoldersSetting = new Setting(containerEl)
+		const ignoredFoldersSetting = new Setting(sectionDiv)
 			.setName("Ignored folders")
 			.setDesc(
 				"Folder paths to exclude from commands. Click + to add more.",
@@ -147,7 +149,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 
 		// Display existing ignored folders
 		this.plugin.settings.ignoredFolders.forEach((folder, index) => {
-			new Setting(containerEl)
+			new Setting(sectionDiv)
 				.setClass("zettelkasten-ignored-folder-item")
 				.addText((text) => {
 					const onSelect = async (value: string) => {
@@ -180,15 +182,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 	}
 
 	private displayZettelSettings(containerEl: HTMLElement): void {
-		const contentDiv = this.createCollapsibleSection(
-			containerEl,
-			"Zettel Settings",
-			"Configure how zettel notes are created and organized.",
-			true,
-		);
+		const sectionDiv = containerEl.createDiv({ cls: "settings-section" });
+
+		sectionDiv.createEl("h1", { text: "Zettel Settings" });
+		sectionDiv.createEl("p", {
+			text: "Configure how zettel notes are created and organized.",
+			cls: "setting-item-description",
+		});
 
 		// Zettel Detection Mode
-		new Setting(contentDiv)
+		new Setting(sectionDiv)
 			.setName("Zettel detection mode")
 			.setDesc(
 				"How to identify zettel notes: by folder location or by tag",
@@ -205,7 +208,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			);
 
 		// Zettels Location
-		new Setting(contentDiv)
+		new Setting(sectionDiv)
 			.setName("Zettels location")
 			.setDesc(
 				"Folder path for zettel notes (leave empty for vault root)",
@@ -226,7 +229,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			});
 
 		// Zettel ID Format
-		new Setting(contentDiv)
+		new Setting(sectionDiv)
 			.setName("Zettel ID format")
 			.setDesc(
 				"Date format for generating zettel IDs (e.g., YYYYMMDDHHmm, YYYYMMDD, YYYYMMDDHHmmss)",
@@ -242,7 +245,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			);
 
 		// Zettel ID Separator
-		// new Setting(contentDiv)
+		// new Setting(sectionDiv)
 		// 	.setName("Zettel ID separator")
 		// 	.setDesc("Character(s) separating the zettel ID from the title")
 		// 	.addText((text) =>
@@ -256,7 +259,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		// 	);
 
 		// Zettel ID Matching Mode
-		// new Setting(contentDiv)
+		// new Setting(sectionDiv)
 		// 	.setName("Zettel ID matching mode")
 		// 	.setDesc(
 		// 		"How strictly to match zettel IDs in filenames (strict: exact match; separator: match with separator; fuzzy: loose match)",
@@ -275,7 +278,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		// 	);
 
 		// Note Template Path
-		new Setting(contentDiv)
+		new Setting(sectionDiv)
 			.setName("Note template path")
 			.setDesc(
 				"Path to the template file for new notes (leave empty to use default)",
@@ -296,7 +299,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			});
 
 		// Zettel Tag
-		new Setting(contentDiv)
+		new Setting(sectionDiv)
 			.setName("Zettel tag")
 			.setDesc("Tag used to identify zettel notes (without #)")
 			.addText((text) => {
