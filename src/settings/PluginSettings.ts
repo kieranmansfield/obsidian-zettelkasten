@@ -1,8 +1,14 @@
 // Zettel ID matching modes
 export type ZettelIdMatchingMode = "strict" | "separator" | "fuzzy";
 
-// Index modes
-export type IndexMode = "moc" | "zettelkasten";
+// Structure note modes
+export type StructureNoteMode = "moc" | "zettelkasten";
+
+// Zettel detection modes
+export type ZettelDetectionMode = "tag" | "folder";
+
+// Inbox modes
+export type InboxMode = "default" | "fleeting";
 
 // Plugin settings interface
 export interface ZettelkastenPluginSettings {
@@ -12,6 +18,7 @@ export interface ZettelkastenPluginSettings {
 	zettelsLocation: string;
 
 	// Zettel settings
+	zettelDetectionMode: ZettelDetectionMode;
 	zettelIdFormat: string;
 	useSeparatorFormat: boolean;
 	zettelIdSeparator: string;
@@ -24,8 +31,15 @@ export interface ZettelkastenPluginSettings {
 	// Note Sequence settings
 	enableNoteSequence: boolean;
 
-	// Fleeting notes settings
-	enableFleetingNotes: boolean;
+	// Inbox settings
+	enableInbox: boolean;
+	inboxMode: InboxMode; // "default" or "fleeting"
+	inboxLocation: string;
+
+	// Default mode settings
+	defaultInboxTemplatePath: string;
+
+	// Fleeting Notes mode settings
 	fleetingNotesUseSeparateLocation: boolean;
 	fleetingNotesLocation: string;
 	fleetingNotesTemplatePath: string;
@@ -35,17 +49,22 @@ export interface ZettelkastenPluginSettings {
 	useFleetingNotesPrefix: boolean;
 	fleetingNotesPrefix: string;
 
-	// Index settings (merged MOCs and Indexes)
-	enableIndexes: boolean;
-	indexMode: IndexMode; // "moc" or "zettelkasten"
-	indexesUseSeparateLocation: boolean;
-	indexesLocation: string;
-	indexesTemplatePath: string;
-	indexesUseZettelId: boolean;
-	indexesFilenameFormat: string;
-	indexesTag: string;
-	useIndexesPrefix: boolean;
-	indexesPrefix: string;
+	// Structure Notes settings (MOCs and ZK Indexes)
+	enableStructureNotes: boolean;
+	structureNoteMode: StructureNoteMode; // "moc" or "zettelkasten"
+	structureNotesUseSeparateLocation: boolean;
+	structureNotesLocation: string;
+	mocTemplatePath: string; // Template for MOC mode
+	zkIndexTemplatePath: string; // Template for ZK Index mode
+	structureNotesUseZettelId: boolean;
+	structureNotesFilenameFormat: string;
+	structureNotesTag: string;
+	useStructureNotesPrefix: boolean;
+	structureNotesPrefix: string;
+
+	// Reference settings
+	enableReference: boolean;
+	referenceLocation: string;
 }
 
 // Default settings values
@@ -54,6 +73,7 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	newNoteLocation: "",
 	zettelsLocation: "",
 
+	zettelDetectionMode: "folder",
 	zettelIdFormat: "YYYYMMDDHHmmssSSS",
 	useSeparatorFormat: false,
 	zettelIdSeparator: "⁝ ",
@@ -65,7 +85,12 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 
 	enableNoteSequence: false,
 
-	enableFleetingNotes: true,
+	enableInbox: true,
+	inboxMode: "default",
+	inboxLocation: "",
+
+	defaultInboxTemplatePath: "",
+
 	fleetingNotesUseSeparateLocation: false,
 	fleetingNotesLocation: "",
 	fleetingNotesTemplatePath: "",
@@ -75,14 +100,18 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	useFleetingNotesPrefix: false,
 	fleetingNotesPrefix: "f",
 
-	enableIndexes: true,
-	indexMode: "moc",
-	indexesUseSeparateLocation: false,
-	indexesLocation: "",
-	indexesTemplatePath: "",
-	indexesUseZettelId: false,
-	indexesFilenameFormat: "{{title}} Index",
-	indexesTag: "index",
-	useIndexesPrefix: false,
-	indexesPrefix: "i",
+	enableStructureNotes: true,
+	structureNoteMode: "moc",
+	structureNotesUseSeparateLocation: false,
+	structureNotesLocation: "",
+	mocTemplatePath: "",
+	zkIndexTemplatePath: "",
+	structureNotesUseZettelId: false,
+	structureNotesFilenameFormat: "{{title}} Index",
+	structureNotesTag: "index",
+	useStructureNotesPrefix: false,
+	structureNotesPrefix: "i",
+
+	enableReference: false,
+	referenceLocation: "",
 };

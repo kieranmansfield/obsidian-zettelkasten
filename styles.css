@@ -16,104 +16,90 @@ If your plugin does not need CSS, delete this file.
 	font-family: var(--font-monospace);
 }
 
-/* Settings Tab Navigation */
-.zettelkasten-settings-tabs {
-	display: flex;
-	gap: 4px;
-	margin-bottom: 20px;
-	border-bottom: 2px solid var(--background-modifier-border);
-	padding-bottom: 0;
+/* Settings Page Title */
+h1.zettelkasten-settings-title {
+	font-weight: 600 !important;
+	font-size: 2.5em !important;
+	line-height: 4rem;
+	margin-bottom: 1.5em;
+	margin-top: 0;
+	padding-top: 0;
 }
 
-.zettelkasten-settings-tab {
-	padding: 10px 16px;
-	cursor: pointer;
-	border-radius: 4px 4px 0 0;
+/* Settings Section Headers */
+.vertical-tab-content h1,
+.mod-settings h1 {
+	margin-top: 3.5em;
+	margin-bottom: 0.5em;
+	padding-top: 1em;
 	font-weight: 500;
-	color: var(--text-muted);
-	transition: all 0.2s ease;
-	background-color: transparent;
-	border: 1px solid transparent;
-	border-bottom: none;
-	margin-bottom: -2px;
+	font-size: 1.3em;
 }
 
-.zettelkasten-settings-tab:hover {
-	background-color: var(--background-modifier-hover);
-	color: var(--text-normal);
+.vertical-tab-content h1:first-child,
+.mod-settings h1:first-child {
+	margin-top: 0;
+	padding-top: 0;
 }
 
-.zettelkasten-settings-tab.is-active {
-	background-color: var(--background-primary);
-	color: var(--text-normal);
-	border-color: var(--background-modifier-border);
-	border-bottom: 2px solid var(--background-primary);
-	font-weight: 600;
+/* Collapsible Section Styling */
+.zettelkasten-collapsible-section {
+	margin-top: 3.5em;
+	margin-bottom: 3.5em;
+	border: none;
 }
 
-.zettelkasten-settings-content {
-	padding-top: 10px;
+.zettelkasten-collapsible-section:first-of-type {
+	margin-top: 0;
 }
 
-/* Box Item Styling */
-.zettelkasten-box-item {
-	position: relative;
-}
-
-.zettelkasten-box-item .setting-item:last-child {
-	border-bottom: none;
-	justify-content: flex-end;
-	padding-top: 8px;
-	margin-top: 8px;
-	border-top: 1px solid var(--background-modifier-border);
-}
-
-/* Box Settings Modal */
-.zettelkasten-box-settings-modal {
-	min-width: 600px;
-}
-
-.box-settings-tabs-container {
-	margin-top: 20px;
-}
-
-.box-settings-tabs {
-	display: flex;
-	gap: 4px;
-	margin-bottom: 20px;
-	border-bottom: 2px solid var(--background-modifier-border);
-	padding-bottom: 0;
-}
-
-.box-settings-tab {
-	padding: 8px 14px;
+.zettelkasten-collapsible-section summary {
 	cursor: pointer;
-	border-radius: 4px 4px 0 0;
+	user-select: none;
+	list-style: none;
+	margin-bottom: 0.5em;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.zettelkasten-collapsible-section summary::-webkit-details-marker {
+	display: none;
+}
+
+.zettelkasten-collapsible-section summary .section-header {
+	display: flex;
+	align-items: center;
+	flex: 1;
+}
+
+.zettelkasten-collapsible-section summary h1 {
+	display: inline-block;
+	margin: 0;
+	padding: 0.5em 0;
+	font-size: 1.3em;
 	font-weight: 500;
+}
+
+.zettelkasten-collapsible-section summary h1::before {
+	content: "▶";
+	display: inline-block;
+	transition: transform 0.2s;
+	margin-right: 0.5em;
 	color: var(--text-muted);
-	transition: all 0.2s ease;
-	background-color: transparent;
-	border: 1px solid transparent;
-	border-bottom: none;
-	margin-bottom: -2px;
-	font-size: 0.9em;
+	font-size: 0.7em;
 }
 
-.box-settings-tab:hover {
-	background-color: var(--background-modifier-hover);
-	color: var(--text-normal);
+.zettelkasten-collapsible-section[open] summary h1::before {
+	transform: rotate(90deg);
 }
 
-.box-settings-tab.is-active {
-	background-color: var(--background-primary);
-	color: var(--text-normal);
-	border-color: var(--background-modifier-border);
-	border-bottom: 2px solid var(--background-primary);
-	font-weight: 600;
+.zettelkasten-collapsible-section summary:hover h1 {
+	color: var(--text-accent);
 }
 
-.box-settings-content {
-	padding-top: 10px;
-	max-height: 60vh;
-	overflow-y: auto;
+.zettelkasten-collapsible-section summary .section-toggle {
+	margin-left: auto;
+	display: flex;
+	align-items: center;
 }
