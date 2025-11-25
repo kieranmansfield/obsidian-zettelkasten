@@ -26,6 +26,27 @@ h1.zettelkasten-settings-title {
 	padding-top: 0;
 }
 
+/* Mobile: Hide title */
+.is-mobile h1.zettelkasten-settings-title {
+	display: none;
+}
+
+/* Mobile: Disable collapsible sections - keep all sections open */
+.is-mobile .zettelkasten-collapsible-section {
+	/* Force details element to stay open */
+}
+
+.is-mobile .zettelkasten-collapsible-section summary {
+	/* Disable interaction with the toggle */
+	pointer-events: none;
+	cursor: default;
+}
+
+.is-mobile .zettelkasten-collapsible-section summary h1::before {
+	/* Hide the arrow indicator */
+	display: none;
+}
+
 /* Settings Section Headers */
 .vertical-tab-content h1,
 .mod-settings h1 {
