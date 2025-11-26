@@ -68,6 +68,16 @@ export interface ZettelkastenPluginSettings {
 
 	// Zettelkasten Panel settings
 	enableZettelkastenPanel: boolean;
+	panelShowFileLists: boolean;
+	panelShowFileIcons: boolean;
+	panelInboxName: string;
+	panelZettelsName: string;
+	panelReferencesName: string;
+	panelBookmarksName: string;
+	panelNoteSequenceName: string;
+	panelWorkspacesName: string;
+	panelShowNoteSequence: boolean;
+	panelShowWorkspaces: boolean;
 	panelInboxDashboard: string;
 	panelInboxFilterTags: string[];
 	panelZettelsDashboard: string;
@@ -132,6 +142,16 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	referenceLocation: "",
 
 	enableZettelkastenPanel: true,
+	panelShowFileLists: true,
+	panelShowFileIcons: true,
+	panelInboxName: "Inbox",
+	panelZettelsName: "Zettels",
+	panelReferencesName: "References",
+	panelBookmarksName: "Bookmarks",
+	panelNoteSequenceName: "Note Sequence",
+	panelWorkspacesName: "Workspaces",
+	panelShowNoteSequence: true,
+	panelShowWorkspaces: false,
 	panelInboxDashboard: "",
 	panelInboxFilterTags: [],
 	panelZettelsDashboard: "",

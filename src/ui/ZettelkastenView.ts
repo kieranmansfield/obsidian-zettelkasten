@@ -1,5 +1,6 @@
 import { ItemView, WorkspaceLeaf, TFolder, TFile, setIcon, getAllTags } from "obsidian";
 import type ZettelkastenPlugin from "../../main";
+import { VIEW_TYPE_NOTE_SEQUENCES } from "./NoteSequencesView";
 
 export const VIEW_TYPE_ZETTELKASTEN = "zettelkasten-view";
 
@@ -14,10 +15,47 @@ interface MenuItem {
 export class ZettelkastenView extends ItemView {
 	private collapsedSections: Set<string> = new Set();
 	plugin: ZettelkastenPlugin;
+	private refreshTimeout: NodeJS.Timeout | null = null;
 
 	constructor(leaf: WorkspaceLeaf, plugin: ZettelkastenPlugin) {
 		super(leaf);
 		this.plugin = plugin;
+		this.registerEvents();
+	}
+
+	private registerEvents(): void {
+		// Refresh panel when files are created, deleted, or modified
+		this.registerEvent(
+			this.app.vault.on("create", () => this.scheduleRefresh())
+		);
+		this.registerEvent(
+			this.app.vault.on("delete", () => this.scheduleRefresh())
+		);
+		this.registerEvent(
+			this.app.vault.on("rename", () => this.scheduleRefresh())
+		);
+		// Refresh when metadata changes (tags, frontmatter, etc.)
+		this.registerEvent(
+			this.app.metadataCache.on("changed", () => this.scheduleRefresh())
+		);
+	}
+
+	private scheduleRefresh(): void {
+		// Debounce refreshes to avoid excessive updates
+		if (this.refreshTimeout) {
+			clearTimeout(this.refreshTimeout);
+		}
+		this.refreshTimeout = setTimeout(() => {
+			this.refresh();
+			this.refreshTimeout = null;
+		}, 300);
+	}
+
+	public refresh(): void {
+		const container = this.containerEl.children[1] as HTMLElement;
+		container.empty();
+		container.addClass("zettelkasten-view");
+		this.renderContent(container);
 	}
 
 	getViewType(): string {
@@ -36,24 +74,27 @@ export class ZettelkastenView extends ItemView {
 		const container = this.containerEl.children[1] as HTMLElement;
 		container.empty();
 		container.addClass("zettelkasten-view");
+		this.renderContent(container);
+	}
 
+	private renderContent(container: HTMLElement): void {
 		const menuItems: MenuItem[] = [
 			{
-				name: "Inbox",
+				name: this.plugin.settings.panelInboxName || "Inbox",
 				icon: "inbox",
 				folderName: this.plugin.settings.inboxLocation || "Inbox",
 				dashboardPath: this.plugin.settings.panelInboxDashboard,
 				filterTags: this.plugin.settings.panelInboxFilterTags
 			},
 			{
-				name: "Zettels",
+				name: this.plugin.settings.panelZettelsName || "Zettels",
 				icon: "file-text",
 				folderName: this.plugin.settings.zettelsLocation || "Zettels",
 				dashboardPath: this.plugin.settings.panelZettelsDashboard,
 				filterTags: this.plugin.settings.panelZettelsFilterTags
 			},
 			{
-				name: "References",
+				name: this.plugin.settings.panelReferencesName || "References",
 				icon: "book-open",
 				folderName: this.plugin.settings.referenceLocation || "References",
 				dashboardPath: this.plugin.settings.panelReferencesDashboard,
@@ -67,17 +108,28 @@ export class ZettelkastenView extends ItemView {
 
 		// Add Bookmarks section
 		this.createBookmarksMenuItem(container);
+
+		// Add Note Sequence section (if enabled)
+		if (this.plugin.settings.panelShowNoteSequence) {
+			this.createNoteSequenceMenuItem(container);
+		}
+
+		// Add Workspaces section (if enabled)
+		if (this.plugin.settings.panelShowWorkspaces) {
+			this.createWorkspacesMenuItem(container);
+		}
 	}
 
 	private createBookmarksMenuItem(container: HTMLElement): void {
 		const itemEl = container.createDiv({ cls: "zk-menu-item" });
+		const bookmarksName = this.plugin.settings.panelBookmarksName || "Bookmarks";
 
 		// Header with icon and name
 		const headerEl = itemEl.createDiv({ cls: "zk-menu-header" });
 
 		// Collapse icon
 		const collapseIconEl = headerEl.createDiv({ cls: "zk-collapse-icon" });
-		const isCollapsed = this.collapsedSections.has("Bookmarks");
+		const isCollapsed = this.collapsedSections.has(bookmarksName);
 		setIcon(collapseIconEl, isCollapsed ? "chevron-right" : "chevron-down");
 
 		// Item icon
@@ -87,7 +139,7 @@ export class ZettelkastenView extends ItemView {
 		// Item name
 		headerEl.createDiv({
 			cls: "zk-menu-name",
-			text: "Bookmarks"
+			text: bookmarksName
 		});
 
 		// Content area (collapsible)
@@ -100,14 +152,14 @@ export class ZettelkastenView extends ItemView {
 		headerEl.addEventListener("click", async (e) => {
 			e.stopPropagation();
 
-			const isCurrentlyCollapsed = this.collapsedSections.has("Bookmarks");
+			const isCurrentlyCollapsed = this.collapsedSections.has(bookmarksName);
 
 			if (isCurrentlyCollapsed) {
-				this.collapsedSections.delete("Bookmarks");
+				this.collapsedSections.delete(bookmarksName);
 				contentEl.style.display = "block";
 				setIcon(collapseIconEl, "chevron-down");
 			} else {
-				this.collapsedSections.add("Bookmarks");
+				this.collapsedSections.add(bookmarksName);
 				contentEl.style.display = "none";
 				setIcon(collapseIconEl, "chevron-right");
 			}
@@ -221,10 +273,12 @@ export class ZettelkastenView extends ItemView {
 		// Header with icon and name
 		const headerEl = itemEl.createDiv({ cls: "zk-menu-header" });
 
-		// Collapse icon
+		// Collapse icon (only show if file lists are enabled)
 		const collapseIconEl = headerEl.createDiv({ cls: "zk-collapse-icon" });
-		const isCollapsed = this.collapsedSections.has(item.name);
-		setIcon(collapseIconEl, isCollapsed ? "chevron-right" : "chevron-down");
+		if (this.plugin.settings.panelShowFileLists) {
+			const isCollapsed = this.collapsedSections.has(item.name);
+			setIcon(collapseIconEl, isCollapsed ? "chevron-right" : "chevron-down");
+		}
 
 		// Item icon
 		const iconEl = headerEl.createDiv({ cls: "zk-menu-icon" });
@@ -238,16 +292,23 @@ export class ZettelkastenView extends ItemView {
 
 		// Content area (collapsible)
 		const contentEl = itemEl.createDiv({ cls: "zk-menu-content" });
-		if (isCollapsed) {
+		if (this.plugin.settings.panelShowFileLists) {
+			const isCollapsed = this.collapsedSections.has(item.name);
+			if (isCollapsed) {
+				contentEl.style.display = "none";
+			}
+		} else {
+			// Hide content area when file lists are disabled
 			contentEl.style.display = "none";
 		}
 
-		// Add click handler to header to open index file
+		// Add click handler to header
 		headerEl.addEventListener("click", async (e) => {
 			e.stopPropagation();
 
-			// If clicking on the collapse icon, toggle collapse
-			if (e.target === collapseIconEl || collapseIconEl.contains(e.target as Node)) {
+			// If file lists are enabled and clicking on the collapse icon, toggle collapse
+			if (this.plugin.settings.panelShowFileLists &&
+			    (e.target === collapseIconEl || collapseIconEl.contains(e.target as Node))) {
 				const isCurrentlyCollapsed = this.collapsedSections.has(item.name);
 
 				if (isCurrentlyCollapsed) {
@@ -259,14 +320,17 @@ export class ZettelkastenView extends ItemView {
 					contentEl.style.display = "none";
 					setIcon(collapseIconEl, "chevron-right");
 				}
-			} else {
-				// Otherwise open the index file
+			} else if (!this.plugin.settings.panelShowFileLists ||
+			           !(e.target === collapseIconEl || collapseIconEl.contains(e.target as Node))) {
+				// Open the index file when not clicking collapse icon or when file lists are disabled
 				await this.openIndexFile(item);
 			}
 		});
 
-		// Display folder contents with filter tags
-		this.displayFolderContents(contentEl, item);
+		// Display folder contents with filter tags (only if enabled)
+		if (this.plugin.settings.panelShowFileLists) {
+			this.displayFolderContents(contentEl, item);
+		}
 	}
 
 	private async openIndexFile(item: MenuItem): Promise<void> {
@@ -339,15 +403,34 @@ export class ZettelkastenView extends ItemView {
 			return;
 		}
 
-		// Display files
+		// Display files using Obsidian's tree item styling
 		filteredFiles.forEach(file => {
 			const displayName = this.cleanFileName(file.basename);
-			const fileEl = container.createDiv({
-				cls: "zk-file-link",
+
+			// Create tree item structure like file explorer
+			const treeItem = container.createDiv({
+				cls: "tree-item nav-file"
+			});
+
+			const treeItemSelf = treeItem.createDiv({
+				cls: "tree-item-self nav-file-title"
+			});
+
+			// Add file icon (conditionally based on settings)
+			if (this.plugin.settings.panelShowFileIcons) {
+				const treeItemIcon = treeItemSelf.createDiv({
+					cls: "tree-item-icon nav-file-title-icon"
+				});
+				setIcon(treeItemIcon, "file");
+			}
+
+			// Add file name
+			const treeItemInner = treeItemSelf.createDiv({
+				cls: "tree-item-inner nav-file-title-content",
 				text: displayName
 			});
 
-			fileEl.addEventListener("click", async () => {
+			treeItemSelf.addEventListener("click", async () => {
 				await this.app.workspace.getLeaf(false).openFile(file);
 			});
 		});
@@ -424,7 +507,89 @@ export class ZettelkastenView extends ItemView {
 		return filteredFiles;
 	}
 
+	private createNoteSequenceMenuItem(container: HTMLElement): void {
+		const itemEl = container.createDiv({ cls: "zk-menu-item" });
+		const sequenceName = this.plugin.settings.panelNoteSequenceName || "Note Sequence";
+
+		// Header with icon and name
+		const headerEl = itemEl.createDiv({ cls: "zk-menu-header" });
+
+		// No collapse icon for this item - it opens a view
+		headerEl.createDiv({ cls: "zk-collapse-icon" });
+
+		// Item icon
+		const iconEl = headerEl.createDiv({ cls: "zk-menu-icon" });
+		setIcon(iconEl, "list-ordered");
+
+		// Item name
+		headerEl.createDiv({
+			cls: "zk-menu-name",
+			text: sequenceName
+		});
+
+		// Add click handler to open Note Sequences view
+		headerEl.addEventListener("click", async () => {
+			await this.openNoteSequencesView();
+		});
+	}
+
+	private async openNoteSequencesView(): Promise<void> {
+		const { workspace } = this.app;
+
+		// Check if view already exists
+		let leaf = workspace.getLeavesOfType(VIEW_TYPE_NOTE_SEQUENCES)[0];
+
+		if (!leaf) {
+			// Create new leaf in main area
+			const newLeaf = workspace.getLeaf(true);
+			if (newLeaf) {
+				await newLeaf.setViewState({
+					type: VIEW_TYPE_NOTE_SEQUENCES,
+					active: true,
+				});
+				leaf = newLeaf;
+			}
+		}
+
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+	}
+
+	private createWorkspacesMenuItem(container: HTMLElement): void {
+		const itemEl = container.createDiv({ cls: "zk-menu-item" });
+		const workspacesName = this.plugin.settings.panelWorkspacesName || "Workspaces";
+
+		// Header with icon and name
+		const headerEl = itemEl.createDiv({ cls: "zk-menu-header" });
+
+		// No collapse icon for this item
+		headerEl.createDiv({ cls: "zk-collapse-icon" });
+
+		// Item icon
+		const iconEl = headerEl.createDiv({ cls: "zk-menu-icon" });
+		setIcon(iconEl, "layout-dashboard");
+
+		// Item name
+		headerEl.createDiv({
+			cls: "zk-menu-name",
+			text: workspacesName
+		});
+
+		// Add click handler (disabled for now)
+		headerEl.addEventListener("click", async () => {
+			console.log("Workspaces clicked (disabled)");
+		});
+
+		// Add disabled styling
+		itemEl.addClass("zk-menu-item-disabled");
+	}
+
 	async onClose(): Promise<void> {
-		// Cleanup if needed
+		// Clear any pending refresh timeout
+		if (this.refreshTimeout) {
+			clearTimeout(this.refreshTimeout);
+			this.refreshTimeout = null;
+		}
 	}
 }

@@ -18,6 +18,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 	display(): void {
 		const { containerEl } = this;
 
+		// Save scroll position before clearing
+		const scrollTop = containerEl.scrollTop;
+
 		containerEl.empty();
 
 		// page title
@@ -35,8 +38,11 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		this.displayPanelSettings(containerEl);
 		this.displayExperimentalSettings(containerEl);
 
-		// Prevent auto-focus on first input field
+		// Restore scroll position after rendering
 		setTimeout(() => {
+			containerEl.scrollTop = scrollTop;
+
+			// Prevent auto-focus on first input field
 			const activeElement = document.activeElement as HTMLElement;
 			if (activeElement && activeElement.blur) {
 				activeElement.blur();
@@ -834,6 +840,89 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						} else {
 							await this.plugin.deactivateView();
 						}
+					}),
+			);
+
+		// Show File Lists Toggle
+		new Setting(contentDiv)
+			.setName("Show file lists")
+			.setDesc(
+				"Display files beneath Inbox, Zettels, and References sections. When disabled, only section headers are shown.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.panelShowFileLists)
+					.onChange(async (value) => {
+						this.plugin.settings.panelShowFileLists = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// Show File Icons Toggle
+		new Setting(contentDiv)
+			.setName("Show file icons")
+			.setDesc(
+				"Display file icons next to file names in the panel.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.panelShowFileIcons)
+					.onChange(async (value) => {
+						this.plugin.settings.panelShowFileIcons = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// Section Name Customization
+		new Setting(contentDiv)
+			.setName("Inbox section name")
+			.setDesc("Customize the display name for the Inbox section")
+			.addText((text) =>
+				text
+					.setPlaceholder("Inbox")
+					.setValue(this.plugin.settings.panelInboxName)
+					.onChange(async (value) => {
+						this.plugin.settings.panelInboxName = value || "Inbox";
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(contentDiv)
+			.setName("Zettels section name")
+			.setDesc("Customize the display name for the Zettels section")
+			.addText((text) =>
+				text
+					.setPlaceholder("Zettels")
+					.setValue(this.plugin.settings.panelZettelsName)
+					.onChange(async (value) => {
+						this.plugin.settings.panelZettelsName = value || "Zettels";
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(contentDiv)
+			.setName("References section name")
+			.setDesc("Customize the display name for the References section")
+			.addText((text) =>
+				text
+					.setPlaceholder("References")
+					.setValue(this.plugin.settings.panelReferencesName)
+					.onChange(async (value) => {
+						this.plugin.settings.panelReferencesName = value || "References";
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(contentDiv)
+			.setName("Bookmarks section name")
+			.setDesc("Customize the display name for the Bookmarks section")
+			.addText((text) =>
+				text
+					.setPlaceholder("Bookmarks")
+					.setValue(this.plugin.settings.panelBookmarksName)
+					.onChange(async (value) => {
+						this.plugin.settings.panelBookmarksName = value || "Bookmarks";
+						await this.plugin.saveSettings();
 					}),
 			);
 

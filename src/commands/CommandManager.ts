@@ -45,6 +45,7 @@ export class CommandManager {
 		this.registerAddTitleToAliasesCommand();
 		this.registerBookmarkActiveFileCommand();
 		this.registerBookmarkCurrentSearchCommand();
+		this.registerBookmarkGraphCommand();
 	}
 
 	/**
@@ -1220,19 +1221,23 @@ export class CommandManager {
 	 * Returns true if the file was renamed, false if already correct
 	 */
 	private async fixZettelFilename(file: TFile): Promise<boolean> {
-		const currentId = this.extractZettelId(file.basename);
+		let currentId = this.extractZettelId(file.basename);
+
+		// If no ID found, generate one for this zettel
 		if (!currentId) {
-			return false; // Not a zettel with ID
+			// Generate a new ID based on file's creation time or current time
+			const timestamp = await this.generateTimestampForFile(file);
+			const prefix = this.plugin.settings.useZettelPrefix
+				? this.plugin.settings.zettelPrefix
+				: "";
+			currentId = prefix + timestamp;
 		}
 
-		// Normalize the ID
+		// Normalize the ID (this already includes the prefix if configured)
 		const normalizedId = this.normalizeZettelId(file, currentId);
 
-		// Get the title
-		const title = this.getTitleFromFile(file);
-
-		// Build the expected filename
-		const expectedFilename = this.buildZettelFilename(normalizedId, title);
+		// Build the expected filename with just the ID (no title)
+		const expectedFilename = normalizedId;
 
 		// Check if filename needs fixing
 		if (file.basename !== expectedFilename) {
@@ -1254,6 +1259,43 @@ export class CommandManager {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Generates a timestamp for a file based on its creation time or current time
+	 */
+	private async generateTimestampForFile(file: TFile): Promise<string> {
+		// Try to use file creation time
+		const stat = await this.plugin.app.vault.adapter.stat(file.path);
+		const creationTime = stat?.ctime || Date.now();
+
+		// Format according to settings
+		const format = this.plugin.settings.zettelIdFormat;
+		const date = new Date(creationTime);
+
+		let timestamp = "";
+
+		// Parse format string (e.g., "YYYYMMDDHHmmssSSS")
+		timestamp += date.getFullYear().toString(); // YYYY
+		timestamp += (date.getMonth() + 1).toString().padStart(2, "0"); // MM
+		timestamp += date.getDate().toString().padStart(2, "0"); // DD
+		timestamp += date.getHours().toString().padStart(2, "0"); // HH
+		timestamp += date.getMinutes().toString().padStart(2, "0"); // mm
+		timestamp += date.getSeconds().toString().padStart(2, "0"); // ss
+
+		// Add milliseconds if format requires them
+		if (format.includes("SSS")) {
+			timestamp += date.getMilliseconds().toString().padStart(3, "0"); // SSS
+		}
+
+		// Ensure timestamp matches format length
+		if (timestamp.length > format.length) {
+			timestamp = timestamp.substring(0, format.length);
+		} else if (timestamp.length < format.length) {
+			timestamp = timestamp.padEnd(format.length, "0");
+		}
+
+		return timestamp;
 	}
 
 	/**
@@ -1343,18 +1385,17 @@ export class CommandManager {
 	 * Normalizes a zettel ID to match the current format settings
 	 */
 	private normalizeZettelId(file: TFile, currentId: string): string {
-		// Strip any existing prefix
-		const prefix = this.plugin.settings.useZettelPrefix
+		// Determine current and desired prefix
+		const desiredPrefix = this.plugin.settings.useZettelPrefix
 			? this.plugin.settings.zettelPrefix
 			: "";
+
 		let idWithoutPrefix = currentId;
 
-		// Remove old prefix if it exists
-		if (currentId.startsWith(prefix)) {
-			idWithoutPrefix = currentId.substring(prefix.length);
-		} else if (prefix && /^[a-z]+/.test(currentId)) {
-			// Remove any letter prefix
-			idWithoutPrefix = currentId.replace(/^[a-z]+/, "");
+		// Remove any existing letter prefix from the ID
+		const prefixMatch = currentId.match(/^([a-z]+)/);
+		if (prefixMatch) {
+			idWithoutPrefix = currentId.substring(prefixMatch[1].length);
 		}
 
 		// Extract just the timestamp part (digits only)
@@ -1376,7 +1417,8 @@ export class CommandManager {
 			normalizedTimestamp = timestamp.padEnd(formatLength, "0");
 		}
 
-		return prefix + normalizedTimestamp + hierarchy;
+		// Return with desired prefix (or no prefix if disabled)
+		return desiredPrefix + normalizedTimestamp + hierarchy;
 	}
 
 	/**
@@ -1384,10 +1426,17 @@ export class CommandManager {
 	 * Looks for timestamp-based ID with optional hierarchy at the start of filename
 	 */
 	private extractZettelId(filename: string): string | null {
-		// Match timestamp pattern (13+ digits to handle various formats) with optional alternating letters/numbers
-		// Examples: 2025111321511, 20251114154532123, 20251114154532123a, 20251114154532123a1
-		const match = filename.match(/^(\d{13,}(?:[a-z]+|\d+)*)/);
-		return match ? match[1] : null;
+		// Match timestamp pattern with optional prefix
+		// First try to match with any letter prefix: z20251114... or zk20251114...
+		// Examples: z2025111321511, zk20251114154532123, 20251114154532123a, z20251114154532123a1
+		const withPrefixMatch = filename.match(/^([a-z]+\d{13,}(?:[a-z]+|\d+)*)/);
+		if (withPrefixMatch) {
+			return withPrefixMatch[1];
+		}
+
+		// Try without prefix - just timestamp and hierarchy
+		const withoutPrefixMatch = filename.match(/^(\d{13,}(?:[a-z]+|\d+)*)/);
+		return withoutPrefixMatch ? withoutPrefixMatch[1] : null;
 	}
 
 	/**
@@ -2691,10 +2740,8 @@ export class CommandManager {
 				// Get next available letter for this parent
 				const currentLetter = letterMap.get(actualParentId) || "a";
 				newId = actualParentId + currentLetter;
-				letterMap.set(
-					actualParentId,
-					String.fromCharCode(currentLetter.charCodeAt(0) + 1),
-				);
+				// Move to next letter, handling sequences beyond 'z'
+				letterMap.set(actualParentId, this.getNextLetter(currentLetter));
 			} else {
 				// Get next available number for this parent
 				const currentNum = numberMap.get(actualParentId) || 1;
@@ -2730,6 +2777,34 @@ export class CommandManager {
 				await this.plugin.app.fileManager.renameFile(file, finalPath);
 			}
 		}
+	}
+
+	/**
+	 * Gets the next letter in sequence, handling beyond 'z' by using double letters (aa, ab, ac...)
+	 * Examples: a → b, z → aa, aa → ab, az → ba, zz → aaa
+	 */
+	private getNextLetter(current: string): string {
+		// Convert string to array of character codes
+		const chars = current.split('');
+
+		// Start from the rightmost character
+		for (let i = chars.length - 1; i >= 0; i--) {
+			if (chars[i] === 'z') {
+				// If it's 'z', change to 'a' and continue to next position
+				chars[i] = 'a';
+				if (i === 0) {
+					// We've rolled over all positions, add another 'a' at the start
+					return 'a' + chars.join('');
+				}
+			} else {
+				// Increment this character and we're done
+				chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
+				return chars.join('');
+			}
+		}
+
+		// Fallback (shouldn't reach here)
+		return 'a';
 	}
 
 	/**
@@ -3385,6 +3460,60 @@ export class CommandManager {
 
 				await this.plugin.saveSettings();
 				new Notice(`Bookmarked search: ${query}`);
+			},
+		});
+	}
+
+	private registerBookmarkGraphCommand(): void {
+		this.plugin.addCommand({
+			id: "bookmark-graph",
+			name: "Bookmark this graph",
+			checkCallback: (checking: boolean) => {
+				// Only show command when graph view is active
+				const graphLeaves = this.plugin.app.workspace.getLeavesOfType("graph");
+				const localGraphLeaves = this.plugin.app.workspace.getLeavesOfType("localgraph");
+				const hasGraphView = graphLeaves.length > 0 || localGraphLeaves.length > 0;
+
+				if (checking) {
+					return hasGraphView;
+				}
+
+				if (!hasGraphView) {
+					new Notice("No active graph view");
+					return false;
+				}
+
+				// Check if graph is already bookmarked
+				const existingBookmark = this.plugin.settings.panelBookmarks.find(
+					(b) => b.type === "graph"
+				);
+
+				if (existingBookmark) {
+					new Notice("Graph is already bookmarked");
+					return false;
+				}
+
+				// Determine graph type and title
+				let title = "Graph View";
+				if (localGraphLeaves.length > 0) {
+					// Local graph - try to get the file context
+					const activeFile = this.plugin.app.workspace.getActiveFile();
+					if (activeFile) {
+						title = `Local Graph: ${activeFile.basename}`;
+					} else {
+						title = "Local Graph";
+					}
+				}
+
+				// Add bookmark
+				this.plugin.settings.panelBookmarks.push({
+					type: "graph",
+					title: title
+				});
+
+				this.plugin.saveSettings();
+				new Notice(`Bookmarked: ${title}`);
+				return true;
 			},
 		});
 	}

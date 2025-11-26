@@ -2,6 +2,7 @@ import { App, Modal, Setting, TFile, TFolder } from "obsidian";
 import type ZettelkastenPlugin from "../../main";
 import { FileSuggest } from "./FileSuggest";
 import { FolderSuggest } from "./FolderSuggest";
+import { SearchQuerySuggest } from "./SearchQuerySuggest";
 
 export class BookmarkModal extends Modal {
 	plugin: ZettelkastenPlugin;
@@ -126,6 +127,11 @@ export class BookmarkModal extends Modal {
 			});
 		} else if (this.type === "search") {
 			new Setting(container).setName("Search query").addText((text) => {
+				const onSelect = (value: string) => {
+					text.setValue(value);
+					this.query = value;
+				};
+				new SearchQuerySuggest(this.app, text.inputEl, onSelect);
 				text.setPlaceholder("Enter search query")
 					.setValue(this.query || "")
 					.onChange((value) => {

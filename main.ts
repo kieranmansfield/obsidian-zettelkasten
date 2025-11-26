@@ -3,6 +3,7 @@ import { ZettelkastenPluginSettings, DEFAULT_SETTINGS } from "./src/settings/Plu
 import { ZettelkastenSettingTab } from "./src/settings/SettingsTab";
 import { CommandManager } from "./src/commands/CommandManager";
 import { ZettelkastenView, VIEW_TYPE_ZETTELKASTEN } from "./src/ui/ZettelkastenView";
+import { NoteSequencesView, VIEW_TYPE_NOTE_SEQUENCES } from "./src/ui/NoteSequencesView";
 
 export default class ZettelkastenPlugin extends Plugin {
 	settings: ZettelkastenPluginSettings;
@@ -15,6 +16,12 @@ export default class ZettelkastenPlugin extends Plugin {
 		this.registerView(
 			VIEW_TYPE_ZETTELKASTEN,
 			(leaf) => new ZettelkastenView(leaf, this)
+		);
+
+		// Register the Note Sequences view
+		this.registerView(
+			VIEW_TYPE_NOTE_SEQUENCES,
+			(leaf) => new NoteSequencesView(leaf, this)
 		);
 
 		// Initialize command manager
@@ -139,5 +146,17 @@ export default class ZettelkastenPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 		console.log("Saved settings:", JSON.stringify(this.settings, null, 2));
+
+		// Refresh the panel view when settings change
+		this.refreshPanelView();
+	}
+
+	refreshPanelView() {
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN);
+		leaves.forEach(leaf => {
+			if (leaf.view instanceof ZettelkastenView) {
+				leaf.view.refresh();
+			}
+		});
 	}
 }

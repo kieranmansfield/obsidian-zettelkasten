@@ -279,3 +279,169 @@ h1.zettelkasten-settings-title {
 	gap: 8px;
 	margin-top: 1.5em;
 }
+
+/* Mobile-friendly bookmark settings */
+@media (max-width: 768px) {
+	.zettelkasten-ignored-folder-item .setting-item-control {
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.zettelkasten-ignored-folder-item .setting-item-control > * {
+		flex: 1 1 100%;
+		min-width: 0;
+	}
+
+	.zettelkasten-ignored-folder-item .setting-item-control select {
+		flex: 1 1 100%;
+	}
+
+	.zettelkasten-ignored-folder-item .setting-item-control input {
+		flex: 1 1 100%;
+	}
+
+	.zettelkasten-ignored-folder-item .setting-item-control button {
+		flex: 0 0 auto;
+		align-self: flex-end;
+	}
+}
+
+/* Disabled menu item */
+.zk-menu-item-disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.zk-menu-item-disabled .zk-menu-header {
+	cursor: not-allowed;
+}
+
+.zk-menu-item-disabled .zk-menu-header:hover {
+	background-color: transparent;
+}
+
+/* Note Sequences View */
+.note-sequences-view {
+	padding: 20px;
+}
+
+.sequence-empty-state {
+	text-align: center;
+	padding: 40px 20px;
+	color: var(--text-muted);
+	font-size: 16px;
+}
+
+/* Grid layout for sequence cards */
+.sequence-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	gap: 20px;
+}
+
+/* Mobile: single column */
+@media (max-width: 768px) {
+	.sequence-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* Sequence card styling */
+.sequence-card {
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	overflow: hidden;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.sequence-card:hover {
+	border-color: var(--background-modifier-border-hover);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+	transform: translateY(-2px);
+}
+
+/* Card header */
+.sequence-card-header {
+	background: var(--background-secondary);
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sequence-card-header-content {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.sequence-card-icon {
+	color: var(--text-accent);
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.sequence-card-icon svg {
+	width: 18px;
+	height: 18px;
+}
+
+.sequence-card-title {
+	font-weight: 600;
+	font-size: 14px;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Card body */
+.sequence-card-body {
+	padding: 12px 16px;
+	max-height: 300px;
+	overflow-y: auto;
+}
+
+.sequence-card-empty {
+	color: var(--text-faint);
+	font-style: italic;
+	font-size: 13px;
+	text-align: center;
+	padding: 8px 0;
+}
+
+/* Child items in card */
+.sequence-child-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 0;
+	transition: background-color 0.1s;
+	border-radius: 4px;
+}
+
+.sequence-child-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.sequence-child-icon {
+	color: var(--text-muted);
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.sequence-child-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.sequence-child-title {
+	font-size: 13px;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+}
