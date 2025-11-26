@@ -137,3 +137,145 @@ h1.zettelkasten-settings-title {
 	display: flex;
 	align-items: center;
 }
+
+/* Zettelkasten Panel View */
+.zettelkasten-view {
+	padding: 10px;
+}
+
+.zk-menu-item {
+	margin-bottom: 8px;
+}
+
+.zk-menu-header {
+	display: flex;
+	align-items: center;
+	padding: 6px 8px;
+	cursor: pointer;
+	border-radius: 4px;
+	transition: background-color 0.1s;
+}
+
+.zk-menu-header:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.zk-collapse-icon {
+	display: flex;
+	align-items: center;
+	margin-right: 4px;
+	color: var(--text-muted);
+	width: 16px;
+	height: 16px;
+}
+
+.zk-collapse-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.zk-menu-icon {
+	display: flex;
+	align-items: center;
+	margin-right: 8px;
+	color: var(--text-muted);
+	width: 16px;
+	height: 16px;
+}
+
+.zk-menu-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.zk-menu-name {
+	flex: 1;
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--text-normal);
+}
+
+.zk-menu-content {
+	padding-left: 28px;
+	margin-top: 4px;
+	margin-bottom: 4px;
+}
+
+.zk-folder-note-link {
+	padding: 4px 8px;
+	cursor: pointer;
+	border-radius: 3px;
+	font-size: 13px;
+	color: var(--text-muted);
+	transition: background-color 0.1s;
+}
+
+.zk-folder-note-link:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.zk-no-folder-note,
+.zk-no-folder,
+.zk-no-files {
+	padding: 4px 8px;
+	font-size: 12px;
+	color: var(--text-faint);
+	font-style: italic;
+}
+
+.zk-file-link {
+	padding: 4px 8px;
+	cursor: pointer;
+	border-radius: 3px;
+	font-size: 13px;
+	color: var(--text-muted);
+	transition: background-color 0.1s;
+	margin-bottom: 2px;
+}
+
+.zk-file-link:hover {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.zk-bookmark-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 8px;
+	cursor: pointer;
+	border-radius: 3px;
+	transition: background-color 0.1s;
+	margin-bottom: 2px;
+}
+
+.zk-bookmark-item:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.zk-bookmark-icon {
+	display: flex;
+	align-items: center;
+	flex-shrink: 0;
+	color: var(--text-muted);
+	width: 16px;
+	height: 16px;
+}
+
+.zk-bookmark-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+/* Modal styles */
+.bookmark-fields {
+	margin-top: 1em;
+}
+
+.modal-button-container {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 1.5em;
+}

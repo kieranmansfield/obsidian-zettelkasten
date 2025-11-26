@@ -3,6 +3,7 @@ import type ZettelkastenPlugin from "../../main";
 import { FolderSuggest } from "../ui/FolderSuggest";
 import { FileSuggest } from "../ui/FileSuggest";
 import { TagSuggest } from "../ui/TagSuggest";
+import { BookmarkModal } from "../ui/BookmarkModal";
 
 // Settings tab for the Zettelkasten plugin
 
@@ -31,6 +32,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		this.displayInboxSettings(containerEl);
 		this.displayStructureNoteSettings(containerEl);
 		this.displayReferenceSettings(containerEl);
+		this.displayPanelSettings(containerEl);
 		this.displayExperimentalSettings(containerEl);
 
 		// Prevent auto-focus on first input field
@@ -803,6 +805,396 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						});
 				});
 		}
+	}
+
+	private displayPanelSettings(containerEl: HTMLElement): void {
+		const contentDiv = this.createCollapsibleSection(
+			containerEl,
+			"Zettelkasten Panel",
+			"Configure the Zettelkasten sidebar panel.",
+			true,
+		);
+
+		// Enable Zettelkasten Panel Toggle
+		new Setting(contentDiv)
+			.setName("Enable Zettelkasten panel")
+			.setDesc(
+				"Show the Zettelkasten panel in the left sidebar",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableZettelkastenPanel)
+					.onChange(async (value) => {
+						this.plugin.settings.enableZettelkastenPanel = value;
+						await this.plugin.saveSettings();
+
+						// Activate or deactivate the view based on the setting
+						if (value) {
+							await this.plugin.activateView();
+						} else {
+							await this.plugin.deactivateView();
+						}
+					}),
+			);
+
+		// Tag Match Mode
+		new Setting(contentDiv)
+			.setName("Tag match mode")
+			.setDesc(
+				"When multiple tags are specified, match files with ANY tag or ALL tags",
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("any", "Match any tag (OR)")
+					.addOption("all", "Match all tags (AND)")
+					.setValue(this.plugin.settings.panelTagMatchMode)
+					.onChange(async (value: "any" | "all") => {
+						this.plugin.settings.panelTagMatchMode = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		// Inbox Dashboard
+		new Setting(contentDiv)
+			.setName("Inbox dashboard")
+			.setDesc(
+				"Path to the file that opens when clicking the Inbox heading",
+			)
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.panelInboxDashboard = value;
+					await this.plugin.saveSettings();
+				};
+				new FileSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("Inbox/index.md")
+					.setValue(this.plugin.settings.panelInboxDashboard)
+					.onChange(async (value) => {
+						this.plugin.settings.panelInboxDashboard = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// Inbox Filter Tags
+		const inboxFilterTagsSetting = new Setting(contentDiv)
+			.setName("Inbox filter tags")
+			.setDesc(
+				"Tags to filter files in the Inbox section. Leave empty to show all files. Click + to add more tags.",
+			);
+
+		inboxFilterTagsSetting.addButton((button) => {
+			button
+				.setButtonText("+")
+				.setTooltip("Add tag")
+				.onClick(async () => {
+					this.plugin.settings.panelInboxFilterTags.push("");
+					await this.plugin.saveSettings();
+					this.display();
+				});
+		});
+
+		this.plugin.settings.panelInboxFilterTags.forEach((tag, index) => {
+			new Setting(contentDiv)
+				.setClass("zettelkasten-ignored-folder-item")
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.panelInboxFilterTags[index] = value;
+						await this.plugin.saveSettings();
+					};
+					new TagSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("tag-name")
+						.setValue(tag)
+						.onChange(async (value) => {
+							this.plugin.settings.panelInboxFilterTags[index] = value;
+							await this.plugin.saveSettings();
+						});
+				})
+				.addButton((button) => {
+					button
+						.setIcon("trash")
+						.setTooltip("Remove tag")
+						.onClick(async () => {
+							this.plugin.settings.panelInboxFilterTags.splice(
+								index,
+								1,
+							);
+							await this.plugin.saveSettings();
+							this.display();
+						});
+				});
+		});
+
+		// Zettels Dashboard
+		new Setting(contentDiv)
+			.setName("Zettels dashboard")
+			.setDesc(
+				"Path to the file that opens when clicking the Zettels heading",
+			)
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.panelZettelsDashboard = value;
+					await this.plugin.saveSettings();
+				};
+				new FileSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("Notes/Notes.md")
+					.setValue(this.plugin.settings.panelZettelsDashboard)
+					.onChange(async (value) => {
+						this.plugin.settings.panelZettelsDashboard = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// Zettels Filter Tags
+		const zettelsFilterTagsSetting = new Setting(contentDiv)
+			.setName("Zettels filter tags")
+			.setDesc(
+				"Tags to filter files in the Zettels section. Leave empty to show all files. Click + to add more tags.",
+			);
+
+		zettelsFilterTagsSetting.addButton((button) => {
+			button
+				.setButtonText("+")
+				.setTooltip("Add tag")
+				.onClick(async () => {
+					this.plugin.settings.panelZettelsFilterTags.push("");
+					await this.plugin.saveSettings();
+					this.display();
+				});
+		});
+
+		this.plugin.settings.panelZettelsFilterTags.forEach((tag, index) => {
+			new Setting(contentDiv)
+				.setClass("zettelkasten-ignored-folder-item")
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.panelZettelsFilterTags[index] = value;
+						await this.plugin.saveSettings();
+					};
+					new TagSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("tag-name")
+						.setValue(tag)
+						.onChange(async (value) => {
+							this.plugin.settings.panelZettelsFilterTags[index] = value;
+							await this.plugin.saveSettings();
+						});
+				})
+				.addButton((button) => {
+					button
+						.setIcon("trash")
+						.setTooltip("Remove tag")
+						.onClick(async () => {
+							this.plugin.settings.panelZettelsFilterTags.splice(
+								index,
+								1,
+							);
+							await this.plugin.saveSettings();
+							this.display();
+						});
+				});
+		});
+
+		// References Dashboard
+		new Setting(contentDiv)
+			.setName("References dashboard")
+			.setDesc(
+				"Path to the file that opens when clicking the References heading",
+			)
+			.addText((text) => {
+				const onSelect = async (value: string) => {
+					text.setValue(value);
+					this.plugin.settings.panelReferencesDashboard = value;
+					await this.plugin.saveSettings();
+				};
+				new FileSuggest(this.app, text.inputEl, onSelect);
+				text.setPlaceholder("References/References.md")
+					.setValue(this.plugin.settings.panelReferencesDashboard)
+					.onChange(async (value) => {
+						this.plugin.settings.panelReferencesDashboard = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		// References Filter Tags
+		const referencesFilterTagsSetting = new Setting(contentDiv)
+			.setName("References filter tags")
+			.setDesc(
+				"Tags to filter files in the References section. Leave empty to show all files. Click + to add more tags.",
+			);
+
+		referencesFilterTagsSetting.addButton((button) => {
+			button
+				.setButtonText("+")
+				.setTooltip("Add tag")
+				.onClick(async () => {
+					this.plugin.settings.panelReferencesFilterTags.push("");
+					await this.plugin.saveSettings();
+					this.display();
+				});
+		});
+
+		this.plugin.settings.panelReferencesFilterTags.forEach((tag, index) => {
+			new Setting(contentDiv)
+				.setClass("zettelkasten-ignored-folder-item")
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.panelReferencesFilterTags[index] = value;
+						await this.plugin.saveSettings();
+					};
+					new TagSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("tag-name")
+						.setValue(tag)
+						.onChange(async (value) => {
+							this.plugin.settings.panelReferencesFilterTags[index] = value;
+							await this.plugin.saveSettings();
+						});
+				})
+				.addButton((button) => {
+					button
+						.setIcon("trash")
+						.setTooltip("Remove tag")
+						.onClick(async () => {
+							this.plugin.settings.panelReferencesFilterTags.splice(
+								index,
+								1,
+							);
+							await this.plugin.saveSettings();
+							this.display();
+						});
+				});
+		});
+
+		// Bookmarks List
+		const bookmarksSetting = new Setting(contentDiv)
+			.setName("Bookmarks")
+			.setDesc(
+				"Manage your bookmarked files. Click + to add a bookmark.",
+			);
+
+		bookmarksSetting.addButton((button) => {
+			button
+				.setButtonText("+")
+				.setTooltip("Add bookmark")
+				.onClick(async () => {
+					const modal = new BookmarkModal(
+						this.app,
+						this.plugin,
+						async (bookmark) => {
+							this.plugin.settings.panelBookmarks.push(bookmark);
+							await this.plugin.saveSettings();
+							this.display();
+						}
+					);
+					modal.open();
+				});
+		});
+
+		// Display existing bookmarks
+		this.plugin.settings.panelBookmarks.forEach((bookmark, index) => {
+			const bookmarkSetting = new Setting(contentDiv)
+				.setClass("zettelkasten-ignored-folder-item");
+
+			// Type dropdown
+			bookmarkSetting.addDropdown((dropdown) => {
+				dropdown
+					.addOption("file", "File")
+					.addOption("search", "Search")
+					.addOption("graph", "Graph")
+					.addOption("folder", "Folder")
+					.setValue(bookmark.type || "file")
+					.onChange(async (value: "file" | "search" | "graph" | "folder") => {
+						this.plugin.settings.panelBookmarks[index].type = value;
+						await this.plugin.saveSettings();
+						this.display(); // Refresh to show appropriate inputs
+					});
+			});
+
+			// Show different inputs based on type
+			if (bookmark.type === "file") {
+				bookmarkSetting.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.panelBookmarks[index].path = value;
+						// Auto-fill title from file name if title is empty
+						if (!this.plugin.settings.panelBookmarks[index].title) {
+							const fileName = value.split('/').pop()?.replace('.md', '') || '';
+							this.plugin.settings.panelBookmarks[index].title = fileName;
+						}
+						await this.plugin.saveSettings();
+					};
+					new FileSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("path/to/file.md")
+						.setValue(bookmark.path || "")
+						.onChange(async (value) => {
+							this.plugin.settings.panelBookmarks[index].path = value;
+							// Auto-fill title from file name if title is empty
+							if (!this.plugin.settings.panelBookmarks[index].title) {
+								const fileName = value.split('/').pop()?.replace('.md', '') || '';
+								this.plugin.settings.panelBookmarks[index].title = fileName;
+							}
+							await this.plugin.saveSettings();
+						});
+				});
+			} else if (bookmark.type === "search") {
+				bookmarkSetting.addText((text) => {
+					text.setPlaceholder("Search query")
+						.setValue(bookmark.query || "")
+						.onChange(async (value) => {
+							this.plugin.settings.panelBookmarks[index].query = value;
+							await this.plugin.saveSettings();
+						});
+				});
+			} else if (bookmark.type === "folder") {
+				bookmarkSetting.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.panelBookmarks[index].path = value;
+						// Auto-fill title from folder name if title is empty
+						if (!this.plugin.settings.panelBookmarks[index].title) {
+							const folderName = value.split('/').pop() || '';
+							this.plugin.settings.panelBookmarks[index].title = folderName;
+						}
+						await this.plugin.saveSettings();
+					};
+					new FolderSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("path/to/folder")
+						.setValue(bookmark.path || "")
+						.onChange(async (value) => {
+							this.plugin.settings.panelBookmarks[index].path = value;
+							// Auto-fill title from folder name if title is empty
+							if (!this.plugin.settings.panelBookmarks[index].title) {
+								const folderName = value.split('/').pop() || '';
+								this.plugin.settings.panelBookmarks[index].title = folderName;
+							}
+							await this.plugin.saveSettings();
+						});
+				});
+			}
+
+			// Title field (for all types)
+			bookmarkSetting.addText((text) => {
+				text.setPlaceholder("Display name")
+					.setValue(bookmark.title)
+					.onChange(async (value) => {
+						this.plugin.settings.panelBookmarks[index].title = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+			bookmarkSetting.addButton((button) => {
+				button
+					.setIcon("trash")
+					.setTooltip("Remove bookmark")
+					.onClick(async () => {
+						this.plugin.settings.panelBookmarks.splice(index, 1);
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
+		});
 	}
 
 	private displayExperimentalSettings(containerEl: HTMLElement): void {

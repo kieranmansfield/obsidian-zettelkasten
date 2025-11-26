@@ -43,6 +43,8 @@ export class CommandManager {
 		this.registerFixZettelFilenameCommand();
 		this.registerBatchFixZettelFilenamesCommand();
 		this.registerAddTitleToAliasesCommand();
+		this.registerBookmarkActiveFileCommand();
+		this.registerBookmarkCurrentSearchCommand();
 	}
 
 	/**
@@ -3300,5 +3302,90 @@ export class CommandManager {
 
 		const newContent = lines.join("\n");
 		await this.plugin.app.vault.modify(file, newContent);
+	}
+
+	/**
+	 * Registers the "Bookmark Active File" command
+	 */
+	private registerBookmarkActiveFileCommand(): void {
+		this.plugin.addCommand({
+			id: "bookmark-active-file",
+			name: "Bookmark active file",
+			callback: async () => {
+				const activeFile = this.plugin.app.workspace.getActiveFile();
+				if (!activeFile) {
+					new Notice("No active file to bookmark");
+					return;
+				}
+
+				// Check if already bookmarked
+				const existingBookmark = this.plugin.settings.panelBookmarks.find(
+					(b) => b.path === activeFile.path
+				);
+
+				if (existingBookmark) {
+					new Notice("File is already bookmarked");
+					return;
+				}
+
+				// Get the file title from frontmatter or use basename
+				const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
+				const title = cache?.frontmatter?.title || activeFile.basename;
+
+				// Add bookmark
+				this.plugin.settings.panelBookmarks.push({
+					type: "file",
+					path: activeFile.path,
+					title: title
+				});
+
+				await this.plugin.saveSettings();
+				new Notice(`Bookmarked: ${title}`);
+			},
+		});
+	}
+
+	private registerBookmarkCurrentSearchCommand(): void {
+		this.plugin.addCommand({
+			id: "bookmark-current-search",
+			name: "Bookmark current search",
+			callback: async () => {
+				// Get the search leaf
+				const searchLeaves = this.plugin.app.workspace.getLeavesOfType("search");
+				if (searchLeaves.length === 0) {
+					new Notice("No active search view");
+					return;
+				}
+
+				const searchLeaf = searchLeaves[0];
+				// @ts-ignore - accessing internal API
+				const query = searchLeaf.view?.getQuery?.() || "";
+
+				if (!query) {
+					new Notice("No search query found");
+					return;
+				}
+
+				// Check if already bookmarked
+				const existingBookmark = this.plugin.settings.panelBookmarks.find(
+					(b) => b.type === "search" && b.query === query
+				);
+
+				if (existingBookmark) {
+					new Notice("Search is already bookmarked");
+					return;
+				}
+
+				// Add bookmark with query as title (user can edit in settings)
+				this.plugin.settings.panelBookmarks.push({
+					type: "search",
+					query: query,
+					title: query
+				});
+
+				await this.plugin.saveSettings();
+				new Notice(`Bookmarked search: ${query}`);
+			},
+		});
 	}
 }

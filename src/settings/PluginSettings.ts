@@ -65,6 +65,22 @@ export interface ZettelkastenPluginSettings {
 	// Reference settings
 	enableReference: boolean;
 	referenceLocation: string;
+
+	// Zettelkasten Panel settings
+	enableZettelkastenPanel: boolean;
+	panelInboxDashboard: string;
+	panelInboxFilterTags: string[];
+	panelZettelsDashboard: string;
+	panelZettelsFilterTags: string[];
+	panelReferencesDashboard: string;
+	panelReferencesFilterTags: string[];
+	panelBookmarks: Array<{
+		type: "file" | "search" | "graph" | "folder";
+		path?: string;
+		title: string;
+		query?: string;
+	}>;
+	panelTagMatchMode: "any" | "all";
 }
 
 // Default settings values
@@ -114,4 +130,14 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 
 	enableReference: false,
 	referenceLocation: "",
+
+	enableZettelkastenPanel: true,
+	panelInboxDashboard: "",
+	panelInboxFilterTags: [],
+	panelZettelsDashboard: "",
+	panelZettelsFilterTags: [],
+	panelReferencesDashboard: "",
+	panelReferencesFilterTags: [],
+	panelBookmarks: [],
+	panelTagMatchMode: "any",
 };

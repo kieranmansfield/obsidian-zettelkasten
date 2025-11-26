@@ -2,6 +2,7 @@ import { Plugin } from "obsidian";
 import { ZettelkastenPluginSettings, DEFAULT_SETTINGS } from "./src/settings/PluginSettings";
 import { ZettelkastenSettingTab } from "./src/settings/SettingsTab";
 import { CommandManager } from "./src/commands/CommandManager";
+import { ZettelkastenView, VIEW_TYPE_ZETTELKASTEN } from "./src/ui/ZettelkastenView";
 
 export default class ZettelkastenPlugin extends Plugin {
 	settings: ZettelkastenPluginSettings;
@@ -9,6 +10,12 @@ export default class ZettelkastenPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		// Register the Zettelkasten view
+		this.registerView(
+			VIEW_TYPE_ZETTELKASTEN,
+			(leaf) => new ZettelkastenView(leaf, this)
+		);
 
 		// Initialize command manager
 		this.commandManager = new CommandManager(this);
@@ -18,6 +25,39 @@ export default class ZettelkastenPlugin extends Plugin {
 
 		// Add settings tab
 		this.addSettingTab(new ZettelkastenSettingTab(this.app, this));
+
+		// Activate the view if enabled in settings
+		if (this.settings.enableZettelkastenPanel) {
+			this.activateView();
+		}
+	}
+
+	async activateView() {
+		const { workspace } = this.app;
+
+		let leaf = workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)[0];
+		if (!leaf) {
+			const newLeaf = workspace.getLeftLeaf(false);
+			if (newLeaf) {
+				await newLeaf.setViewState({
+					type: VIEW_TYPE_ZETTELKASTEN,
+					active: true,
+				});
+				leaf = newLeaf;
+			}
+		}
+
+		if (leaf) {
+			workspace.revealLeaf(leaf);
+		}
+	}
+
+	async deactivateView() {
+		const { workspace } = this.app;
+		const leaves = workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN);
+		for (const leaf of leaves) {
+			leaf.detach();
+		}
 	}
 
 	async loadSettings() {
