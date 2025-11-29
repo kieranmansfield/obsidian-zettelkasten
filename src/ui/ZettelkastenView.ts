@@ -1,4 +1,11 @@
-import { ItemView, WorkspaceLeaf, TFolder, TFile, setIcon, getAllTags } from "obsidian";
+import {
+	ItemView,
+	WorkspaceLeaf,
+	TFolder,
+	TFile,
+	setIcon,
+	getAllTags,
+} from "obsidian";
 import type ZettelkastenPlugin from "../../main";
 import { VIEW_TYPE_NOTE_SEQUENCES } from "./NoteSequencesView";
 
@@ -26,17 +33,23 @@ export class ZettelkastenView extends ItemView {
 	private registerEvents(): void {
 		// Refresh panel when files are created, deleted, or modified
 		this.registerEvent(
-			this.app.vault.on("create", () => this.scheduleRefresh())
+			this.app.vault.on("create", () => this.scheduleRefresh()),
 		);
 		this.registerEvent(
-			this.app.vault.on("delete", () => this.scheduleRefresh())
+			this.app.vault.on("delete", () => this.scheduleRefresh()),
 		);
 		this.registerEvent(
-			this.app.vault.on("rename", () => this.scheduleRefresh())
+			this.app.vault.on("rename", () => this.scheduleRefresh()),
 		);
 		// Refresh when metadata changes (tags, frontmatter, etc.)
 		this.registerEvent(
-			this.app.metadataCache.on("changed", () => this.scheduleRefresh())
+			this.app.metadataCache.on("changed", () => this.scheduleRefresh()),
+		);
+		// Refresh when active file changes to update highlighting
+		this.registerEvent(
+			this.app.workspace.on("active-leaf-change", () =>
+				this.scheduleRefresh(),
+			),
 		);
 	}
 
@@ -84,23 +97,36 @@ export class ZettelkastenView extends ItemView {
 				icon: "inbox",
 				folderName: this.plugin.settings.inboxLocation || "Inbox",
 				dashboardPath: this.plugin.settings.panelInboxDashboard,
-				filterTags: this.plugin.settings.panelInboxFilterTags
+				filterTags: this.plugin.settings.panelInboxFilterTags,
 			},
 			{
 				name: this.plugin.settings.panelZettelsName || "Zettels",
 				icon: "file-text",
 				folderName: this.plugin.settings.zettelsLocation || "Zettels",
 				dashboardPath: this.plugin.settings.panelZettelsDashboard,
-				filterTags: this.plugin.settings.panelZettelsFilterTags
+				filterTags: this.plugin.settings.panelZettelsFilterTags,
 			},
 			{
 				name: this.plugin.settings.panelReferencesName || "References",
 				icon: "book-open",
-				folderName: this.plugin.settings.referenceLocation || "References",
+				folderName:
+					this.plugin.settings.referenceLocation || "References",
 				dashboardPath: this.plugin.settings.panelReferencesDashboard,
-				filterTags: this.plugin.settings.panelReferencesFilterTags
+				filterTags: this.plugin.settings.panelReferencesFilterTags,
 			},
 		];
+
+		// Add Projects item if enabled
+		if (this.plugin.settings.enableProjects) {
+			menuItems.push({
+				name: this.plugin.settings.panelProjectsName || "Projects",
+				icon: "folder-kanban",
+				folderName:
+					this.plugin.settings.projectsLocation || "Projects",
+				dashboardPath: this.plugin.settings.panelProjectsDashboard,
+				filterTags: this.plugin.settings.panelProjectsFilterTags,
+			});
+		}
 
 		menuItems.forEach((item) => {
 			this.createMenuItem(container, item);
@@ -109,8 +135,11 @@ export class ZettelkastenView extends ItemView {
 		// Add Bookmarks section
 		this.createBookmarksMenuItem(container);
 
-		// Add Note Sequence section (if enabled)
-		if (this.plugin.settings.panelShowNoteSequence) {
+		// Add Note Sequence section (if both the feature and panel display are enabled)
+		if (
+			this.plugin.settings.enableNoteSequence &&
+			this.plugin.settings.panelShowNoteSequence
+		) {
 			this.createNoteSequenceMenuItem(container);
 		}
 
@@ -122,7 +151,8 @@ export class ZettelkastenView extends ItemView {
 
 	private createBookmarksMenuItem(container: HTMLElement): void {
 		const itemEl = container.createDiv({ cls: "zk-menu-item" });
-		const bookmarksName = this.plugin.settings.panelBookmarksName || "Bookmarks";
+		const bookmarksName =
+			this.plugin.settings.panelBookmarksName || "Bookmarks";
 
 		// Header with icon and name
 		const headerEl = itemEl.createDiv({ cls: "zk-menu-header" });
@@ -139,7 +169,7 @@ export class ZettelkastenView extends ItemView {
 		// Item name
 		headerEl.createDiv({
 			cls: "zk-menu-name",
-			text: bookmarksName
+			text: bookmarksName,
 		});
 
 		// Content area (collapsible)
@@ -152,7 +182,8 @@ export class ZettelkastenView extends ItemView {
 		headerEl.addEventListener("click", async (e) => {
 			e.stopPropagation();
 
-			const isCurrentlyCollapsed = this.collapsedSections.has(bookmarksName);
+			const isCurrentlyCollapsed =
+				this.collapsedSections.has(bookmarksName);
 
 			if (isCurrentlyCollapsed) {
 				this.collapsedSections.delete(bookmarksName);
@@ -175,19 +206,19 @@ export class ZettelkastenView extends ItemView {
 		if (bookmarks.length === 0) {
 			container.createDiv({
 				cls: "zk-no-files",
-				text: "No bookmarks yet"
+				text: "No bookmarks yet",
 			});
 			return;
 		}
 
 		bookmarks.forEach((bookmark) => {
 			const bookmarkContainer = container.createDiv({
-				cls: "zk-bookmark-item"
+				cls: "zk-bookmark-item",
 			});
 
 			// Icon based on type
 			const iconEl = bookmarkContainer.createDiv({
-				cls: "zk-bookmark-icon"
+				cls: "zk-bookmark-icon",
 			});
 
 			let iconName = "file";
@@ -208,8 +239,8 @@ export class ZettelkastenView extends ItemView {
 			setIcon(iconEl, iconName);
 
 			// Title
-			const titleEl = bookmarkContainer.createDiv({
-				text: bookmark.title
+			bookmarkContainer.createDiv({
+				text: bookmark.title,
 			});
 
 			bookmarkContainer.addEventListener("click", async () => {
@@ -227,7 +258,9 @@ export class ZettelkastenView extends ItemView {
 		switch (bookmark.type) {
 			case "file":
 				if (bookmark.path) {
-					const file = this.app.vault.getAbstractFileByPath(bookmark.path);
+					const file = this.app.vault.getAbstractFileByPath(
+						bookmark.path,
+					);
 					if (file instanceof TFile) {
 						await this.app.workspace.getLeaf(false).openFile(file);
 					}
@@ -237,7 +270,8 @@ export class ZettelkastenView extends ItemView {
 			case "search":
 				if (bookmark.query) {
 					// Open search view with the query
-					const searchLeaf = this.app.workspace.getLeavesOfType("search")[0];
+					const searchLeaf =
+						this.app.workspace.getLeavesOfType("search")[0];
 					if (searchLeaf) {
 						this.app.workspace.revealLeaf(searchLeaf);
 						// @ts-ignore - accessing internal API
@@ -256,11 +290,19 @@ export class ZettelkastenView extends ItemView {
 
 			case "folder":
 				if (bookmark.path) {
-					const folder = this.app.vault.getAbstractFileByPath(bookmark.path);
+					const folder = this.app.vault.getAbstractFileByPath(
+						bookmark.path,
+					);
 					if (folder instanceof TFolder) {
 						// Reveal folder in file explorer
-						// @ts-ignore - accessing internal API
-						this.app.workspace.getLeavesOfType("file-explorer")[0]?.view.revealInFolder(folder);
+						const fileExplorer =
+							this.app.workspace.getLeavesOfType(
+								"file-explorer",
+							)[0];
+						if (fileExplorer && fileExplorer.view) {
+							// @ts-ignore - accessing internal API
+							fileExplorer.view.revealInFolder(folder);
+						}
 					}
 				}
 				break;
@@ -277,7 +319,10 @@ export class ZettelkastenView extends ItemView {
 		const collapseIconEl = headerEl.createDiv({ cls: "zk-collapse-icon" });
 		if (this.plugin.settings.panelShowFileLists) {
 			const isCollapsed = this.collapsedSections.has(item.name);
-			setIcon(collapseIconEl, isCollapsed ? "chevron-right" : "chevron-down");
+			setIcon(
+				collapseIconEl,
+				isCollapsed ? "chevron-right" : "chevron-down",
+			);
 		}
 
 		// Item icon
@@ -287,7 +332,7 @@ export class ZettelkastenView extends ItemView {
 		// Item name
 		headerEl.createDiv({
 			cls: "zk-menu-name",
-			text: item.name
+			text: item.name,
 		});
 
 		// Content area (collapsible)
@@ -302,14 +347,27 @@ export class ZettelkastenView extends ItemView {
 			contentEl.style.display = "none";
 		}
 
+		// Check if the dashboard file is active
+		const activeFile = this.app.workspace.getActiveFile();
+		const isDashboardActive =
+			item.dashboardPath && activeFile?.path === item.dashboardPath;
+		if (isDashboardActive) {
+			headerEl.addClass("is-active-dashboard");
+		}
+
 		// Add click handler to header
 		headerEl.addEventListener("click", async (e) => {
 			e.stopPropagation();
 
 			// If file lists are enabled and clicking on the collapse icon, toggle collapse
-			if (this.plugin.settings.panelShowFileLists &&
-			    (e.target === collapseIconEl || collapseIconEl.contains(e.target as Node))) {
-				const isCurrentlyCollapsed = this.collapsedSections.has(item.name);
+			if (
+				this.plugin.settings.panelShowFileLists &&
+				(e.target === collapseIconEl ||
+					collapseIconEl.contains(e.target as Node))
+			) {
+				const isCurrentlyCollapsed = this.collapsedSections.has(
+					item.name,
+				);
 
 				if (isCurrentlyCollapsed) {
 					this.collapsedSections.delete(item.name);
@@ -320,8 +378,13 @@ export class ZettelkastenView extends ItemView {
 					contentEl.style.display = "none";
 					setIcon(collapseIconEl, "chevron-right");
 				}
-			} else if (!this.plugin.settings.panelShowFileLists ||
-			           !(e.target === collapseIconEl || collapseIconEl.contains(e.target as Node))) {
+			} else if (
+				!this.plugin.settings.panelShowFileLists ||
+				!(
+					e.target === collapseIconEl ||
+					collapseIconEl.contains(e.target as Node)
+				)
+			) {
 				// Open the index file when not clicking collapse icon or when file lists are disabled
 				await this.openIndexFile(item);
 			}
@@ -339,7 +402,8 @@ export class ZettelkastenView extends ItemView {
 
 		if (!filePath) {
 			// Fallback to old logic
-			const folderBasename = item.folderName.split('/').pop() || item.folderName;
+			const folderBasename =
+				item.folderName.split("/").pop() || item.folderName;
 			filePath = `${item.folderName}/${folderBasename}.md`;
 		}
 
@@ -352,7 +416,30 @@ export class ZettelkastenView extends ItemView {
 		}
 	}
 
-	private async displayFolderContents(container: HTMLElement, item: MenuItem): Promise<void> {
+	private isDashboardFile(file: TFile | null): boolean {
+		if (!file) return false;
+
+		// Check if this file is any of the dashboard files
+		const dashboardPaths = [
+			this.plugin.settings.panelInboxDashboard,
+			this.plugin.settings.panelZettelsDashboard,
+			this.plugin.settings.panelReferencesDashboard,
+		].filter((path) => path && path.trim() !== "");
+
+		return dashboardPaths.some((dashboardPath) => {
+			const dashboardFile =
+				this.app.vault.getAbstractFileByPath(dashboardPath);
+			return (
+				dashboardFile instanceof TFile &&
+				dashboardFile.path === file.path
+			);
+		});
+	}
+
+	private async displayFolderContents(
+		container: HTMLElement,
+		item: MenuItem,
+	): Promise<void> {
 		const folder = this.app.vault.getAbstractFileByPath(item.folderName);
 
 		console.log("ZK Panel - Looking for folder:", item.folderName);
@@ -361,13 +448,14 @@ export class ZettelkastenView extends ItemView {
 			console.log("ZK Panel - Folder not found:", item.folderName);
 			container.createDiv({
 				cls: "zk-no-folder",
-				text: "Folder not found"
+				text: "Folder not found",
 			});
 			return;
 		}
 
 		// Get the default folder note name for fallback exclusion
-		const folderBasename = item.folderName.split('/').pop() || item.folderName;
+		const folderBasename =
+			item.folderName.split("/").pop() || item.folderName;
 		const excludeFileName = `${folderBasename}.md`;
 
 		console.log("ZK Panel - Excluding file:", excludeFileName);
@@ -375,59 +463,85 @@ export class ZettelkastenView extends ItemView {
 		// Get all files in folder (recursively)
 		const files = this.getFilesInFolder(folder);
 
-		console.log("ZK Panel - Files before filter:", files.map(f => f.basename));
+		console.log(
+			"ZK Panel - Files before filter:",
+			files.map((f) => f.basename),
+		);
 
 		// Filter files by tags if specified (only if tags array is not empty)
 		let filteredFiles = files;
 		if (item.filterTags && item.filterTags.length > 0) {
-			filteredFiles = await this.filterFilesByTags(files, item.filterTags);
+			filteredFiles = await this.filterFilesByTags(
+				files,
+				item.filterTags,
+			);
 		}
 		// If no tags specified, show all files
 
 		// Exclude the dashboard file if it exists
 		if (item.dashboardPath) {
-			const dashboardFileName = item.dashboardPath.split('/').pop() || '';
-			filteredFiles = filteredFiles.filter(file => file.name !== dashboardFileName);
+			const dashboardFileName = item.dashboardPath.split("/").pop() || "";
+			filteredFiles = filteredFiles.filter(
+				(file) => file.name !== dashboardFileName,
+			);
 		} else {
 			// Fallback: exclude the folder note
-			filteredFiles = filteredFiles.filter(file => file.name !== excludeFileName);
+			filteredFiles = filteredFiles.filter(
+				(file) => file.name !== excludeFileName,
+			);
 		}
 
-		console.log("ZK Panel - Files after exclusion:", filteredFiles.map(f => f.basename));
+		console.log(
+			"ZK Panel - Files after exclusion:",
+			filteredFiles.map((f) => f.basename),
+		);
 
 		if (filteredFiles.length === 0) {
 			container.createDiv({
 				cls: "zk-no-files",
-				text: "No files found"
+				text: "No files found",
 			});
 			return;
 		}
 
+		// Get the currently active file to highlight it
+		const activeFile = this.app.workspace.getActiveFile();
+
 		// Display files using Obsidian's tree item styling
-		filteredFiles.forEach(file => {
-			const displayName = this.cleanFileName(file.basename);
+		filteredFiles.forEach((file) => {
+			const isActive = activeFile && activeFile.path === file.path;
+
+			// Get display name - use title from frontmatter if available, otherwise use full basename (including zettel IDs)
+			const cache = this.app.metadataCache.getFileCache(file);
+			const title = cache?.frontmatter?.title;
+			const displayName = title ? title : file.basename;
 
 			// Create tree item structure like file explorer
 			const treeItem = container.createDiv({
-				cls: "tree-item nav-file"
+				cls: "tree-item nav-file",
 			});
 
 			const treeItemSelf = treeItem.createDiv({
-				cls: "tree-item-self nav-file-title"
+				cls: "tree-item-self nav-file-title",
 			});
+
+			// Add active class if this is the currently open file
+			if (isActive) {
+				treeItemSelf.addClass("is-active");
+			}
 
 			// Add file icon (conditionally based on settings)
 			if (this.plugin.settings.panelShowFileIcons) {
 				const treeItemIcon = treeItemSelf.createDiv({
-					cls: "tree-item-icon nav-file-title-icon"
+					cls: "tree-item-icon nav-file-title-icon",
 				});
 				setIcon(treeItemIcon, "file");
 			}
 
 			// Add file name
-			const treeItemInner = treeItemSelf.createDiv({
+			treeItemSelf.createDiv({
 				cls: "tree-item-inner nav-file-title-content",
-				text: displayName
+				text: displayName,
 			});
 
 			treeItemSelf.addEventListener("click", async () => {
@@ -439,10 +553,13 @@ export class ZettelkastenView extends ItemView {
 	private cleanFileName(filename: string): string {
 		// Remove emoji prefix (any emoji at the start followed by space)
 		// This regex matches emoji characters and removes them if at the start
-		let cleaned = filename.replace(/^[\p{Emoji}\p{Emoji_Presentation}\p{Emoji_Modifier_Base}\p{Emoji_Component}]+\s*/gu, '');
+		let cleaned = filename.replace(
+			/^[\p{Emoji}\p{Emoji_Presentation}\p{Emoji_Modifier_Base}\p{Emoji_Component}]+\s*/gu,
+			"",
+		);
 
 		// Also remove common emoji patterns like "📝 " or similar
-		cleaned = cleaned.replace(/^[\u{1F300}-\u{1F9FF}]\s*/u, '');
+		cleaned = cleaned.replace(/^[\u{1F300}-\u{1F9FF}]\s*/u, "");
 
 		return cleaned;
 	}
@@ -461,7 +578,10 @@ export class ZettelkastenView extends ItemView {
 		return files;
 	}
 
-	private async filterFilesByTags(files: TFile[], tags: string[]): Promise<TFile[]> {
+	private async filterFilesByTags(
+		files: TFile[],
+		tags: string[],
+	): Promise<TFile[]> {
 		const filteredFiles: TFile[] = [];
 		const matchMode = this.plugin.settings.panelTagMatchMode;
 
@@ -485,13 +605,13 @@ export class ZettelkastenView extends ItemView {
 
 			if (matchMode === "all") {
 				// ALL tags must match (AND)
-				matches = tags.every(tag => {
+				matches = tags.every((tag) => {
 					const normalizedTag = tag.startsWith("#") ? tag : `#${tag}`;
 					return fileTags.includes(normalizedTag);
 				});
 			} else {
 				// ANY tag matches (OR) - default
-				matches = tags.some(tag => {
+				matches = tags.some((tag) => {
 					const normalizedTag = tag.startsWith("#") ? tag : `#${tag}`;
 					return fileTags.includes(normalizedTag);
 				});
@@ -509,7 +629,8 @@ export class ZettelkastenView extends ItemView {
 
 	private createNoteSequenceMenuItem(container: HTMLElement): void {
 		const itemEl = container.createDiv({ cls: "zk-menu-item" });
-		const sequenceName = this.plugin.settings.panelNoteSequenceName || "Note Sequence";
+		const sequenceName =
+			this.plugin.settings.panelNoteSequenceName || "Note Sequence";
 
 		// Header with icon and name
 		const headerEl = itemEl.createDiv({ cls: "zk-menu-header" });
@@ -519,12 +640,12 @@ export class ZettelkastenView extends ItemView {
 
 		// Item icon
 		const iconEl = headerEl.createDiv({ cls: "zk-menu-icon" });
-		setIcon(iconEl, "list-ordered");
+		setIcon(iconEl, "layers");
 
 		// Item name
 		headerEl.createDiv({
 			cls: "zk-menu-name",
-			text: sequenceName
+			text: sequenceName,
 		});
 
 		// Add click handler to open Note Sequences view
@@ -558,7 +679,8 @@ export class ZettelkastenView extends ItemView {
 
 	private createWorkspacesMenuItem(container: HTMLElement): void {
 		const itemEl = container.createDiv({ cls: "zk-menu-item" });
-		const workspacesName = this.plugin.settings.panelWorkspacesName || "Workspaces";
+		const workspacesName =
+			this.plugin.settings.panelWorkspacesName || "Workspaces";
 
 		// Header with icon and name
 		const headerEl = itemEl.createDiv({ cls: "zk-menu-header" });
@@ -573,7 +695,7 @@ export class ZettelkastenView extends ItemView {
 		// Item name
 		headerEl.createDiv({
 			cls: "zk-menu-name",
-			text: workspacesName
+			text: workspacesName,
 		});
 
 		// Add click handler (disabled for now)

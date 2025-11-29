@@ -1,4 +1,4 @@
-import { App, Modal, Setting, TFile, TFolder } from "obsidian";
+import { App, Modal, Setting } from "obsidian";
 import type ZettelkastenPlugin from "../../main";
 import { FileSuggest } from "./FileSuggest";
 import { FolderSuggest } from "./FolderSuggest";
@@ -29,7 +29,7 @@ export class BookmarkModal extends Modal {
 		initialType?: "file" | "search" | "graph" | "folder",
 		initialPath?: string,
 		initialQuery?: string,
-		initialTitle?: string
+		initialTitle?: string,
 	) {
 		super(app);
 		this.plugin = plugin;
@@ -56,10 +56,12 @@ export class BookmarkModal extends Modal {
 					.addOption("graph", "Graph")
 					.addOption("folder", "Folder")
 					.setValue(this.type)
-					.onChange((value: "file" | "search" | "graph" | "folder") => {
-						this.type = value;
-						this.updateInputFields();
-					});
+					.onChange(
+						(value: "file" | "search" | "graph" | "folder") => {
+							this.type = value;
+							this.updateInputFields();
+						},
+					);
 			});
 
 		// Container for dynamic fields
@@ -166,7 +168,7 @@ export class BookmarkModal extends Modal {
 		}
 
 		// Title field (for all types)
-		const titleSetting = new Setting(container)
+		new Setting(container)
 			.setName("Display name")
 			.addText((text) => {
 				text.setPlaceholder("Enter display name")
@@ -175,13 +177,13 @@ export class BookmarkModal extends Modal {
 						this.title = value;
 					});
 				// Store reference for updating
-				(container as any).titleInput = text;
+				(container as HTMLElement & { titleInput?: typeof text }).titleInput = text;
 			});
 	}
 
 	private updateInputFields() {
 		const fieldsContainer = this.contentEl.querySelector(
-			".bookmark-fields"
+			".bookmark-fields",
 		) as HTMLElement;
 		if (fieldsContainer) {
 			this.renderFields(fieldsContainer);
@@ -190,10 +192,10 @@ export class BookmarkModal extends Modal {
 
 	private updateTitleField() {
 		const fieldsContainer = this.contentEl.querySelector(
-			".bookmark-fields"
-		) as HTMLElement;
-		if (fieldsContainer && (fieldsContainer as any).titleInput) {
-			(fieldsContainer as any).titleInput.setValue(this.title);
+			".bookmark-fields",
+		) as HTMLElement & { titleInput?: { setValue: (value: string) => void } };
+		if (fieldsContainer?.titleInput) {
+			fieldsContainer.titleInput.setValue(this.title);
 		}
 	}
 

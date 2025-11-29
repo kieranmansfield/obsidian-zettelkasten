@@ -5,13 +5,16 @@ export class SequenceReorderModal extends Modal {
 	private parentFile: TFile;
 	private newParentFile: TFile | null = null; // Track if a child becomes the new parent
 	private indentLevels: Map<TFile, number> = new Map(); // Track indentation level for each note
+	private compactRequested: boolean = false; // Track if ID compaction was requested
 	private onReorder: (
 		reorderedNotes: TFile[],
 		promoted: TFile[],
 		indentLevels: Map<TFile, number>,
+		compactRequested: boolean,
 	) => void;
 	private draggedElement: HTMLElement | null = null;
 	private draggedIndex: number = -1;
+	private listContainer: HTMLElement | null = null;
 
 	constructor(
 		app: App,
@@ -21,6 +24,7 @@ export class SequenceReorderModal extends Modal {
 			reorderedNotes: TFile[],
 			promoted: TFile[],
 			indentLevels: Map<TFile, number>,
+			compactRequested: boolean,
 		) => void,
 	) {
 		super(app);
@@ -70,6 +74,30 @@ export class SequenceReorderModal extends Modal {
 		return level;
 	}
 
+	/**
+	 * Get hierarchical number for a note based on sibling position at same level
+	 * E.g., note `a` is 1, note `aa` is also 1 (first child of `a`), note `b` is 2 (second sibling of `a`)
+	 */
+	private getHierarchicalNumber(note: TFile, index: number): number {
+		const currentLevel = this.indentLevels.get(note) || 1;
+
+		// Count how many siblings at the same level came before this note
+		let siblingCount = 1;
+		for (let i = 0; i < index; i++) {
+			const prevNote = this.notes[i];
+			const prevLevel = this.indentLevels.get(prevNote) || 1;
+
+			if (prevLevel === currentLevel) {
+				siblingCount++;
+			} else if (prevLevel < currentLevel) {
+				// Reset count when we enter a new parent context
+				siblingCount = 1;
+			}
+		}
+
+		return siblingCount;
+	}
+
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
@@ -90,15 +118,33 @@ export class SequenceReorderModal extends Modal {
 		});
 
 		// List container
-		const listContainer = contentEl.createDiv({
+		this.listContainer = contentEl.createDiv({
 			cls: "sequence-list-container",
 		});
 
-		this.renderList(listContainer);
+		this.renderList(this.listContainer);
 
 		// Buttons
 		const buttonContainer = contentEl.createDiv({
 			cls: "sequence-buttons",
+		});
+
+		const compactButton = buttonContainer.createEl("button", {
+			text: "Compact IDs",
+			cls: "sequence-compact-btn",
+			attr: { title: "Compress available zettel IDs upwards (e.g., a,c,f → a,b,c)" },
+		});
+		compactButton.addEventListener("click", () => {
+			this.compactRequested = !this.compactRequested;
+			if (this.compactRequested) {
+				new Notice("ID compaction will be applied when you save");
+				compactButton.addClass("mod-warning");
+				compactButton.setText("Compact IDs (ON)");
+			} else {
+				new Notice("ID compaction disabled");
+				compactButton.removeClass("mod-warning");
+				compactButton.setText("Compact IDs");
+			}
 		});
 
 		const saveButton = buttonContainer.createEl("button", {
@@ -134,7 +180,7 @@ export class SequenceReorderModal extends Modal {
 				}
 			});
 
-			this.onReorder(remaining, promoted, this.indentLevels);
+			this.onReorder(remaining, promoted, this.indentLevels, this.compactRequested);
 			new Notice("Note sequence saved!");
 			this.close();
 		});
@@ -174,9 +220,10 @@ export class SequenceReorderModal extends Modal {
 			// Note info
 			const noteInfo = item.createDiv({ cls: "sequence-note-info" });
 
-			// Number
+			// Number - hierarchical numbering based on sibling position at same level
 			const numberEl = noteInfo.createDiv({ cls: "sequence-number" });
-			numberEl.setText(`${index + 1}.`);
+			const hierarchicalNumber = this.getHierarchicalNumber(note, index);
+			numberEl.setText(`${hierarchicalNumber}.`);
 
 			// Title and filename
 			const textContainer = noteInfo.createDiv({
@@ -449,6 +496,31 @@ export class SequenceReorderModal extends Modal {
 	private changeIndent(note: TFile, direction: number) {
 		const currentLevel = this.indentLevels.get(note) || 1;
 		const newLevel = Math.max(1, Math.min(3, currentLevel + direction)); // Limit to 3 levels
+
+		// If indenting (direction > 0), check if a note exists at the level above
+		if (direction > 0 && newLevel > currentLevel) {
+			const noteIndex = this.notes.indexOf(note);
+			if (noteIndex > 0) {
+				// Check if there's a note immediately before this one at currentLevel or deeper
+				const prevNote = this.notes[noteIndex - 1];
+				const prevLevel = this.indentLevels.get(prevNote) || 1;
+
+				// Can only indent if the previous note is at the current level or deeper
+				// This ensures we're making it a child of something that exists
+				if (prevLevel < currentLevel) {
+					// Previous note is shallower - can't indent
+					new Notice(
+						"Cannot indent: no parent note at this level",
+					);
+					return;
+				}
+			} else {
+				// First note - can't indent
+				new Notice("Cannot indent: no parent note exists");
+				return;
+			}
+		}
+
 		this.indentLevels.set(note, newLevel);
 	}
 
@@ -560,7 +632,10 @@ export class SequenceReorderModal extends Modal {
 		);
 
 		return draggableElements.reduce(
-			(closest: any, child: any) => {
+			(
+				closest: { offset: number; element?: Element },
+				child: Element,
+			) => {
 				const box = child.getBoundingClientRect();
 				const offset = y - box.top - box.height / 2;
 
@@ -628,6 +703,10 @@ export class SequenceReorderModal extends Modal {
 			.sequence-item.dragging {
 				opacity: 0.5;
 				cursor: grabbing;
+			}
+			.sequence-item.selected {
+				outline: 2px solid var(--interactive-accent);
+				outline-offset: 2px;
 			}
 			.sequence-drag-handle {
 				color: var(--text-muted);
@@ -750,6 +829,28 @@ export class SequenceReorderModal extends Modal {
 			}
 			.sequence-buttons button {
 				padding: 8px 16px;
+			}
+			.sequence-hotkeys-doc {
+				margin-bottom: 20px;
+				padding: 12px;
+				background: var(--background-secondary);
+				border-radius: 4px;
+				border: 1px solid var(--background-modifier-border);
+			}
+			.sequence-hotkeys-doc h4 {
+				margin: 0 0 8px 0;
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--text-normal);
+			}
+			.sequence-hotkeys-doc ul {
+				margin: 0;
+				padding-left: 20px;
+			}
+			.sequence-hotkeys-doc li {
+				font-size: 13px;
+				color: var(--text-muted);
+				margin-bottom: 4px;
 			}
 		`;
 		this.contentEl.appendChild(styleEl);

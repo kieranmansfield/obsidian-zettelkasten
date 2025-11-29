@@ -1,4 +1,4 @@
-import { App, FuzzySuggestModal, FuzzyMatch, TFile, Scope } from "obsidian";
+import { App, FuzzySuggestModal, FuzzyMatch, TFile } from "obsidian";
 
 /**
  * Modal for creating a new note with autocomplete to detect existing notes
@@ -31,9 +31,9 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<string> {
 		super.onOpen();
 
 		// Unregister default Enter handler and add our own
-		const scope = this.scope as any;
+		const scope = this.scope as { keys?: Array<{ key: string }> };
 		if (scope.keys) {
-			scope.keys = scope.keys.filter((k: any) => k.key !== "Enter");
+			scope.keys = scope.keys.filter((k) => k.key !== "Enter");
 		}
 
 		this.scope.register([], "Enter", (evt: KeyboardEvent) => {
@@ -49,7 +49,9 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<string> {
 			const inputValue = this.inputEl.value.trim();
 
 			// Check if there's a selected suggestion (highlighted item)
-			const modalEl = this.modalEl as any;
+			const modalEl = this.modalEl as HTMLElement & {
+				querySelector: (selector: string) => Element | null;
+			};
 			const selectedEl = modalEl?.querySelector(
 				".suggestion-item.is-selected",
 			);

@@ -1,4 +1,4 @@
-import { App, Modal, TFile, Notice } from "obsidian";
+import { App, Modal, TFile } from "obsidian";
 
 export interface NavigationOption {
 	direction: string;
@@ -11,6 +11,7 @@ export class NavigatorModal extends Modal {
 	private options: NavigationOption[];
 	private onNavigate: (file: TFile) => void;
 	private currentTitle: string;
+	private buttons: Map<string, HTMLButtonElement> = new Map();
 
 	constructor(
 		app: App,
@@ -30,7 +31,7 @@ export class NavigatorModal extends Modal {
 		contentEl.addClass("zettelkasten-navigator");
 
 		// Title
-		const titleEl = contentEl.createEl("h3", {
+		contentEl.createEl("h3", {
 			text: this.currentTitle,
 			cls: "navigator-title",
 		});
@@ -64,6 +65,9 @@ export class NavigatorModal extends Modal {
 		this.createNavigationButton(row4, "prev-sequence", "⇐ Prev Sequence");
 		this.createNavigationButton(row4, "next-sequence", "⇒ Next Sequence");
 
+		// Register keyboard shortcuts
+		this.registerKeyboardShortcuts();
+
 		// Add styles
 		this.addStyles();
 	}
@@ -81,6 +85,9 @@ export class NavigatorModal extends Modal {
 			cls: "navigator-button",
 		});
 
+		// Store button reference for keyboard shortcuts
+		this.buttons.set(direction, button);
+
 		if (option.disabled || !option.file) {
 			button.addClass("navigator-button-disabled");
 			button.disabled = true;
@@ -96,6 +103,68 @@ export class NavigatorModal extends Modal {
 				}
 			});
 		}
+	}
+
+	private registerKeyboardShortcuts() {
+		// Arrow Up - triggers Up button
+		this.scope.register([], "ArrowUp", (evt) => {
+			evt.preventDefault();
+			const button = this.buttons.get("up");
+			if (button && !button.disabled) {
+				button.click();
+			}
+			return false;
+		});
+
+		// Arrow Down - triggers Down button
+		this.scope.register([], "ArrowDown", (evt) => {
+			evt.preventDefault();
+			const button = this.buttons.get("down");
+			if (button && !button.disabled) {
+				button.click();
+			}
+			return false;
+		});
+
+		// Arrow Left - triggers Left button
+		this.scope.register([], "ArrowLeft", (evt) => {
+			evt.preventDefault();
+			const button = this.buttons.get("left");
+			if (button && !button.disabled) {
+				button.click();
+			}
+			return false;
+		});
+
+		// Arrow Right - triggers Right button
+		this.scope.register([], "ArrowRight", (evt) => {
+			evt.preventDefault();
+			const button = this.buttons.get("right");
+			if (button && !button.disabled) {
+				button.click();
+			}
+			return false;
+		});
+
+		// Cmd+Arrow Left - triggers Prev Sequence button
+		this.scope.register(["Mod"], "ArrowLeft", (evt) => {
+			evt.preventDefault();
+			const button = this.buttons.get("prev-sequence");
+			if (button && !button.disabled) {
+				button.click();
+			}
+			return false;
+		});
+
+		// Cmd+Arrow Right - triggers Next Sequence button
+		this.scope.register(["Mod"], "ArrowRight", (evt) => {
+			evt.preventDefault();
+			const button = this.buttons.get("next-sequence");
+			if (button && !button.disabled) {
+				button.click();
+			}
+			return false;
+		});
 	}
 
 	private addStyles() {

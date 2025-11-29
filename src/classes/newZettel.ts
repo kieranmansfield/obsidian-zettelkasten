@@ -1,347 +1,609 @@
 import {
 	App,
-	Editor,
+	EditorPosition,
 	MarkdownView,
 	Modal,
 	Notice,
 	Plugin,
 	PluginSettingTab,
 	Setting,
-	FuzzyMatch,
 	FuzzySuggestModal,
 	TFile,
 } from "obsidian";
 
+// Constants for ID manipulation
+const lettersIDComponentSuccessors: Record<string, string> = {
+	a: "b",
+	b: "c",
+	c: "d",
+	d: "e",
+	e: "f",
+	f: "g",
+	g: "h",
+	h: "i",
+	i: "j",
+	j: "k",
+	k: "l",
+	l: "m",
+	m: "n",
+	n: "o",
+	o: "p",
+	p: "q",
+	q: "r",
+	r: "s",
+	s: "t",
+	t: "u",
+	u: "v",
+	v: "w",
+	w: "x",
+	x: "y",
+	y: "z",
+	z: "a",
+};
+
+const idOnlyRegex = /([0-9]+|[a-z]+)/g;
+const checkSettingsMessage =
+	"Please check the Zettel ID format and separator in settings.";
+
+// Settings interface for NewZettel
+interface NewZettelSettings {
+	matchRule: "strict" | "separator" | "fuzzy";
+	separator: string;
+	addTitle: boolean;
+	addAlias: boolean;
+	templateFile: string;
+	templateRequireTitle: boolean;
+	templateRequireLink: boolean;
+	useLinkAlias: boolean;
+}
+
+// Default settings
+const DEFAULT_NEWZETTEL_SETTINGS: NewZettelSettings = {
+	matchRule: "separator",
+	separator: " ",
+	addTitle: true,
+	addAlias: false,
+	templateFile: "",
+	templateRequireTitle: false,
+	templateRequireLink: false,
+	useLinkAlias: false,
+};
+
+// Modal for creating a new zettel with options
+class NewZettelModal extends Modal {
+	private onSubmit: (
+		title: string,
+		options: { openNewZettel: boolean },
+	) => void;
+	private defaultOptions: { openNewZettel: boolean };
+
+	constructor(
+		app: App,
+		onSubmit: (title: string, options: { openNewZettel: boolean }) => void,
+		defaultOptions: { openNewZettel: boolean } = { openNewZettel: true },
+	) {
+		super(app);
+		this.onSubmit = onSubmit;
+		this.defaultOptions = defaultOptions;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.createEl("h2", { text: "Create New Zettel" });
+
+		const form = contentEl.createEl("form");
+		form.style.display = "flex";
+		form.style.flexDirection = "column";
+		form.style.gap = "1em";
+
+		const inputContainer = form.createDiv();
+		inputContainer.createEl("label", { text: "Zettel Title:" });
+		const input = inputContainer.createEl("input", {
+			type: "text",
+			placeholder: "Enter zettel title",
+		});
+		input.style.width = "100%";
+		input.style.marginTop = "0.5em";
+
+		const checkboxContainer = form.createDiv();
+		const checkbox = checkboxContainer.createEl("input", {
+			type: "checkbox",
+		});
+		checkbox.checked = this.defaultOptions.openNewZettel;
+		checkboxContainer.createEl("label", { text: " Open new zettel" });
+		checkbox.style.marginRight = "0.5em";
+
+		const buttonContainer = form.createDiv();
+		buttonContainer.style.display = "flex";
+		buttonContainer.style.gap = "0.5em";
+		buttonContainer.style.justifyContent = "flex-end";
+
+		const submitButton = buttonContainer.createEl("button", {
+			text: "Create",
+			type: "submit",
+		});
+		submitButton.addClass("mod-cta");
+
+		const cancelButton = buttonContainer.createEl("button", {
+			text: "Cancel",
+			type: "button",
+		});
+
+		form.addEventListener("submit", (e) => {
+			e.preventDefault();
+			const title = input.value.trim();
+			if (title) {
+				this.close();
+				this.onSubmit(title, {
+					openNewZettel: checkbox.checked,
+				});
+			}
+		});
+
+		cancelButton.addEventListener("click", () => {
+			this.close();
+		});
+
+		input.focus();
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+// Setting tab for NewZettel
+class LuhmanSettingTab extends PluginSettingTab {
+	plugin: NewZettel;
+
+	constructor(app: App, plugin: NewZettel) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+
+		containerEl.createEl("h2", { text: "New Zettel Settings" });
+
+		new Setting(containerEl)
+			.setName("Match Rule")
+			.setDesc("How to match zettel IDs in filenames")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("strict", "Strict")
+					.addOption("separator", "Separator")
+					.addOption("fuzzy", "Fuzzy")
+					.setValue(this.plugin.settings.matchRule)
+					.onChange(async (value) => {
+						this.plugin.settings.matchRule = value as
+							| "strict"
+							| "separator"
+							| "fuzzy";
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Separator")
+			.setDesc("Separator between ID and title")
+			.addText((text) =>
+				text
+					.setValue(this.plugin.settings.separator)
+					.onChange(async (value) => {
+						this.plugin.settings.separator = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Add Title")
+			.setDesc("Include title in filename")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.addTitle)
+					.onChange(async (value) => {
+						this.plugin.settings.addTitle = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Add Alias")
+			.setDesc("Add title as frontmatter alias")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.addAlias)
+					.onChange(async (value) => {
+						this.plugin.settings.addAlias = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Template File")
+			.setDesc("Path to template file")
+			.addText((text) =>
+				text
+					.setValue(this.plugin.settings.templateFile)
+					.onChange(async (value) => {
+						this.plugin.settings.templateFile = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+	}
+}
+
+// ZettelSuggester import placeholder (should be imported from separate file)
+class ZettelSuggester extends FuzzySuggestModal<string> {
+	private titles: Map<string, TFile>;
+	private completion: (file: TFile) => void;
+	private initialQuery: string;
+
+	constructor(
+		app: App,
+		titles: Map<string, TFile>,
+		search: string | undefined,
+		completion: (file: TFile) => void,
+	) {
+		super(app);
+		this.initialQuery = search ?? "";
+		this.titles = titles;
+		this.completion = completion;
+		this.setPlaceholder("Search for a zettel...");
+	}
+
+	onOpen() {
+		super.onOpen();
+		this.inputEl.value = this.initialQuery;
+		const event = new Event("input");
+		this.inputEl.dispatchEvent(event);
+	}
+
+	getItems(): string[] {
+		return Array.from(this.titles.keys()).sort();
+	}
+
+	getItemText(item: string): string {
+		return item;
+	}
+
+	onChooseItem(item: string, _evt: MouseEvent | KeyboardEvent) {
+		this.completion(this.titles.get(item)!);
+	}
+}
+
 export default class NewZettel extends Plugin {
-	// incrementStringIDComponent(id: string): string {
-	// 	const comps = id.split("");
-	// 	const last = comps.pop()!;
-	// 	return comps.concat([lettersIDComponentSuccessors[last]]).join("");
-	// }
+	settings!: NewZettelSettings;
 
-	// incrementNumberIDComponent(id: string): string {
-	// 	return (parseInt(id) + 1).toString();
-	// }
+	incrementStringIDComponent(id: string): string {
+		const comps = id.split("");
+		const last = comps.pop()!;
+		return comps.concat([lettersIDComponentSuccessors[last]]).join("");
+	}
 
-	// isNumber(string: string): boolean {
-	// 	return /^\d+$/.test(string);
-	// }
+	incrementNumberIDComponent(id: string): string {
+		return (parseInt(id) + 1).toString();
+	}
 
-	// incrementIDComponent(id: string): string {
-	// 	if (this.isNumber(id)) {
-	// 		return this.incrementNumberIDComponent(id);
-	// 	} else {
-	// 		return this.incrementStringIDComponent(id);
-	// 	}
-	// }
+	isNumber(string: string): boolean {
+		return /^\d+$/.test(string);
+	}
 
-	// incrementID(id: string): string {
-	// 	const parts = id.match(idOnlyRegex)!;
-	// 	const lastPart = parts.pop()!;
-	// 	return parts.concat([this.incrementIDComponent(lastPart)]).join("");
-	// }
+	incrementIDComponent(id: string): string {
+		if (this.isNumber(id)) {
+			return this.incrementNumberIDComponent(id);
+		} else {
+			return this.incrementStringIDComponent(id);
+		}
+	}
 
-	// parentID(id: string): string {
-	// 	const parts = id.match(idOnlyRegex)!;
-	// 	if (parts) {
-	// 		parts.pop();
-	// 		return parts.join("");
-	// 	} else {
-	// 		return "";
-	// 	}
-	// }
+	incrementID(id: string): string {
+		const parts = id.match(idOnlyRegex)!;
+		const lastPart = parts.pop()!;
+		return parts.concat([this.incrementIDComponent(lastPart)]).join("");
+	}
 
-	// nextComponentOf(id: string): string {
-	// 	const parts = id.match(idOnlyRegex)!;
-	// 	const lastPart = parts.pop()!;
-	// 	if (this.isNumber(lastPart)) {
-	// 		return "a";
-	// 	} else {
-	// 		return "1";
-	// 	}
-	// }
+	parentID(id: string): string {
+		const parts = id.match(idOnlyRegex)!;
+		if (parts) {
+			parts.pop();
+			return parts.join("");
+		} else {
+			return "";
+		}
+	}
 
-	// firstChildOf(parentID: string): string {
-	// 	return parentID + this.nextComponentOf(parentID);
-	// }
+	nextComponentOf(id: string): string {
+		const parts = id.match(idOnlyRegex)!;
+		const lastPart = parts.pop()!;
+		if (this.isNumber(lastPart)) {
+			return "a";
+		} else {
+			return "1";
+		}
+	}
 
-	// fileToId(filename: string): string {
-	// 	const ruleRegexes: Record<string, RegExp> = {
-	// 		strict: /^((?:[0-9]+|[a-z]+)+)$/,
-	// 		separator: new RegExp(
-	// 			`^((?:[0-9]+|[a-z]+)+)${this.settings.separator}.*`,
-	// 		),
-	// 		fuzzy: /^((?:[0-9]+|[a-z]+)+).*/,
-	// 	};
-	// 	const match = filename.match(ruleRegexes[this.settings.matchRule]);
-	// 	if (match) {
-	// 		return match[1];
-	// 	}
-	// 	return "";
-	// }
+	firstChildOf(parentID: string): string {
+		return parentID + this.nextComponentOf(parentID);
+	}
 
-	// idExists(id: string): boolean {
-	// 	const fileMatcher = (file: TFile) =>
-	// 		this.fileToId(file.basename) === id;
-	// 	return (
-	// 		this.app.vault.getMarkdownFiles().filter(fileMatcher).length != 0
-	// 	);
-	// }
+	fileToId(filename: string): string {
+		const ruleRegexes: Record<string, RegExp> = {
+			strict: /^((?:[0-9]+|[a-z]+)+)$/,
+			separator: new RegExp(
+				`^((?:[0-9]+|[a-z]+)+)${this.settings.separator}.*`,
+			),
+			fuzzy: /^((?:[0-9]+|[a-z]+)+).*/,
+		};
+		const match = filename.match(ruleRegexes[this.settings.matchRule]);
+		if (match) {
+			return match[1];
+		}
+		return "";
+	}
 
-	// firstAvailableID(startingID: string): string {
-	// 	let nextID = startingID;
-	// 	while (this.idExists(nextID)) {
-	// 		nextID = this.incrementID(nextID);
-	// 	}
-	// 	return nextID;
-	// }
+	idExists(id: string): boolean {
+		const fileMatcher = (file: TFile) =>
+			this.fileToId(file.basename) === id;
+		return (
+			this.app.vault.getMarkdownFiles().filter(fileMatcher).length != 0
+		);
+	}
 
-	// makeNoteForNextSiblingOf(sibling: TFile): string {
-	// 	const nextID = this.firstAvailableID(
-	// 		this.incrementID(this.fileToId(sibling.basename)),
-	// 	);
-	// 	return nextID;
-	// }
+	firstAvailableID(startingID: string): string {
+		let nextID = startingID;
+		while (this.idExists(nextID)) {
+			nextID = this.incrementID(nextID);
+		}
+		return nextID;
+	}
 
-	// makeNoteForNextChildOf(parent: TFile): string {
-	// 	const childID = this.firstAvailableID(
-	// 		this.firstChildOf(this.fileToId(parent.basename)),
-	// 	);
-	// 	return childID;
-	// }
+	makeNoteForNextSiblingOf(sibling: TFile): string {
+		const nextID = this.firstAvailableID(
+			this.incrementID(this.fileToId(sibling.basename)),
+		);
+		return nextID;
+	}
 
-	// async makeNote(
-	// 	path: string,
-	// 	title: string,
-	// 	fileLink: string,
-	// 	placeCursorAtStartOfContent: boolean,
-	// 	openZettel = false,
-	// 	successCallback: () => void = () => {
-	// 		return;
-	// 	},
-	// ) {
-	// 	const useTemplate =
-	// 		this.settings.templateFile &&
-	// 		this.settings.templateFile.trim() != "";
-	// 	const app = this.app;
-	// 	let titleContent = null;
-	// 	if (title && title.length > 0) {
-	// 		titleContent =
-	// 			(useTemplate == false ? "# " : "") + title.trimStart();
-	// 	} else {
-	// 		titleContent = "";
-	// 	}
+	makeNoteForNextChildOf(parent: TFile): string {
+		const childID = this.firstAvailableID(
+			this.firstChildOf(this.fileToId(parent.basename)),
+		);
+		return childID;
+	}
 
-	// 	let file = null;
-	// 	const backlinkRegex = /{{link}}/g;
-	// 	const titleRegex = /{{title}}/g;
-	// 	if (useTemplate) {
-	// 		let template_content = "";
-	// 		try {
-	// 			template_content = await this.app.vault.adapter.read(
-	// 				this.settings.templateFile.trim(),
-	// 			);
-	// 		} catch (err) {
-	// 			new Notice(
-	// 				`[LUHMAN] Couldn't read template file. Make sure the path and file are valid/correct. Current setting: ${this.settings.templateFile.trim()}`,
-	// 				15000,
-	// 			);
-	// 			return;
-	// 		}
+	async makeNote(
+		path: string,
+		title: string,
+		fileLink: string,
+		placeCursorAtStartOfContent: boolean,
+		openZettel = false,
+		successCallback: () => void = () => {
+			return;
+		},
+	) {
+		const useTemplate =
+			this.settings.templateFile &&
+			this.settings.templateFile.trim() != "";
+		const app = this.app;
+		let titleContent = null;
+		if (title && title.length > 0) {
+			titleContent =
+				(useTemplate == false ? "# " : "") + title.trimStart();
+		} else {
+			titleContent = "";
+		}
 
-	// 		const testTitle =
-	// 			this.settings.templateRequireTitle == false ||
-	// 			titleRegex.test(template_content);
-	// 		const testLink =
-	// 			this.settings.templateRequireLink == false ||
-	// 			backlinkRegex.test(template_content);
-	// 		if (testTitle == false || testLink == false) {
-	// 			new Notice(
-	// 				`[LUHMAN] Template Malformed. Missing {{${testTitle ? "" : "title"}${
-	// 					testTitle == false && testLink == false
-	// 						? "}} and {{"
-	// 						: ""
-	// 				}${testLink ? "" : "link"}}} placeholder. Please add ${
-	// 					testTitle == false && testLink == false ? "them" : "it"
-	// 				} to the template and try again...`,
-	// 				15000,
-	// 			);
-	// 			return;
-	// 		}
+		let file = null;
+		const backlinkRegex = /{{link}}/g;
+		const titleRegex = /{{title}}/g;
+		if (useTemplate) {
+			let template_content = "";
+			try {
+				template_content = await this.app.vault.adapter.read(
+					this.settings.templateFile.trim(),
+				);
+			} catch {
+				new Notice(
+					`[LUHMAN] Couldn't read template file. Make sure the path and file are valid/correct. Current setting: ${this.settings.templateFile.trim()}`,
+					15000,
+				);
+				return;
+			}
 
-	// 		const file_content = template_content
-	// 			.replace(titleRegex, titleContent)
-	// 			.replace(backlinkRegex, fileLink);
-	// 		file = await this.app.vault.create(path, file_content);
-	// 		successCallback();
-	// 	} else {
-	// 		const fullContent = titleContent + "\n\n" + fileLink;
-	// 		file = await this.app.vault.create(path, fullContent);
+			const testTitle =
+				this.settings.templateRequireTitle == false ||
+				titleRegex.test(template_content);
+			const testLink =
+				this.settings.templateRequireLink == false ||
+				backlinkRegex.test(template_content);
+			if (testTitle == false || testLink == false) {
+				new Notice(
+					`[LUHMAN] Template Malformed. Missing {{${testTitle ? "" : "title"}${
+						testTitle == false && testLink == false
+							? "}} and {{"
+							: ""
+					}${testLink ? "" : "link"}}} placeholder. Please add ${
+						testTitle == false && testLink == false ? "them" : "it"
+					} to the template and try again...`,
+					15000,
+				);
+				return;
+			}
 
-	// 		successCallback();
-	// 	}
+			const file_content = template_content
+				.replace(titleRegex, titleContent)
+				.replace(backlinkRegex, fileLink);
+			file = await this.app.vault.create(path, file_content);
+			successCallback();
+		} else {
+			const fullContent = titleContent + "\n\n" + fileLink;
+			file = await this.app.vault.create(path, fullContent);
 
-	// 	if (this.settings.addAlias && file) {
-	// 		await this.app.fileManager.processFrontMatter(
-	// 			file,
-	// 			(frontMatter) => {
-	// 				frontMatter = frontMatter || {};
-	// 				frontMatter.aliases = frontMatter.aliases || [];
-	// 				frontMatter.aliases.push(title);
-	// 				return frontMatter;
-	// 			},
-	// 		);
-	// 	}
+			successCallback();
+		}
 
-	// 	const active = app.workspace.getLeaf();
-	// 	if (active == null) {
-	// 		return;
-	// 	}
-	// 	if (openZettel == false) return;
+		if (this.settings.addAlias && file) {
+			await this.app.fileManager.processFrontMatter(
+				file,
+				(frontMatter) => {
+					frontMatter = frontMatter || {};
+					frontMatter.aliases = frontMatter.aliases || [];
+					frontMatter.aliases.push(title);
+					return frontMatter;
+				},
+			);
+		}
 
-	// 	await active.openFile(file);
+		const active = app.workspace.getLeaf();
+		if (active == null) {
+			return;
+		}
+		if (openZettel == false) return;
 
-	// 	const editor = app.workspace.getActiveViewOfType(MarkdownView)?.editor;
-	// 	if (editor == null) {
-	// 		return;
-	// 	}
+		await active.openFile(file);
 
-	// 	if (
-	// 		placeCursorAtStartOfContent &&
-	// 		(!this.settings.templateFile ||
-	// 			this.settings.templateFile.trim() == "")
-	// 	) {
-	// 		let line = 2;
-	// 		if (this.settings.addAlias) {
-	// 			line += 4;
-	// 		}
-	// 		const position: EditorPosition = { line, ch: 0 };
-	// 		editor.setCursor(position);
-	// 	} else {
-	// 		editor.exec("goEnd");
-	// 	}
-	// }
+		const editor = app.workspace.getActiveViewOfType(MarkdownView)?.editor;
+		if (editor == null) {
+			return;
+		}
 
-	// // isZettelFile(name: string): boolean {
-	// // 	const mdRegex = /(.*)\.md$/;
-	// // 	const matchedName = mdRegex.exec(name)?.[1] || null;
-	// // 	return matchedName != null && this.fileToId(matchedName) !== "";
-	// // }
+		if (
+			placeCursorAtStartOfContent &&
+			(!this.settings.templateFile ||
+				this.settings.templateFile.trim() == "")
+		) {
+			let line = 2;
+			if (this.settings.addAlias) {
+				line += 4;
+			}
+			const position: EditorPosition = { line, ch: 0 };
+			editor.setCursor(position);
+		} else {
+			editor.exec("goEnd");
+		}
+	}
 
-	// makeNoteFunction(idGenerator: (file: TFile) => string, openNewFile = true) {
-	// 	const file = this.app.workspace.getActiveFile();
-	// 	if (file == null) {
-	// 		return;
-	// 	}
-	// 	if (this.isZettelFile(file.name)) {
-	// 		const fileID = this.fileToId(file.basename);
-	// 		const fileLink = "[[" + file.basename + "]]";
+	isZettelFile(name: string): boolean {
+		const mdRegex = /(.*)\.md$/;
+		const matchedName = mdRegex.exec(name)?.[1] || null;
+		return matchedName != null && this.fileToId(matchedName) !== "";
+	}
 
-	// 		const editor =
-	// 			this.app.workspace.getActiveViewOfType(MarkdownView)?.editor;
-	// 		if (editor == null) {
-	// 			return;
-	// 		}
+	makeNoteFunction(idGenerator: (file: TFile) => string, openNewFile = true) {
+		const file = this.app.workspace.getActiveFile();
+		if (file == null) {
+			return;
+		}
+		if (this.isZettelFile(file.name)) {
+			const fileLink = "[[" + file.basename + "]]";
 
-	// 		const selection = editor.getSelection();
+			const editor =
+				this.app.workspace.getActiveViewOfType(MarkdownView)?.editor;
+			if (editor == null) {
+				return;
+			}
 
-	// 		const nextID = idGenerator.bind(this, file)();
-	// 		const nextPath = (title: string) =>
-	// 			file?.path
-	// 				? this.app.fileManager.getNewFileParent(file.path).path +
-	// 					"/" +
-	// 					nextID +
-	// 					(this.settings.addTitle
-	// 						? this.settings.separator + title
-	// 						: "") +
-	// 					".md"
-	// 				: "";
-	// 		const useLinkAlias = this.settings.useLinkAlias;
-	// 		const newLink = (title: string) => {
-	// 			const alias = useLinkAlias ? `|${title}` : "";
+			const selection = editor.getSelection();
 
-	// 			return `[[${nextID}${
-	// 				this.settings.addTitle
-	// 					? this.settings.separator + title
-	// 					: ""
-	// 			}${alias}]]`;
-	// 		};
-	// 		// const newLink = "[[" + nextID + "]]";
+			const nextID = idGenerator.bind(this, file)();
+			const nextPath = (title: string) =>
+				file?.path
+					? this.app.fileManager.getNewFileParent(file.path).path +
+						"/" +
+						nextID +
+						(this.settings.addTitle
+							? this.settings.separator + title
+							: "") +
+						".md"
+					: "";
+			const useLinkAlias = this.settings.useLinkAlias;
+			const newLink = (title: string) => {
+				const alias = useLinkAlias ? `|${title}` : "";
 
-	// 		if (selection) {
-	// 			// This current solution eats line returns spaces but thats
-	// 			// fine as it is turning the selection into a title so it makes sense
-	// 			const selectionTrimStart = selection.trimStart();
-	// 			const selectionTrimEnd = selectionTrimStart.trimEnd();
-	// 			const spaceBefore =
-	// 				selection.length - selectionTrimStart.length;
-	// 			const spaceAfter =
-	// 				selectionTrimStart.length - selectionTrimEnd.length;
-	// 			const title = selectionTrimEnd
-	// 				.split(/\s+/)
-	// 				.map((w) => w[0].toUpperCase() + w.slice(1))
-	// 				.join(" ");
-	// 			const selectionPos = editor!.listSelections()[0];
-	// 			/* By default the anchor is what ever position the selection started
-	//        how ever replaceRange does not accept it both ways and
-	//        gets weird if we just pass in the anchor then the head
-	//        so here we create a vertual anchor and head position to pass in */
-	// 			const anchorCorrect =
-	// 				selectionPos.anchor.line == selectionPos.head.line // If the anchor and head are on the same line
-	// 					? selectionPos.anchor.ch <= selectionPos.head.ch // Then if anchor is before the head
-	// 					: selectionPos.anchor.line < selectionPos.head.line; // else they are not on the same line and just check if anchor is before head
+				return `[[${nextID}${
+					this.settings.addTitle
+						? this.settings.separator + title
+						: ""
+				}${alias}]]`;
+			};
 
-	// 			// if anchorCorrect use as is, else switch
-	// 			const virtualAnchor = anchorCorrect
-	// 				? selectionPos.anchor
-	// 				: selectionPos.head;
-	// 			const virtualHead = anchorCorrect
-	// 				? selectionPos.head
-	// 				: selectionPos.anchor;
-	// 			// editor!.replaceRange(" ".repeat(spaceBefore) + newLink(title) + " ".repeat(spaceAfter), virtualAnchor, virtualHead);
-	// 			this.makeNote(
-	// 				nextPath(title),
-	// 				title,
-	// 				fileLink,
-	// 				true,
-	// 				openNewFile,
-	// 				() => {
-	// 					editor!.replaceRange(
-	// 						" ".repeat(spaceBefore) +
-	// 							newLink(title) +
-	// 							" ".repeat(spaceAfter),
-	// 						virtualAnchor,
-	// 						virtualHead,
-	// 					);
-	// 				},
-	// 			);
-	// 		} else {
-	// 			new NewZettelModal(
-	// 				this.app,
-	// 				(title: string, options) => {
-	// 					this.makeNote(
-	// 						nextPath(title),
-	// 						title,
-	// 						fileLink,
-	// 						true,
-	// 						options.openNewZettel,
-	// 						this.insertTextIntoCurrentNote(newLink(title)),
-	// 					);
-	// 				},
-	// 				{
-	// 					openNewZettel: openNewFile,
-	// 				},
-	// 			).open();
-	// 		}
-	// 	} else {
-	// 		new Notice(
-	// 			`Couldn't find ID in "${file.basename}". ${checkSettingsMessage}`,
-	// 		);
-	// 	}
-	// }
+			if (selection) {
+				// This current solution eats line returns spaces but thats
+				// fine as it is turning the selection into a title so it makes sense
+				const selectionTrimStart = selection.trimStart();
+				const selectionTrimEnd = selectionTrimStart.trimEnd();
+				const spaceBefore =
+					selection.length - selectionTrimStart.length;
+				const spaceAfter =
+					selectionTrimStart.length - selectionTrimEnd.length;
+				const title = selectionTrimEnd
+					.split(/\s+/)
+					.map((w) => w[0].toUpperCase() + w.slice(1))
+					.join(" ");
+				const selectionPos = editor!.listSelections()[0];
+				/* By default the anchor is what ever position the selection started
+	       how ever replaceRange does not accept it both ways and
+	       gets weird if we just pass in the anchor then the head
+	       so here we create a vertual anchor and head position to pass in */
+				const anchorCorrect =
+					selectionPos.anchor.line == selectionPos.head.line // If the anchor and head are on the same line
+						? selectionPos.anchor.ch <= selectionPos.head.ch // Then if anchor is before the head
+						: selectionPos.anchor.line < selectionPos.head.line; // else they are not on the same line and just check if anchor is before head
+
+				// if anchorCorrect use as is, else switch
+				const virtualAnchor = anchorCorrect
+					? selectionPos.anchor
+					: selectionPos.head;
+				const virtualHead = anchorCorrect
+					? selectionPos.head
+					: selectionPos.anchor;
+				this.makeNote(
+					nextPath(title),
+					title,
+					fileLink,
+					true,
+					openNewFile,
+					() => {
+						editor!.replaceRange(
+							" ".repeat(spaceBefore) +
+								newLink(title) +
+								" ".repeat(spaceAfter),
+							virtualAnchor,
+							virtualHead,
+						);
+					},
+				);
+			} else {
+				new NewZettelModal(
+					this.app,
+					(title: string, options) => {
+						this.makeNote(
+							nextPath(title),
+							title,
+							fileLink,
+							true,
+							options.openNewZettel,
+							this.insertTextIntoCurrentNote(newLink(title)),
+						);
+					},
+					{
+						openNewZettel: openNewFile,
+					},
+				).open();
+			}
+		} else {
+			new Notice(
+				`Couldn't find ID in "${file.basename}". ${checkSettingsMessage}`,
+			);
+		}
+	}
 
 	async renameZettel(id: string, toId: string) {
-		const sep = this.settings.separator;
 		const zettel = this.app.vault
 			.getMarkdownFiles()
 			.filter((file) => this.fileToId(file.basename) === id)
@@ -390,9 +652,8 @@ export default class NewZettel extends Plugin {
 
 	async onload() {
 		console.log("loading New Zettel");
-		this.loadSettings();
+		await this.loadSettings();
 		this.addSettingTab(new LuhmanSettingTab(this.app, this));
-		// this.app.workspace.onLayoutReady(this.initialize);
 
 		this.addCommand({
 			id: "new-sibling-note",
@@ -435,7 +696,6 @@ export default class NewZettel extends Plugin {
 			name: "Insert Zettel Link",
 			icon: "link-2",
 			callback: async () => {
-				// let completion = (te)
 				const titles = await this.getAllNoteTitles();
 				new ZettelSuggester(
 					this.app,
@@ -510,11 +770,13 @@ export default class NewZettel extends Plugin {
 
 	onunload() {
 		console.log("unloading New Zettel");
-		// this.initialize(true);
 	}
 
 	currentFile(): TFile | undefined {
-		return this.app.workspace.getActiveViewOfType(MarkdownView)?.file;
+		return (
+			this.app.workspace.getActiveViewOfType(MarkdownView)?.file ||
+			undefined
+		);
 	}
 
 	openZettel(id: string) {
@@ -589,5 +851,17 @@ export default class NewZettel extends Plugin {
 		}
 
 		return titles;
+	}
+
+	async loadSettings() {
+		this.settings = Object.assign(
+			{},
+			DEFAULT_NEWZETTEL_SETTINGS,
+			await this.loadData(),
+		);
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
 	}
 }

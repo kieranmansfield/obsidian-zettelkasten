@@ -30,12 +30,15 @@ export class SearchQuerySuggest extends AbstractInputSuggest<string> {
 
 		// Add operators if input is empty or typing an operator
 		if (!inputStr || inputStr.endsWith(" ")) {
-			operators.forEach(op => suggestions.add(op));
+			operators.forEach((op) => suggestions.add(op));
 		}
 
 		// Get all tags from vault
-		const tags = Object.keys((this.app.metadataCache as any).getTags());
-		tags.forEach(tag => {
+		const metadataCache = this.app.metadataCache as {
+			getTags?: () => Record<string, number>;
+		};
+		const tags = metadataCache.getTags ? Object.keys(metadataCache.getTags()) : [];
+		tags.forEach((tag) => {
 			// Add tag suggestions
 			if (tag.toLowerCase().includes(inputStr.toLowerCase())) {
 				suggestions.add(tag);
@@ -59,9 +62,13 @@ export class SearchQuerySuggest extends AbstractInputSuggest<string> {
 		// Get file paths for path: operator
 		if (inputStr.startsWith("path:") || inputStr.includes(" path:")) {
 			const files = this.app.vault.getMarkdownFiles();
-			files.forEach(file => {
+			files.forEach((file) => {
 				const pathSuggestion = `path:${file.path}`;
-				if (pathSuggestion.toLowerCase().includes(inputStr.toLowerCase())) {
+				if (
+					pathSuggestion
+						.toLowerCase()
+						.includes(inputStr.toLowerCase())
+				) {
 					suggestions.add(pathSuggestion);
 				}
 			});
@@ -70,9 +77,13 @@ export class SearchQuerySuggest extends AbstractInputSuggest<string> {
 		// Get file names for file: operator
 		if (inputStr.startsWith("file:") || inputStr.includes(" file:")) {
 			const files = this.app.vault.getMarkdownFiles();
-			files.forEach(file => {
+			files.forEach((file) => {
 				const fileSuggestion = `file:${file.basename}`;
-				if (fileSuggestion.toLowerCase().includes(inputStr.toLowerCase())) {
+				if (
+					fileSuggestion
+						.toLowerCase()
+						.includes(inputStr.toLowerCase())
+				) {
 					suggestions.add(fileSuggestion);
 				}
 			});
@@ -80,7 +91,7 @@ export class SearchQuerySuggest extends AbstractInputSuggest<string> {
 
 		const suggestionArray = Array.from(suggestions);
 		return suggestionArray
-			.filter(s => s.toLowerCase().contains(inputStr.toLowerCase()))
+			.filter((s) => s.toLowerCase().contains(inputStr.toLowerCase()))
 			.slice(0, 20); // Limit to 20 suggestions
 	}
 

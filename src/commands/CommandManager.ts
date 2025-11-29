@@ -20,9 +20,7 @@ export class CommandManager {
 		this.registerOpenChildZettelCommand();
 		this.registerOpenSiblingZettelCommand();
 		this.registerZettelkastenNavigatorCommand();
-		if (this.plugin.settings.enableNoteSequence) {
-			this.registerReorderSequenceCommand();
-		}
+		this.registerReorderSequenceCommand();
 		this.registerNextSequenceCommand();
 		this.registerPreviousSequenceCommand();
 		this.registerNextChildCommand();
@@ -38,6 +36,7 @@ export class CommandManager {
 		this.registerOutdentZettelCommand();
 		this.registerOpenFleetingCommand();
 		this.registerCreateFleetingNoteCommand();
+		this.registerCreateProjectCommand();
 		this.registerOpenIndexCommand();
 		this.registerCreateIndexCommand();
 		this.registerFixZettelFilenameCommand();
@@ -46,6 +45,7 @@ export class CommandManager {
 		this.registerBookmarkActiveFileCommand();
 		this.registerBookmarkCurrentSearchCommand();
 		this.registerBookmarkGraphCommand();
+		this.registerToggleSequenceNavigatorCommand();
 	}
 
 	/**
@@ -250,20 +250,18 @@ export class CommandManager {
 					return true;
 				}
 
-				this.getNoteTitlesByTag(this.plugin.settings.structureNotesTag).then(
-					(titles) => {
-						new ZettelSuggester(
-							this.plugin.app,
-							titles,
-							this.currentlySelectedText(),
-							(file: TFile) => {
-								this.plugin.app.workspace
-									.getLeaf()
-									.openFile(file);
-							},
-						).open();
-					},
-				);
+				this.getNoteTitlesByTag(
+					this.plugin.settings.structureNotesTag,
+				).then((titles) => {
+					new ZettelSuggester(
+						this.plugin.app,
+						titles,
+						this.currentlySelectedText(),
+						(file: TFile) => {
+							this.plugin.app.workspace.getLeaf().openFile(file);
+						},
+					).open();
+				});
 
 				return true;
 			},
@@ -346,15 +344,20 @@ export class CommandManager {
 	}
 
 	/**
-	 * Registers the "Zettelkasten Navigator" command
+	 * Registers the "Quick Zettelkasten Navigator" command
 	 * Provides directional navigation: up (parent), down (child), left (prev sibling), right (next sibling)
 	 */
 	private registerZettelkastenNavigatorCommand(): void {
 		this.plugin.addCommand({
 			id: "zettelkasten-navigator",
-			name: "Zettelkasten Navigator",
+			name: "Quick Zettelkasten Navigator",
 			icon: "compass",
 			checkCallback: (checking: boolean) => {
+				// Check if Note Sequences feature is enabled
+				if (!this.plugin.settings.enableNoteSequence) {
+					return false;
+				}
+
 				const activeFile = this.plugin.app.workspace.getActiveFile();
 				if (!activeFile) {
 					return false;
@@ -995,9 +998,12 @@ export class CommandManager {
 										.fleetingNotesUseSeparateLocation,
 									this.plugin.settings.fleetingNotesLocation,
 								);
-								const filename = this.buildFleetingFilename(title);
+								const filename =
+									this.buildFleetingFilename(title);
 								const path = `${folder.path}/${filename}.md`;
-								templatePath = this.plugin.settings.fleetingNotesTemplatePath;
+								templatePath =
+									this.plugin.settings
+										.fleetingNotesTemplatePath;
 
 								const creator = new FileCreator(
 									this.plugin.app,
@@ -1033,16 +1039,15 @@ export class CommandManager {
 							);
 							const filename = title;
 							const path = `${folder.path}/${filename}.md`;
-							templatePath = this.plugin.settings.defaultInboxTemplatePath;
+							templatePath =
+								this.plugin.settings.defaultInboxTemplatePath;
 
 							const creator = new FileCreator(
 								this.plugin.app,
 								path,
 								title,
 								() => {
-									new Notice(
-										`Created inbox note: ${title}`,
-									);
+									new Notice(`Created inbox note: ${title}`);
 								},
 								templatePath,
 							);
@@ -1057,6 +1062,62 @@ export class CommandManager {
 						true,
 					).open();
 				}
+
+				return true;
+			},
+		});
+	}
+
+	/**
+	 * Registers the "New Project" command
+	 */
+	private registerCreateProjectCommand(): void {
+		this.plugin.addCommand({
+			id: "create-project",
+			name: "New Project",
+			icon: "folder-kanban",
+			checkCallback: (checking: boolean) => {
+				if (!this.plugin.settings.enableProjects) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
+				// Simple note creation for projects
+				new CreateNoteWithSuggestModal(
+					this.plugin.app,
+					new Map(),
+					async (title: string) => {
+						const folder = this.getNoteTypeFolder(
+							false,
+							this.plugin.settings.projectsLocation,
+						);
+						const filename = title;
+						const path = `${folder.path}/${filename}.md`;
+						const templatePath =
+							this.plugin.settings.projectsTemplatePath;
+
+						const creator = new FileCreator(
+							this.plugin.app,
+							path,
+							title,
+							() => {
+								new Notice(`Created project: ${title}`);
+							},
+							templatePath,
+						);
+						try {
+							await creator.create();
+						} catch (error) {
+							new Notice(
+								`Error creating project: ${error.message}`,
+							);
+						}
+					},
+					true,
+				).open();
 
 				return true;
 			},
@@ -1081,45 +1142,46 @@ export class CommandManager {
 				}
 
 				// Get existing indexes for autocomplete
-				this.getNoteTitlesByTag(this.plugin.settings.structureNotesTag).then(
-					(notesMap) => {
-						new CreateNoteWithSuggestModal(
-							this.plugin.app,
-							notesMap,
-							async (title: string) => {
-								const folder = this.getNoteTypeFolder(
-									this.plugin.settings
-										.structureNotesUseSeparateLocation,
-									this.plugin.settings.structureNotesLocation,
-								);
-								const filename = this.buildIndexFilename(title);
-								const path = `${folder.path}/${filename}.md`;
+				this.getNoteTitlesByTag(
+					this.plugin.settings.structureNotesTag,
+				).then((notesMap) => {
+					new CreateNoteWithSuggestModal(
+						this.plugin.app,
+						notesMap,
+						async (title: string) => {
+							const folder = this.getNoteTypeFolder(
+								this.plugin.settings
+									.structureNotesUseSeparateLocation,
+								this.plugin.settings.structureNotesLocation,
+							);
+							const filename = this.buildIndexFilename(title);
+							const path = `${folder.path}/${filename}.md`;
 
-								// Determine which template to use based on mode
-								const templatePath = this.plugin.settings.structureNoteMode === "moc"
+							// Determine which template to use based on mode
+							const templatePath =
+								this.plugin.settings.structureNoteMode === "moc"
 									? this.plugin.settings.mocTemplatePath
 									: this.plugin.settings.zkIndexTemplatePath;
 
-								const creator = new FileCreator(
-									this.plugin.app,
-									path,
-									title,
-									() => {
-										new Notice(`Created index: ${title}`);
-									},
-									templatePath,
+							const creator = new FileCreator(
+								this.plugin.app,
+								path,
+								title,
+								() => {
+									new Notice(`Created index: ${title}`);
+								},
+								templatePath,
+							);
+							try {
+								await creator.create();
+							} catch (error) {
+								new Notice(
+									`Error creating index: ${error.message}`,
 								);
-								try {
-									await creator.create();
-								} catch (error) {
-									new Notice(
-										`Error creating index: ${error.message}`,
-									);
-								}
-							},
-						).open();
-					},
-				);
+							}
+						},
+					).open();
+				});
 
 				return true;
 			},
@@ -1156,7 +1218,9 @@ export class CommandManager {
 						new Notice("Zettel filename is already correct.");
 					}
 				} catch (error) {
-					new Notice(`Error fixing zettel filename: ${error.message}`);
+					new Notice(
+						`Error fixing zettel filename: ${error.message}`,
+					);
 				}
 			},
 		});
@@ -1221,26 +1285,54 @@ export class CommandManager {
 	 * Returns true if the file was renamed, false if already correct
 	 */
 	private async fixZettelFilename(file: TFile): Promise<boolean> {
-		let currentId = this.extractZettelId(file.basename);
+		const basename = file.basename;
+
+		// Extract the raw ID (might have wrong prefix or no prefix)
+		let rawId = this.extractZettelId(basename);
 
 		// If no ID found, generate one for this zettel
-		if (!currentId) {
-			// Generate a new ID based on file's creation time or current time
+		if (!rawId) {
 			const timestamp = await this.generateTimestampForFile(file);
 			const prefix = this.plugin.settings.useZettelPrefix
 				? this.plugin.settings.zettelPrefix
 				: "";
-			currentId = prefix + timestamp;
+			rawId = prefix + timestamp;
 		}
 
-		// Normalize the ID (this already includes the prefix if configured)
-		const normalizedId = this.normalizeZettelId(file, currentId);
+		// Strip any existing prefix and get just the numeric part + hierarchy
+		const idWithoutAnyPrefix = this.stripAllPrefixes(rawId);
 
-		// Build the expected filename with just the ID (no title)
-		const expectedFilename = normalizedId;
+		// Add the correct prefix if configured
+		const desiredPrefix = this.plugin.settings.useZettelPrefix
+			? this.plugin.settings.zettelPrefix
+			: "";
+
+		// Extract just the timestamp part (digits only)
+		const timestampMatch = idWithoutAnyPrefix.match(/^(\d+)/);
+		if (!timestampMatch) {
+			console.warn(`Could not extract timestamp from ${basename}`);
+			return false;
+		}
+
+		const timestamp = timestampMatch[1];
+		const hierarchy = idWithoutAnyPrefix.substring(timestamp.length);
+
+		// Normalize timestamp length to match format
+		const formatLength = this.plugin.settings.zettelIdFormat.length;
+		let normalizedTimestamp = timestamp;
+
+		if (timestamp.length > formatLength) {
+			normalizedTimestamp = timestamp.substring(0, formatLength);
+		} else if (timestamp.length < formatLength) {
+			normalizedTimestamp = timestamp.padEnd(formatLength, "0");
+		}
+
+		// Build the expected filename (just the ID, nothing else)
+		const expectedFilename =
+			desiredPrefix + normalizedTimestamp + hierarchy;
 
 		// Check if filename needs fixing
-		if (file.basename !== expectedFilename) {
+		if (basename !== expectedFilename) {
 			const folder = file.parent || this.plugin.app.vault.getRoot();
 			const newPath = `${folder.path}/${expectedFilename}.md`;
 
@@ -1249,7 +1341,7 @@ export class CommandManager {
 				this.plugin.app.vault.getAbstractFileByPath(newPath);
 			if (existing && existing !== file) {
 				console.warn(
-					`Cannot fix ${file.basename}: ${expectedFilename}.md already exists`,
+					`Cannot fix ${basename}: ${expectedFilename}.md already exists`,
 				);
 				return false;
 			}
@@ -1259,6 +1351,17 @@ export class CommandManager {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Strips ALL letter prefixes from a zettel ID to get just the numeric part + hierarchy
+	 */
+	private stripAllPrefixes(zettelId: string): string {
+		const match = zettelId.match(/^[a-z]+(\d{13,}(?:[a-z]+|\d+)*)/);
+		if (match) {
+			return match[1];
+		}
+		return zettelId;
 	}
 
 	/**
@@ -1308,8 +1411,10 @@ export class CommandManager {
 		}
 
 		// Check if file path starts with folder path
-		return file.path.startsWith(folder.path + "/") ||
-			   file.parent?.path === folder.path;
+		return (
+			file.path.startsWith(folder.path + "/") ||
+			file.parent?.path === folder.path
+		);
 	}
 
 	/**
@@ -1319,13 +1424,17 @@ export class CommandManager {
 		if (this.plugin.settings.zettelDetectionMode === "tag") {
 			// Tag-based: check if file has the zettel tag
 			const cache = this.plugin.app.metadataCache.getFileCache(file);
-			const tags = cache?.frontmatter?.tags || cache?.tags?.map(t => t.tag) || [];
+			const tags =
+				cache?.frontmatter?.tags ||
+				cache?.tags?.map((t) => t.tag) ||
+				[];
 			const tagArray = Array.isArray(tags) ? tags : [tags];
 			const zettelTag = this.plugin.settings.zettelTag.startsWith("#")
 				? this.plugin.settings.zettelTag
 				: `#${this.plugin.settings.zettelTag}`;
-			return tagArray.some(tag =>
-				tag === zettelTag || tag === this.plugin.settings.zettelTag
+			return tagArray.some(
+				(tag) =>
+					tag === zettelTag || tag === this.plugin.settings.zettelTag,
 			);
 		} else {
 			// Folder-based: check if file is in the zettels location
@@ -1334,8 +1443,10 @@ export class CommandManager {
 				// If no location specified, check if file has a zettel ID
 				return this.extractZettelId(file.basename) !== null;
 			}
-			return file.path.startsWith(zettelsLocation + "/") ||
-				   file.parent?.path === zettelsLocation;
+			return (
+				file.path.startsWith(zettelsLocation + "/") ||
+				file.parent?.path === zettelsLocation
+			);
 		}
 	}
 
@@ -1353,7 +1464,9 @@ export class CommandManager {
 		if (id && this.plugin.settings.useSeparatorFormat) {
 			const separator = this.plugin.settings.zettelIdSeparator;
 			const parts = file.basename.split(separator);
-			return parts.length > 1 ? parts.slice(1).join(separator).trim() : "";
+			return parts.length > 1
+				? parts.slice(1).join(separator).trim()
+				: "";
 		}
 
 		// No separator, return basename without ID
@@ -1429,7 +1542,9 @@ export class CommandManager {
 		// Match timestamp pattern with optional prefix
 		// First try to match with any letter prefix: z20251114... or zk20251114...
 		// Examples: z2025111321511, zk20251114154532123, 20251114154532123a, z20251114154532123a1
-		const withPrefixMatch = filename.match(/^([a-z]+\d{13,}(?:[a-z]+|\d+)*)/);
+		const withPrefixMatch = filename.match(
+			/^([a-z]+\d{13,}(?:[a-z]+|\d+)*)/,
+		);
 		if (withPrefixMatch) {
 			return withPrefixMatch[1];
 		}
@@ -1458,23 +1573,31 @@ export class CommandManager {
 	 * Alternates based on hierarchy depth
 	 */
 	private shouldUseLetterForChild(parentId: string): boolean {
+		// Strip any prefix first
+		const idWithoutPrefix = this.stripPrefix(parentId);
+
 		// Remove the timestamp portion (first 13+ digits)
-		const hierarchyPart = parentId.replace(/^\d{13,}/, "");
+		const hierarchyPart = idWithoutPrefix.replace(/^\d{13,}/, "");
 
 		if (!hierarchyPart) {
 			// No hierarchy yet, first level should use letters
 			return true;
 		}
 
-		// Count the depth by counting letters and numbers
-		const letterMatches = hierarchyPart.match(/[a-z]/g);
-		const numberMatches = hierarchyPart.match(/\d+/g);
+		// Check the last character to determine alternation
+		// If last character is a digit, next level uses letters
+		// If last character is a letter, next level uses digits
+		const lastChar = hierarchyPart[hierarchyPart.length - 1];
+		return /\d/.test(lastChar);
+	}
 
-		const letterCount = letterMatches ? letterMatches.length : 0;
-		const numberCount = numberMatches ? numberMatches.length : 0;
-
-		// If counts are equal, use letter; otherwise use number
-		return letterCount === numberCount;
+	/**
+	 * Strips any letter prefix from a zettel ID
+	 * Example: "Z20241118123456789a" -> "20241118123456789a"
+	 */
+	private stripPrefix(zettelId: string): string {
+		// Remove any leading letters (prefix)
+		return zettelId.replace(/^[A-Za-z]+/, "");
 	}
 
 	/**
@@ -1920,26 +2043,23 @@ export class CommandManager {
 	): Promise<NavigationOption[]> {
 		const options: NavigationOption[] = [];
 
-		// UP: Parent (from frontmatter 'up' property)
+		// UP: Parent (based on zettel ID structure)
 		let parentFile: TFile | null = null;
 		let parentLabel = "No parent";
-		const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
-		const upLink = cache?.frontmatter?.up;
+		const parentId = this.getParentZettelId(currentId);
 
-		if (upLink) {
-			// Extract the link from [[link]] format
-			const linkMatch = upLink.match(/\[\[([^\]]+)\]\]/);
-			if (linkMatch) {
-				const linkPath = linkMatch[1];
-				parentFile = this.plugin.app.metadataCache.getFirstLinkpathDest(
-					linkPath,
-					activeFile.path,
-				);
-				if (parentFile) {
+		if (parentId) {
+			// Find the file with this parent ID
+			const allFiles = this.plugin.app.vault.getMarkdownFiles();
+			for (const file of allFiles) {
+				const fileId = this.extractZettelId(file.basename);
+				if (fileId === parentId) {
+					parentFile = file;
 					const parentCache =
 						this.plugin.app.metadataCache.getFileCache(parentFile);
 					parentLabel =
 						parentCache?.frontmatter?.title || parentFile.basename;
+					break;
 				}
 			}
 		}
@@ -2129,7 +2249,10 @@ export class CommandManager {
 	/**
 	 * Centralized method to check if a zettel ID is available (not in use)
 	 */
-	private isZettelIdAvailable(zettelId: string, excludeFile?: TFile): boolean {
+	private isZettelIdAvailable(
+		zettelId: string,
+		excludeFile?: TFile,
+	): boolean {
 		const files = this.plugin.app.vault.getMarkdownFiles();
 
 		for (const file of files) {
@@ -2187,7 +2310,9 @@ export class CommandManager {
 			}
 
 			// All letters used, this is unusual but return next after z
-			new Notice("Warning: All letter slots (a-z) used for this parent. Consider restructuring.");
+			new Notice(
+				"Warning: All letter slots (a-z) used for this parent. Consider restructuring.",
+			);
 			return `${parentId}aa`; // Fallback to double letters
 		} else {
 			// Check for gaps in number sequence (1-999)
@@ -2200,7 +2325,9 @@ export class CommandManager {
 			}
 
 			// All numbers 1-999 used
-			new Notice("Warning: All number slots (1-999) used for this parent. Consider restructuring.");
+			new Notice(
+				"Warning: All number slots (1-999) used for this parent. Consider restructuring.",
+			);
 			return `${parentId}${1000}`; // Fallback to 4-digit numbers
 		}
 	}
@@ -2225,7 +2352,10 @@ export class CommandManager {
 			const hours = now.getHours().toString().padStart(2, "0");
 			const minutes = now.getMinutes().toString().padStart(2, "0");
 			const seconds = now.getSeconds().toString().padStart(2, "0");
-			const milliseconds = now.getMilliseconds().toString().padStart(3, "0");
+			const milliseconds = now
+				.getMilliseconds()
+				.toString()
+				.padStart(3, "0");
 
 			// Replace date/time tokens
 			id = id.replace(/YYYY/g, year);
@@ -2245,11 +2375,13 @@ export class CommandManager {
 			// ID collision - wait 1ms and try again
 			attempts++;
 			// Add a small delay to ensure timestamp changes
-			await new Promise(resolve => setTimeout(resolve, 1));
+			await new Promise((resolve) => setTimeout(resolve, 1));
 		}
 
 		// Fallback: append a random suffix if we somehow still have collisions
-		new Notice("Warning: Could not generate unique timestamp. Adding random suffix.");
+		new Notice(
+			"Warning: Could not generate unique timestamp. Adding random suffix.",
+		);
 		const baseId = await this.generateZettelId();
 		return `${baseId}-${Math.random().toString(36).substring(7)}`;
 	}
@@ -2323,7 +2455,8 @@ export class CommandManager {
 	 * Builds Index filename based on settings
 	 */
 	private buildIndexFilename(title: string): string {
-		const { structureNotesUseZettelId, structureNotesFilenameFormat } = this.plugin.settings;
+		const { structureNotesUseZettelId, structureNotesFilenameFormat } =
+			this.plugin.settings;
 
 		if (structureNotesUseZettelId) {
 			// Use zettel ID format
@@ -2331,7 +2464,10 @@ export class CommandManager {
 		}
 
 		// Use custom format if specified
-		if (structureNotesFilenameFormat && structureNotesFilenameFormat.trim()) {
+		if (
+			structureNotesFilenameFormat &&
+			structureNotesFilenameFormat.trim()
+		) {
 			return structureNotesFilenameFormat.replace("{{title}}", title);
 		}
 
@@ -2528,6 +2664,11 @@ export class CommandManager {
 			name: "Reorder Sequence (Alpha)",
 			icon: "list-ordered",
 			checkCallback: (checking: boolean) => {
+				// Check if the feature is enabled
+				if (!this.plugin.settings.enableNoteSequence) {
+					return false;
+				}
+
 				const activeFile = this.plugin.app.workspace.getActiveFile();
 
 				if (!activeFile) {
@@ -2579,6 +2720,7 @@ export class CommandManager {
 						reorderedNotes: TFile[],
 						promoted: TFile[],
 						indentLevels: Map<TFile, number>,
+						compactRequested: boolean,
 					) => {
 						try {
 							await this.handleSequenceReorder(
@@ -2587,6 +2729,7 @@ export class CommandManager {
 								reorderedNotes,
 								promoted,
 								indentLevels,
+								compactRequested,
 							);
 						} catch (error) {
 							new Notice(
@@ -2623,12 +2766,13 @@ export class CommandManager {
 
 		let childPattern: RegExp;
 		if (shouldUseLetter) {
+			// Match one or more letters (to include aa, ab, etc.) but no numbers after
 			childPattern = new RegExp(
-				`^${this.escapeRegex(parentId)}[a-z](?![a-z0-9])`,
+				`^${this.escapeRegex(parentId)}[a-z]+(?![0-9])`,
 			);
 		} else {
 			childPattern = new RegExp(
-				`^${this.escapeRegex(parentId)}\\d+(?![a-z0-9])`,
+				`^${this.escapeRegex(parentId)}\\d+(?![a-z])`,
 			);
 		}
 
@@ -2653,7 +2797,36 @@ export class CommandManager {
 	}
 
 	/**
+	 * Gets all descendants of a given zettel ID recursively
+	 */
+	private getAllDescendants(zettelId: string): TFile[] {
+		const files = this.plugin.app.vault.getMarkdownFiles();
+		const descendants: TFile[] = [];
+
+		for (const file of files) {
+			if (this.shouldIgnoreFile(file)) {
+				continue;
+			}
+			const fileId = this.extractZettelId(file.basename);
+			if (!fileId) {
+				continue;
+			}
+
+			// Check if this file's ID starts with the parent ID and has additional suffixes
+			if (fileId.startsWith(zettelId) && fileId.length > zettelId.length) {
+				descendants.push(file);
+			}
+		}
+
+		return descendants;
+	}
+
+	/**
 	 * Handles the reordering of a sequence based on modal results
+	 */
+	/**
+	 * Handles sequence reordering with automatic ID compaction.
+	 * IDs are always compacted to sequential values (a,b,c... or 1,2,3...) to fill gaps.
 	 */
 	private async handleSequenceReorder(
 		parentFile: TFile,
@@ -2661,8 +2834,13 @@ export class CommandManager {
 		reorderedNotes: TFile[],
 		promoted: TFile[],
 		indentLevels: Map<TFile, number>,
+		compactRequested: boolean = true, // Always compact by default
 	): Promise<void> {
 		const folder = parentFile.parent || this.plugin.app.vault.getRoot();
+
+		// Note: ID compaction happens automatically as part of the reordering process.
+		// The letterMap and numberMap ensure sequential assignment (a,b,c... or 1,2,3...)
+		// regardless of the compactRequested flag, maintaining note sequence integrity.
 
 		// Handle promoted notes first (notes that became siblings of parent)
 		const tempPromotedPrefix = `_temp_promoted_${Date.now()}_`;
@@ -2705,11 +2883,12 @@ export class CommandManager {
 		}
 
 		// Three-pass rename to avoid collisions
-		// Pass 1: Calculate all new IDs first
+		// Pass 1: Calculate all new IDs first (for direct children and all descendants)
 		const newIds = new Map<TFile, string>();
 		const letterMap = new Map<string, string>(); // Track letter assignments per parent
 		const numberMap = new Map<string, number>(); // Track number assignments per parent
 
+		// Calculate new IDs for direct children (notes in the modal)
 		for (let i = 0; i < reorderedNotes.length; i++) {
 			const file = reorderedNotes[i];
 			const level = indentLevels.get(file) || 1;
@@ -2741,7 +2920,10 @@ export class CommandManager {
 				const currentLetter = letterMap.get(actualParentId) || "a";
 				newId = actualParentId + currentLetter;
 				// Move to next letter, handling sequences beyond 'z'
-				letterMap.set(actualParentId, this.getNextLetter(currentLetter));
+				letterMap.set(
+					actualParentId,
+					this.getNextLetter(currentLetter),
+				);
 			} else {
 				// Get next available number for this parent
 				const currentNum = numberMap.get(actualParentId) || 1;
@@ -2752,9 +2934,31 @@ export class CommandManager {
 			newIds.set(file, newId);
 		}
 
-		// Pass 2: Rename all files to temporary names (including parent if it's being renamed)
-		const tempPrefix = `_temp_reorder_${Date.now()}_`;
-		const allFilesToRename = [...reorderedNotes];
+		// Now calculate new IDs for all descendants of renamed notes
+		const allFilesToRename: TFile[] = [];
+		for (const file of reorderedNotes) {
+			const oldId = this.extractZettelId(file.basename);
+			const newId = newIds.get(file);
+
+			if (oldId && newId && oldId !== newId) {
+				// This note is being renamed, so we need to rename all its descendants too
+				allFilesToRename.push(file);
+
+				const descendants = this.getAllDescendants(oldId);
+				for (const descendant of descendants) {
+					const descendantId = this.extractZettelId(descendant.basename);
+					if (descendantId) {
+						// Replace the old parent ID prefix with the new one
+						const descendantNewId = descendantId.replace(oldId, newId);
+						newIds.set(descendant, descendantNewId);
+						allFilesToRename.push(descendant);
+					}
+				}
+			} else {
+				// Note is not being renamed, but still include it in the list
+				allFilesToRename.push(file);
+			}
+		}
 
 		// Check if we need to rename the parent too
 		const parentCurrentId = this.extractZettelId(parentFile.basename);
@@ -2763,14 +2967,16 @@ export class CommandManager {
 			allFilesToRename.push(parentFile);
 		}
 
+		// Pass 2: Rename all files (direct children + descendants) to temporary names
+		const tempPrefix = `_temp_reorder_${Date.now()}_`;
 		for (let i = 0; i < allFilesToRename.length; i++) {
 			const file = allFilesToRename[i];
 			const tempPath = `${folder.path}/${tempPrefix}${i}.md`;
 			await this.plugin.app.fileManager.renameFile(file, tempPath);
 		}
 
-		// Pass 3: Rename from temp names to final names
-		for (const file of reorderedNotes) {
+		// Pass 3: Rename from temp names to final names (direct children + descendants)
+		for (const file of allFilesToRename) {
 			const newId = newIds.get(file);
 			if (newId) {
 				const finalPath = `${folder.path}/${newId}.md`;
@@ -2785,26 +2991,26 @@ export class CommandManager {
 	 */
 	private getNextLetter(current: string): string {
 		// Convert string to array of character codes
-		const chars = current.split('');
+		const chars = current.split("");
 
 		// Start from the rightmost character
 		for (let i = chars.length - 1; i >= 0; i--) {
-			if (chars[i] === 'z') {
+			if (chars[i] === "z") {
 				// If it's 'z', change to 'a' and continue to next position
-				chars[i] = 'a';
+				chars[i] = "a";
 				if (i === 0) {
 					// We've rolled over all positions, add another 'a' at the start
-					return 'a' + chars.join('');
+					return "a" + chars.join("");
 				}
 			} else {
 				// Increment this character and we're done
 				chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
-				return chars.join('');
+				return chars.join("");
 			}
 		}
 
 		// Fallback (shouldn't reach here)
-		return 'a';
+		return "a";
 	}
 
 	/**
@@ -3386,17 +3592,26 @@ export class CommandManager {
 		this.plugin.addCommand({
 			id: "bookmark-active-file",
 			name: "Bookmark active file",
-			callback: async () => {
+			checkCallback: (checking: boolean) => {
+				if (!this.plugin.settings.enableZettelkastenPanel) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
 				const activeFile = this.plugin.app.workspace.getActiveFile();
 				if (!activeFile) {
 					new Notice("No active file to bookmark");
-					return;
+					return true;
 				}
 
 				// Check if already bookmarked
-				const existingBookmark = this.plugin.settings.panelBookmarks.find(
-					(b) => b.path === activeFile.path
-				);
+				const existingBookmark =
+					this.plugin.settings.panelBookmarks.find(
+						(b) => b.path === activeFile.path,
+					);
 
 				if (existingBookmark) {
 					new Notice("File is already bookmarked");
@@ -3404,18 +3619,23 @@ export class CommandManager {
 				}
 
 				// Get the file title from frontmatter or use basename
-				const cache = this.plugin.app.metadataCache.getFileCache(activeFile);
+				const cache =
+					this.plugin.app.metadataCache.getFileCache(activeFile);
 				const title = cache?.frontmatter?.title || activeFile.basename;
 
 				// Add bookmark
 				this.plugin.settings.panelBookmarks.push({
 					type: "file",
 					path: activeFile.path,
-					title: title
+					title: title,
 				});
 
-				await this.plugin.saveSettings();
-				new Notice(`Bookmarked: ${title}`);
+				// Save settings asynchronously
+				this.plugin.saveSettings().then(() => {
+					new Notice(`Bookmarked: ${title}`);
+				});
+
+				return true;
 			},
 		});
 	}
@@ -3424,12 +3644,21 @@ export class CommandManager {
 		this.plugin.addCommand({
 			id: "bookmark-current-search",
 			name: "Bookmark current search",
-			callback: async () => {
+			checkCallback: (checking: boolean) => {
+				if (!this.plugin.settings.enableZettelkastenPanel) {
+					return false;
+				}
+
+				if (checking) {
+					return true;
+				}
+
 				// Get the search leaf
-				const searchLeaves = this.plugin.app.workspace.getLeavesOfType("search");
+				const searchLeaves =
+					this.plugin.app.workspace.getLeavesOfType("search");
 				if (searchLeaves.length === 0) {
 					new Notice("No active search view");
-					return;
+					return true;
 				}
 
 				const searchLeaf = searchLeaves[0];
@@ -3442,9 +3671,10 @@ export class CommandManager {
 				}
 
 				// Check if already bookmarked
-				const existingBookmark = this.plugin.settings.panelBookmarks.find(
-					(b) => b.type === "search" && b.query === query
-				);
+				const existingBookmark =
+					this.plugin.settings.panelBookmarks.find(
+						(b) => b.type === "search" && b.query === query,
+					);
 
 				if (existingBookmark) {
 					new Notice("Search is already bookmarked");
@@ -3455,11 +3685,15 @@ export class CommandManager {
 				this.plugin.settings.panelBookmarks.push({
 					type: "search",
 					query: query,
-					title: query
+					title: query,
 				});
 
-				await this.plugin.saveSettings();
-				new Notice(`Bookmarked search: ${query}`);
+				// Save settings asynchronously
+				this.plugin.saveSettings().then(() => {
+					new Notice(`Bookmarked search: ${query}`);
+				});
+
+				return true;
 			},
 		});
 	}
@@ -3469,10 +3703,17 @@ export class CommandManager {
 			id: "bookmark-graph",
 			name: "Bookmark this graph",
 			checkCallback: (checking: boolean) => {
+				if (!this.plugin.settings.enableZettelkastenPanel) {
+					return false;
+				}
+
 				// Only show command when graph view is active
-				const graphLeaves = this.plugin.app.workspace.getLeavesOfType("graph");
-				const localGraphLeaves = this.plugin.app.workspace.getLeavesOfType("localgraph");
-				const hasGraphView = graphLeaves.length > 0 || localGraphLeaves.length > 0;
+				const graphLeaves =
+					this.plugin.app.workspace.getLeavesOfType("graph");
+				const localGraphLeaves =
+					this.plugin.app.workspace.getLeavesOfType("localgraph");
+				const hasGraphView =
+					graphLeaves.length > 0 || localGraphLeaves.length > 0;
 
 				if (checking) {
 					return hasGraphView;
@@ -3484,9 +3725,10 @@ export class CommandManager {
 				}
 
 				// Check if graph is already bookmarked
-				const existingBookmark = this.plugin.settings.panelBookmarks.find(
-					(b) => b.type === "graph"
-				);
+				const existingBookmark =
+					this.plugin.settings.panelBookmarks.find(
+						(b) => b.type === "graph",
+					);
 
 				if (existingBookmark) {
 					new Notice("Graph is already bookmarked");
@@ -3497,7 +3739,8 @@ export class CommandManager {
 				let title = "Graph View";
 				if (localGraphLeaves.length > 0) {
 					// Local graph - try to get the file context
-					const activeFile = this.plugin.app.workspace.getActiveFile();
+					const activeFile =
+						this.plugin.app.workspace.getActiveFile();
 					if (activeFile) {
 						title = `Local Graph: ${activeFile.basename}`;
 					} else {
@@ -3508,12 +3751,42 @@ export class CommandManager {
 				// Add bookmark
 				this.plugin.settings.panelBookmarks.push({
 					type: "graph",
-					title: title
+					title: title,
 				});
 
-				this.plugin.saveSettings();
-				new Notice(`Bookmarked: ${title}`);
+				// Save settings asynchronously
+				this.plugin.saveSettings().then(() => {
+					new Notice(`Bookmarked: ${title}`);
+				});
+
 				return true;
+			},
+		});
+	}
+
+	/**
+	 * Registers the "Toggle Sequence Navigator" command
+	 */
+	private registerToggleSequenceNavigatorCommand(): void {
+		this.plugin.addCommand({
+			id: "toggle-sequence-navigator",
+			name: "Toggle Note Sequence Navigator",
+			icon: "list-tree",
+			callback: async () => {
+				const { workspace } = this.plugin.app;
+				const leaves = workspace.getLeavesOfType(
+					"sequence-navigator-view",
+				);
+
+				if (leaves.length > 0) {
+					// Close the view
+					leaves.forEach((leaf) => leaf.detach());
+					new Notice("Sequence Navigator closed");
+				} else {
+					// Open the view
+					await this.plugin.activateSequenceNavigator();
+					new Notice("Sequence Navigator opened");
+				}
 			},
 		});
 	}

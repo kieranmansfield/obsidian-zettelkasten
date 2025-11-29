@@ -30,6 +30,8 @@ export interface ZettelkastenPluginSettings {
 
 	// Note Sequence settings
 	enableNoteSequence: boolean;
+	enableNoteSequencesView: boolean;
+	enableSequenceNavigator: boolean;
 
 	// Inbox settings
 	enableInbox: boolean;
@@ -66,6 +68,11 @@ export interface ZettelkastenPluginSettings {
 	enableReference: boolean;
 	referenceLocation: string;
 
+	// Projects settings
+	enableProjects: boolean;
+	projectsLocation: string;
+	projectsTemplatePath: string;
+
 	// Zettelkasten Panel settings
 	enableZettelkastenPanel: boolean;
 	panelShowFileLists: boolean;
@@ -73,6 +80,7 @@ export interface ZettelkastenPluginSettings {
 	panelInboxName: string;
 	panelZettelsName: string;
 	panelReferencesName: string;
+	panelProjectsName: string;
 	panelBookmarksName: string;
 	panelNoteSequenceName: string;
 	panelWorkspacesName: string;
@@ -84,6 +92,8 @@ export interface ZettelkastenPluginSettings {
 	panelZettelsFilterTags: string[];
 	panelReferencesDashboard: string;
 	panelReferencesFilterTags: string[];
+	panelProjectsDashboard: string;
+	panelProjectsFilterTags: string[];
 	panelBookmarks: Array<{
 		type: "file" | "search" | "graph" | "folder";
 		path?: string;
@@ -110,6 +120,8 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	zettelPrefix: "z",
 
 	enableNoteSequence: false,
+	enableNoteSequencesView: true,
+	enableSequenceNavigator: true,
 
 	enableInbox: true,
 	inboxMode: "default",
@@ -141,12 +153,17 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	enableReference: false,
 	referenceLocation: "",
 
+	enableProjects: false,
+	projectsLocation: "",
+	projectsTemplatePath: "",
+
 	enableZettelkastenPanel: true,
 	panelShowFileLists: true,
 	panelShowFileIcons: true,
 	panelInboxName: "Inbox",
 	panelZettelsName: "Zettels",
 	panelReferencesName: "References",
+	panelProjectsName: "Projects",
 	panelBookmarksName: "Bookmarks",
 	panelNoteSequenceName: "Note Sequence",
 	panelWorkspacesName: "Workspaces",
@@ -158,6 +175,8 @@ export const DEFAULT_SETTINGS: ZettelkastenPluginSettings = {
 	panelZettelsFilterTags: [],
 	panelReferencesDashboard: "",
 	panelReferencesFilterTags: [],
+	panelProjectsDashboard: "",
+	panelProjectsFilterTags: [],
 	panelBookmarks: [],
 	panelTagMatchMode: "any",
 };

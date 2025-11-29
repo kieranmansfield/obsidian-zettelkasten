@@ -30,13 +30,13 @@ export class NoteSequencesView extends ItemView {
 	private registerEvents(): void {
 		// Refresh view when files are created, deleted, or modified
 		this.registerEvent(
-			this.app.vault.on("create", () => this.scheduleRefresh())
+			this.app.vault.on("create", () => this.scheduleRefresh()),
 		);
 		this.registerEvent(
-			this.app.vault.on("delete", () => this.scheduleRefresh())
+			this.app.vault.on("delete", () => this.scheduleRefresh()),
 		);
 		this.registerEvent(
-			this.app.vault.on("rename", () => this.scheduleRefresh())
+			this.app.vault.on("rename", () => this.scheduleRefresh()),
 		);
 	}
 
@@ -67,7 +67,7 @@ export class NoteSequencesView extends ItemView {
 	}
 
 	getIcon(): string {
-		return "list-ordered";
+		return "layers";
 	}
 
 	async onOpen(): Promise<void> {
@@ -84,7 +84,7 @@ export class NoteSequencesView extends ItemView {
 		if (parentNotes.length === 0) {
 			container.createDiv({
 				cls: "sequence-empty-state",
-				text: "No note sequences found"
+				text: "No note sequences found",
 			});
 			return;
 		}
@@ -93,7 +93,7 @@ export class NoteSequencesView extends ItemView {
 		const gridContainer = container.createDiv({ cls: "sequence-grid" });
 
 		// Display each parent note as a card
-		parentNotes.forEach(parent => {
+		parentNotes.forEach((parent) => {
 			this.createSequenceCard(gridContainer, parent);
 		});
 	}
@@ -112,12 +112,12 @@ export class NoteSequencesView extends ItemView {
 		}
 
 		// Get all files in zettels folder
-		const allFiles = this.app.vault.getMarkdownFiles().filter(file =>
-			file.path.startsWith(zettelsFolder)
-		);
+		const allFiles = this.app.vault
+			.getMarkdownFiles()
+			.filter((file) => file.path.startsWith(zettelsFolder));
 
 		// Find files that are parent-level zettels (just timestamp, no hierarchy suffix)
-		const parentFiles = allFiles.filter(file => {
+		const parentFiles = allFiles.filter((file) => {
 			const zettelId = this.extractZettelId(file.basename);
 			if (!zettelId) return false;
 
@@ -128,7 +128,7 @@ export class NoteSequencesView extends ItemView {
 		});
 
 		// Build hierarchy for each parent
-		parentFiles.forEach(parentFile => {
+		parentFiles.forEach((parentFile) => {
 			const parentId = this.extractZettelId(parentFile.basename);
 			if (!parentId) return;
 
@@ -138,7 +138,7 @@ export class NoteSequencesView extends ItemView {
 				parentNotes.push({
 					file: parentFile,
 					zettelId: parentId,
-					children: children
+					children: children,
 				});
 			}
 		});
@@ -149,29 +149,35 @@ export class NoteSequencesView extends ItemView {
 		return parentNotes;
 	}
 
-	private buildHierarchy(parentId: string, allFiles: TFile[]): SequenceNode[] {
+	private buildHierarchy(
+		parentId: string,
+		allFiles: TFile[],
+	): SequenceNode[] {
 		const children: SequenceNode[] = [];
 		const parentIdWithoutPrefix = this.stripPrefix(parentId);
 
 		// Find all children of this parent
-		allFiles.forEach(file => {
+		allFiles.forEach((file) => {
 			const childId = this.extractZettelId(file.basename);
 			if (!childId || childId === parentId) return;
 
 			const childIdWithoutPrefix = this.stripPrefix(childId);
 
 			// Check if this file is a direct child of the parent
-			if (childIdWithoutPrefix.startsWith(parentIdWithoutPrefix) &&
-				childIdWithoutPrefix.length > parentIdWithoutPrefix.length) {
-
-				const suffix = childIdWithoutPrefix.substring(parentIdWithoutPrefix.length);
+			if (
+				childIdWithoutPrefix.startsWith(parentIdWithoutPrefix) &&
+				childIdWithoutPrefix.length > parentIdWithoutPrefix.length
+			) {
+				const suffix = childIdWithoutPrefix.substring(
+					parentIdWithoutPrefix.length,
+				);
 				const level = this.calculateLevel(suffix);
 
 				children.push({
 					file: file,
 					zettelId: childId,
 					level: level,
-					children: []
+					children: [],
 				});
 			}
 		});
@@ -200,23 +206,59 @@ export class NoteSequencesView extends ItemView {
 		return level;
 	}
 
-	private createSequenceCard(container: HTMLElement, parent: ParentNote): void {
+	private createSequenceCard(
+		container: HTMLElement,
+		parent: ParentNote,
+	): void {
 		const card = container.createDiv({ cls: "sequence-card" });
 
 		// Card header with parent note
 		const header = card.createDiv({ cls: "sequence-card-header" });
 
-		const headerContent = header.createDiv({ cls: "sequence-card-header-content" });
+		const headerContent = header.createDiv({
+			cls: "sequence-card-header-content",
+		});
 
 		// Parent icon
 		const iconEl = headerContent.createDiv({ cls: "sequence-card-icon" });
-		setIcon(iconEl, "file");
+		setIcon(iconEl, "layers");
 
-		// Parent title/filename
+		// Parent title/filename (clickable)
 		const titleEl = headerContent.createDiv({ cls: "sequence-card-title" });
 		const cache = this.app.metadataCache.getFileCache(parent.file);
 		const title = cache?.frontmatter?.title || parent.file.basename;
 		titleEl.setText(title);
+		titleEl.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			await this.app.workspace.getLeaf(false).openFile(parent.file);
+		});
+
+		// Action buttons container
+		const actionsEl = headerContent.createDiv({
+			cls: "sequence-card-actions",
+		});
+
+		// Open in new tab button
+		const openBtn = actionsEl.createDiv({
+			cls: "sequence-card-action-btn",
+			attr: { "aria-label": "Open sequence in new tab" },
+		});
+		setIcon(openBtn, "external-link");
+		openBtn.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			await this.openSequenceInNewTab(parent);
+		});
+
+		// Reorder button
+		const reorderBtn = actionsEl.createDiv({
+			cls: "sequence-card-action-btn",
+			attr: { "aria-label": "Reorder sequence" },
+		});
+		setIcon(reorderBtn, "list-ordered");
+		reorderBtn.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			await this.openReorderModal(parent);
+		});
 
 		// Card body with children
 		const body = card.createDiv({ cls: "sequence-card-body" });
@@ -224,49 +266,62 @@ export class NoteSequencesView extends ItemView {
 		if (parent.children.length === 0) {
 			body.createDiv({
 				cls: "sequence-card-empty",
-				text: "No children"
+				text: "No children",
 			});
 		} else {
-			parent.children.forEach(child => {
+			parent.children.forEach((child) => {
 				this.createChildItem(body, child);
 			});
 		}
-
-		// Click handler for entire card to open reorder modal
-		card.addEventListener("click", async (e) => {
-			e.stopPropagation();
-			await this.openReorderModal(parent);
-		});
 	}
 
 	private createChildItem(container: HTMLElement, node: SequenceNode): void {
 		const item = container.createDiv({
 			cls: "sequence-child-item",
-			attr: { style: `padding-left: ${(node.level - 1) * 20}px` }
+			attr: { style: `padding-left: ${12 + (node.level - 1) * 20}px` },
 		});
 
-		// Child icon
-		const iconEl = item.createDiv({ cls: "sequence-child-icon" });
-		setIcon(iconEl, "file-text");
-
-		// Child title/filename
+		// Child title/filename (no icon)
 		const titleEl = item.createDiv({ cls: "sequence-child-title" });
 		const cache = this.app.metadataCache.getFileCache(node.file);
 		const title = cache?.frontmatter?.title || node.file.basename;
 		titleEl.setText(title);
+
+		// Click handler to open the file
+		item.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			await this.app.workspace.getLeaf(false).openFile(node.file);
+		});
+
+		// Recursively render children
+		if (node.children && node.children.length > 0) {
+			node.children.forEach((child) => {
+				this.createChildItem(container, child);
+			});
+		}
+	}
+
+	private async openSequenceInNewTab(parent: ParentNote): Promise<void> {
+		await this.app.workspace.getLeaf(true).openFile(parent.file);
 	}
 
 	private async openReorderModal(parent: ParentNote): Promise<void> {
 		// Get all children as flat list for the modal
-		const childFiles = parent.children.map(child => child.file);
+		const childFiles = parent.children.map((child) => child.file);
 
 		const modal = new SequenceReorderModal(
 			this.app,
 			parent.file,
 			childFiles,
 			async (reorderedNotes, promoted, indentLevels) => {
-				await this.handleSequenceReorder(parent.file, parent.zettelId, reorderedNotes, promoted, indentLevels);
-			}
+				await this.handleSequenceReorder(
+					parent.file,
+					parent.zettelId,
+					reorderedNotes,
+					promoted,
+					indentLevels,
+				);
+			},
 		);
 
 		modal.open();
@@ -335,45 +390,97 @@ export class NoteSequencesView extends ItemView {
 
 		// Second pass: assign proper IDs based on hierarchy
 		const actualParentId = this.stripPrefix(parentId);
-		const letterMap = new Map<string, string>();
+
+		// Track counters for each parent at each level
+		const counterMap = new Map<string, string>(); // Maps parent ID to next available letter/number
+
+		// Track what the actual parent ID is for each note (to handle nesting)
+		const noteParents = new Map<TFile, string>();
+		const noteNewIds = new Map<TFile, string>();
+
+		let lastLevel1Id = "";
+		let lastLevel2Id = "";
 
 		for (const note of reorderedNotes) {
 			const level = indentLevels.get(note) || 1;
 			let newId: string;
+			let noteParentId: string;
 
 			if (level === 1) {
-				// Direct child of parent - use letters
-				const currentLetter = letterMap.get(actualParentId) || "a";
+				// Direct child of root parent - use letters
+				noteParentId = actualParentId;
+				const currentLetter = counterMap.get(noteParentId) || "a";
+
+				// Check if we've exceeded the letter limit
+				if (currentLetter === "z" && counterMap.has(noteParentId)) {
+					new Notice(
+						"Error: Maximum of 26 children (a-z) reached for this parent",
+					);
+					continue;
+				}
+
 				newId = actualParentId + currentLetter;
-				letterMap.set(actualParentId, this.getNextLetter(currentLetter));
+				const nextLetter = this.getNextLetter(currentLetter);
+
+				// Only update counter if we haven't hit the limit
+				if (nextLetter !== currentLetter) {
+					counterMap.set(noteParentId, nextLetter);
+				}
+
+				lastLevel1Id = newId;
 			} else if (level === 2) {
 				// Child of previous level-1 child - use numbers
-				const lastL1Key = Array.from(letterMap.keys()).pop();
-				if (!lastL1Key) continue;
+				if (!lastLevel1Id) {
+					new Notice(
+						"Error: Cannot create level 2 child without a level 1 parent",
+					);
+					continue;
+				}
 
-				const currentNumber = letterMap.get(`${lastL1Key}_l2`) || "1";
-				newId = lastL1Key + currentNumber;
-				letterMap.set(
-					`${lastL1Key}_l2`,
+				noteParentId = lastLevel1Id;
+				const currentNumber = counterMap.get(noteParentId) || "1";
+				newId = lastLevel1Id + currentNumber;
+				counterMap.set(
+					noteParentId,
 					(parseInt(currentNumber) + 1).toString(),
 				);
+				lastLevel2Id = newId;
 			} else if (level === 3) {
 				// Child of previous level-2 child - use letters again
-				const lastL2Key = Array.from(letterMap.keys())
-					.filter((k) => k.includes("_l2"))
-					.pop();
-				if (!lastL2Key) continue;
+				if (!lastLevel2Id) {
+					new Notice(
+						"Error: Cannot create level 3 child without a level 2 parent",
+					);
+					continue;
+				}
 
-				const parentL2Id = lastL2Key.replace("_l2", "");
-				const currentLetter = letterMap.get(`${parentL2Id}_l3`) || "a";
-				newId = parentL2Id + currentLetter;
-				letterMap.set(
-					`${parentL2Id}_l3`,
-					this.getNextLetter(currentLetter),
-				);
+				noteParentId = lastLevel2Id;
+				const currentLetter = counterMap.get(noteParentId) || "a";
+
+				// Check if we've exceeded the letter limit
+				if (currentLetter === "z" && counterMap.has(noteParentId)) {
+					new Notice(
+						"Error: Maximum of 26 children (a-z) reached for this parent",
+					);
+					continue;
+				}
+
+				newId = lastLevel2Id + currentLetter;
+				const nextLetter = this.getNextLetter(currentLetter);
+
+				// Only update counter if we haven't hit the limit
+				if (nextLetter !== currentLetter) {
+					counterMap.set(noteParentId, nextLetter);
+				}
 			} else {
+				new Notice(
+					`Error: Invalid nesting level ${level}. Maximum depth is 3.`,
+				);
 				continue;
 			}
+
+			noteParents.set(note, noteParentId);
+			noteNewIds.set(note, newId);
 
 			// Add prefix if configured
 			const prefix = this.plugin.settings.useZettelPrefix
@@ -390,25 +497,17 @@ export class NoteSequencesView extends ItemView {
 	}
 
 	private getNextLetter(current: string): string {
-		const chars = current.split('');
-
-		// Start from the rightmost character
-		for (let i = chars.length - 1; i >= 0; i--) {
-			if (chars[i] === 'z') {
-				// If it's 'z', change to 'a' and continue to next position
-				chars[i] = 'a';
-				if (i === 0) {
-					// We've rolled over all positions, add another 'a' at the start
-					return 'a' + chars.join('');
-				}
-			} else {
-				// Increment this character and we're done
-				chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1);
-				return chars.join('');
+		// Only support single letters a-z at each level
+		if (current.length === 1) {
+			if (current === "z") {
+				// Can't go beyond 'z', return 'z' and caller should handle the error
+				return "z";
 			}
+			return String.fromCharCode(current.charCodeAt(0) + 1);
 		}
 
-		return 'a';
+		// Multi-character letters are not supported in the zettelkasten hierarchy
+		return current;
 	}
 
 	private getParentZettelId(zettelId: string): string | null {
@@ -428,19 +527,23 @@ export class NoteSequencesView extends ItemView {
 
 	private async generateChildZettelId(
 		parentId: string,
-		folder: any,
+		folder: { path: string },
 		childFile: TFile,
 	): Promise<string> {
 		const parentIdWithoutPrefix = this.stripPrefix(parentId);
-		const files = this.app.vault.getMarkdownFiles().filter(f => f.path.startsWith(folder.path));
+		const files = this.app.vault
+			.getMarkdownFiles()
+			.filter((f) => f.path.startsWith(folder.path));
 
 		// Find all existing children
-		const existingChildren = files.filter(file => {
+		const existingChildren = files.filter((file) => {
 			const id = this.extractZettelId(file.basename);
 			if (!id) return false;
 			const idWithoutPrefix = this.stripPrefix(id);
-			return idWithoutPrefix.startsWith(parentIdWithoutPrefix) &&
-				   idWithoutPrefix.length > parentIdWithoutPrefix.length;
+			return (
+				idWithoutPrefix.startsWith(parentIdWithoutPrefix) &&
+				idWithoutPrefix.length > parentIdWithoutPrefix.length
+			);
 		});
 
 		// Determine if we should use letter or number
@@ -448,12 +551,14 @@ export class NoteSequencesView extends ItemView {
 
 		if (shouldUseLetter) {
 			// Find highest letter
-			let highestLetter = 'a';
-			existingChildren.forEach(file => {
+			let highestLetter = "a";
+			existingChildren.forEach((file) => {
 				const id = this.extractZettelId(file.basename);
 				if (!id) return;
 				const idWithoutPrefix = this.stripPrefix(id);
-				const suffix = idWithoutPrefix.substring(parentIdWithoutPrefix.length);
+				const suffix = idWithoutPrefix.substring(
+					parentIdWithoutPrefix.length,
+				);
 				const letterMatch = suffix.match(/^([a-z]+)/);
 				if (letterMatch && letterMatch[1] > highestLetter) {
 					highestLetter = letterMatch[1];
@@ -468,11 +573,13 @@ export class NoteSequencesView extends ItemView {
 		} else {
 			// Find highest number
 			let highestNumber = 0;
-			existingChildren.forEach(file => {
+			existingChildren.forEach((file) => {
 				const id = this.extractZettelId(file.basename);
 				if (!id) return;
 				const idWithoutPrefix = this.stripPrefix(id);
-				const suffix = idWithoutPrefix.substring(parentIdWithoutPrefix.length);
+				const suffix = idWithoutPrefix.substring(
+					parentIdWithoutPrefix.length,
+				);
 				const numberMatch = suffix.match(/^(\d+)/);
 				if (numberMatch) {
 					const num = parseInt(numberMatch[1]);
@@ -523,7 +630,9 @@ export class NoteSequencesView extends ItemView {
 
 	private extractZettelId(filename: string): string | null {
 		// Match timestamp pattern with optional prefix
-		const withPrefixMatch = filename.match(/^([a-z]+\d{13,}(?:[a-z]+|\d+)*)/);
+		const withPrefixMatch = filename.match(
+			/^([a-z]+\d{13,}(?:[a-z]+|\d+)*)/,
+		);
 		if (withPrefixMatch) {
 			return withPrefixMatch[1];
 		}

@@ -1,94 +1,240 @@
-# Obsidian Sample Plugin
+# Zettelkasten for Obsidian (BETA)
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+> **⚠️ BETA WARNING**: This plugin is currently in active development with frequent breaking changes. Please freeze your version number and avoid hastily updating until a stable release is announced. The codebase is undergoing significant refactoring and improvements.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+Bring the powerful Luhmann Zettelkasten method to Obsidian with this comprehensive plugin. Manage interconnected atomic notes with hierarchical IDs, navigate complex note sequences, and organize your knowledge base with ease.
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+Inspired by [luhman-obsidian-plugin](https://github.com/Dyldog/luhman-obsidian-plugin).
 
-## First time developing plugins?
+**Current Version**: 0.1.4 (Beta)
 
-Quick starting guide for new plugin devs:
+## Features
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+### 🏷️ Zettelkasten ID System
 
-## Releasing new releases
+- **Automatic ID Generation**: Create notes with Luhmann-style alternating letter/number IDs (e.g., `20231127123456a1b2`)
+- **Hierarchical Structure**: Build parent-child-grandchild relationships using ID patterns
+- **Flexible Prefixes**: Optional custom prefixes for different note types
+- **Multiple Formats**: Support for strict, separator, and fuzzy ID matching modes
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+### 📊 Zettelkasten Panel (Sidebar)
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+- **Organized Navigation**: Left sidebar panel with customizable sections
+- **Inbox Management**: Quick access to fleeting notes and ideas
+- **Zettels Collection**: Browse your main zettelkasten notes
+- **References**: Manage literature and reference notes
+- **Projects**: Dedicated project note organization
+- **Bookmarks**: Save frequently accessed files, searches, folders, and graph views
+- **Workspaces**: Quick workspace switching (when enabled)
+- **Active File Highlighting**: Visual indicator for currently open dashboard files
 
-## Adding your plugin to the community plugin list
+### 🔗 Note Sequences
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+- **Sequence View**: Visual cards showing parent notes and their children
+- **Sequence Navigator**: Right sidebar panel displaying the current note's hierarchical tree
+- **Quick Navigator Modal**: Keyboard-driven navigation through parent/child/sibling relationships
+    - Navigate up/down/left/right through your note structure
+    - Jump to previous/next sequences
+    - Keyboard shortcuts: Arrow keys and Cmd+Arrow combinations
+- **Sequence Reordering**: Drag-and-drop interface to reorganize note hierarchies
+    - Visual indentation for multi-level structures
+    - Automatic ID compaction (e.g., `a`, `c`, `aa` → `a`, `b`, `c`)
+    - Hierarchical numbering display
+    - Maintains complete note sequence integrity
 
-## How to use
+### 📝 Note Types & Templates
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+- **Inbox Notes**: Capture fleeting thoughts with optional templates
+    - Default mode or fleeting notes mode
+    - Configurable locations and templates
+    - Custom filename formats
+- **Structure Notes**: MOCs (Maps of Content) or Zettelkasten Indexes
+    - Switchable modes
+    - Separate templates for each type
+    - Optional zettel IDs
+- **Reference Notes**: Literature and source material organization
+- **Project Notes**: Dedicated project management notes
 
-## Manually installing the plugin
+### 🎯 Smart Commands
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+- **Create Commands**: Quick note creation with templates for all note types
+- **Navigation Commands**:
+    - Open parent/child/sibling zettels
+    - Next/previous in sequence
+    - Up/down level navigation
+- **Organization Commands**:
+    - Assign parent/child relationships
+    - Indent/outdent zettels
+    - Fix zettel filenames
+    - Batch operations
+- **Bookmark Commands**: Bookmark active file, current search, or graph view
 
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint ./src/`
+### 🎨 Customization
 
-## Funding URL
+- **Panel Customization**:
+    - Custom section names
+    - Dashboard files for each section
+    - Tag-based filtering (any/all matching)
+    - Toggle file lists and icons
+- **Top-Level Feature Toggles**: Enable/disable entire feature sets
+    - Zettelkasten Panel
+    - Note Sequences
+    - Inbox
+    - Structure Notes
+    - Reference Notes
+    - Projects
+- **Folder & Template Management**: Configure locations and templates for each note type
 
-You can include funding URLs where people who use your plugin can financially support it.
+## Installation
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+### Via BRAT (Recommended for Beta Testing)
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
-```
+1. **Install BRAT Plugin**:
+    - Open Obsidian Settings
+    - Go to Community Plugins
+    - Search for "BRAT" (Beta Reviewer's Auto-update Tool)
+    - Install and enable BRAT
 
-If you have multiple URLs, you can also do:
+2. **Add This Plugin**:
+    - Open BRAT settings
+    - Click "Add Beta Plugin"
+    - Enter the repository URL: `YOUR_GITHUB_USERNAME/obsidian-zettelkasten`
+    - Click "Add Plugin"
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+3. **Freeze Version (Important)**:
+    - In BRAT settings, find this plugin in your list
+    - **Click "Freeze Version"** to prevent automatic updates
+    - This protects you from breaking changes during active development
 
-## API Documentation
+4. **Enable the Plugin**:
+    - Go to Settings → Community Plugins
+    - Find "Zettelkasten" and toggle it on
 
-See https://github.com/obsidianmd/obsidian-api
+### Manual Installation
+
+1. Download the latest release files:
+    - `main.js`
+    - `manifest.json`
+    - `styles.css`
+
+2. Create a folder in your vault:
+
+    ```
+    YourVault/.obsidian/plugins/obsidian-zettelkasten/
+    ```
+
+3. Copy the three files into this folder
+
+4. Reload Obsidian and enable the plugin in Settings → Community Plugins
+
+## Getting Started
+
+### Basic Setup
+
+1. **Configure Zettel Location**:
+    - Go to Settings → Zettelkasten
+    - Set your main zettels folder path
+    - Choose detection mode (folder or tag-based)
+
+2. **Set Up the Panel** (optional):
+    - Enable "Zettelkasten Panel" toggle
+    - Customize section names
+    - Configure dashboard files for quick access
+    - Add bookmarks to frequently used files
+
+3. **Enable Note Sequences** (optional):
+    - Toggle "Note Sequences" feature
+    - Enable sequence view and/or sequence navigator
+    - Try the "Quick Zettelkasten Navigator" command
+
+4. **Configure Note Types**:
+    - Set up Inbox location and template
+    - Configure Structure Notes (MOC or Zettelkasten mode)
+    - Set up Projects and References as needed
+
+### Creating Your First Zettel
+
+1. Use the command palette (Cmd/Ctrl+P)
+2. Type "Create Zettel"
+3. Enter a title
+4. Your note is created with a timestamp-based ID
+
+### Building Note Sequences
+
+1. Create a parent zettel
+2. From within it, use "Create Child Zettel" command
+3. This creates a note with ID like `parent-id + a`
+4. Create more children - they automatically get `b`, `c`, etc.
+5. From a child, create another child to go deeper (e.g., `a1`, `a2`)
+
+### Using the Reorder Modal
+
+1. Open any note in a sequence
+2. Run "Reorder Note Sequence" command
+3. Drag and drop to reorder notes
+4. Use arrow buttons to indent/outdent (change parent)
+5. Toggle "Compact IDs" to compress gaps
+6. Click "Save Order" to apply changes
+
+## Key Concepts
+
+### Zettelkasten ID Structure
+
+IDs alternate between letters and numbers:
+
+- Parent: `20231127123456`
+- Children: `...a`, `...b`, `...c`, ..., `...z`, `...aa`, `...ab`, etc.
+- Grandchildren: `...a1`, `...a2`, `...a3`, etc.
+- Great-grandchildren: `...a1a`, `...a1b`, etc.
+
+Notes with the same type of suffix are siblings:
+
+- `a`, `b`, `aa`, `ac` are all siblings (all letters)
+- `a1`, `a2`, `a12` are all siblings (all numbers)
+
+### ID Compaction
+
+The reorder feature includes automatic ID compaction:
+
+- Gaps are filled: `a`, `c`, `f` → `a`, `b`, `c`
+- Multi-letter IDs are compressed: `a`, `b`, `aa` → `a`, `b`, `c`
+- Full hierarchy is maintained: children and descendants are updated
+
+## Tips & Best Practices
+
+1. **Start Simple**: Enable just the core zettelkasten features first
+2. **Use Templates**: Set up note templates for consistent formatting
+3. **Tag Strategically**: Use tags with panel filtering for powerful organization
+4. **Dashboard Files**: Create dashboard notes for each panel section to provide context
+5. **Freeze Updates**: During beta, always freeze your BRAT version before updating
+6. **Backup Regularly**: The plugin modifies filenames - **ALWAYS KEEP REGULAR BACKUPS OF YOUR VAULT**.
+
+## Known Issues & Limitations
+
+- Plugin is in active beta development
+- Breaking changes may occur between versions
+- Some features may have undiscovered edge cases
+
+## Roadmap
+
+- Stable v1.0 release
+- Note Sequence Bases View
+- Additional visualization options
+- Enhanced search and filtering
+- Performance optimizations
+- Community plugin store release (post-beta)
+
+## Support & Feedback
+
+- **Issues**: Report bugs via GitHub Issues
+- **Feature Requests**: Submit via GitHub Discussions
+- **Author**: Kieran Mansfield
+- **Website**: [kieranmansfield.com](https://kieranmansfield.com)
+
+## License
+
+MIT License - See LICENSE file for details
+
+---
+
+**Remember**: This is beta software. **_ALWAYS BACK UP YOUR VAULT REGULARLY!!_** Be sure to freeze your version in BRAT and update cautiously!

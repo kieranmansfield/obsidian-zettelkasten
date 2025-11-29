@@ -32,11 +32,12 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		// Display all settings in a single page
 		this.displayGeneralSettings(containerEl);
 		this.displayZettelSettings(containerEl);
+		this.displayNoteSequenceSettings(containerEl);
 		this.displayInboxSettings(containerEl);
 		this.displayStructureNoteSettings(containerEl);
 		this.displayReferenceSettings(containerEl);
+		this.displayProjectsSettings(containerEl);
 		this.displayPanelSettings(containerEl);
-		this.displayExperimentalSettings(containerEl);
 
 		// Restore scroll position after rendering
 		setTimeout(() => {
@@ -78,14 +79,13 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		// Add toggle if config provided
 		if (toggleConfig) {
 			const toggleDiv = summary.createDiv({ cls: "section-toggle" });
-			const setting = new Setting(toggleDiv)
-				.addToggle((toggle) =>
-					toggle
-						.setValue(toggleConfig.getValue())
-						.onChange(async (value) => {
-							await toggleConfig.onChange(value);
-						}),
-				);
+			const setting = new Setting(toggleDiv).addToggle((toggle) =>
+				toggle
+					.setValue(toggleConfig.getValue())
+					.onChange(async (value) => {
+						await toggleConfig.onChange(value);
+					}),
+			);
 			// Remove default setting styling to make it inline
 			setting.settingEl.style.border = "none";
 			setting.settingEl.style.padding = "0";
@@ -329,41 +329,61 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 	private displayNoteSequenceSettings(containerEl: HTMLElement): void {
 		const contentDiv = this.createCollapsibleSection(
 			containerEl,
-			"Note Sequence",
-			"Configure note sequencing and reordering.",
+			"Note Sequences",
+			"Configure note sequences, sequence view, and navigation.",
 			true,
-		);
-
-		// Enable Note Sequence Toggle
-		const sequenceReorderSetting = new Setting(contentDiv).setName(
-			"Enable note sequence",
-		);
-
-		// Add custom description with line breaks
-		const descEl = sequenceReorderSetting.descEl;
-		descEl.empty();
-		descEl
-			.createDiv()
-			.setText(
-				"Enable the command to reorder child notes within a sequence.",
-			);
-		descEl.createEl("br");
-		descEl
-			.createDiv()
-			.setText("⚠️ Warning: This is an experimental feature.");
-
-		sequenceReorderSetting.addToggle((toggle) =>
-			toggle
-				.setValue(this.plugin.settings.enableNoteSequence)
-				.onChange(async (value) => {
+			{
+				getValue: () => this.plugin.settings.enableNoteSequence,
+				onChange: async (value) => {
 					this.plugin.settings.enableNoteSequence = value;
 					await this.plugin.saveSettings();
-				}),
+					this.display(); // Refresh to show/hide settings
+				},
+			},
 		);
 
-		// Add Alpha label to the name
-		const nameEl = sequenceReorderSetting.nameEl;
-		nameEl.innerHTML = "Enable note sequence <strong>(Alpha)</strong>";
+		if (this.plugin.settings.enableNoteSequence) {
+			// Enable Note Sequences View
+			new Setting(contentDiv)
+				.setName("Enable note sequences view")
+				.setDesc(
+					"Show note sequences view with cards for all parent notes and their children.",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.enableNoteSequencesView)
+						.onChange(async (value) => {
+							this.plugin.settings.enableNoteSequencesView = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+
+			// Enable Sequence Navigator
+			new Setting(contentDiv)
+				.setName("Enable sequence navigator")
+				.setDesc(
+					"Show the current note sequence navigator in the right sidebar.",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.enableSequenceNavigator)
+						.onChange(async (value) => {
+							this.plugin.settings.enableSequenceNavigator = value;
+							await this.plugin.saveSettings();
+
+							// Toggle the view
+							if (value) {
+								await this.plugin.activateSequenceNavigator();
+							} else {
+								const { workspace } = this.plugin.app;
+								const leaves = workspace.getLeavesOfType(
+									"sequence-navigator-view",
+								);
+								leaves.forEach((leaf) => leaf.detach());
+							}
+						}),
+				);
+		}
 	}
 
 	private displayInboxSettings(containerEl: HTMLElement): void {
@@ -386,9 +406,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 			// Inbox Mode Selection
 			new Setting(contentDiv)
 				.setName("Inbox mode")
-				.setDesc(
-					"Choose between Default or Fleeting Notes inbox style",
-				)
+				.setDesc("Choose between Default or Fleeting Notes inbox style")
 				.addDropdown((dropdown) =>
 					dropdown
 						.addOption("default", "Default")
@@ -648,8 +666,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					.addText((text) => {
 						const onSelect = async (value: string) => {
 							text.setValue(value);
-							this.plugin.settings.structureNotesLocation =
-								value;
+							this.plugin.settings.structureNotesLocation = value;
 							await this.plugin.saveSettings();
 						};
 						new FolderSuggest(this.app, text.inputEl, onSelect);
@@ -700,9 +717,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						};
 						new FileSuggest(this.app, text.inputEl, onSelect);
 						text.setPlaceholder("templates/zk-index.md")
-							.setValue(
-								this.plugin.settings.zkIndexTemplatePath,
-							)
+							.setValue(this.plugin.settings.zkIndexTemplatePath)
 							.onChange(async (value) => {
 								this.plugin.settings.zkIndexTemplatePath =
 									value;
@@ -813,35 +828,107 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		}
 	}
 
+	private displayProjectsSettings(containerEl: HTMLElement): void {
+		const contentDiv = this.createCollapsibleSection(
+			containerEl,
+			"Projects",
+			"Configure projects folder, dashboard, and template.",
+			true,
+			{
+				getValue: () => this.plugin.settings.enableProjects,
+				onChange: async (value) => {
+					this.plugin.settings.enableProjects = value;
+					await this.plugin.saveSettings();
+					this.display(); // Refresh to show/hide settings
+				},
+			},
+		);
+
+		if (this.plugin.settings.enableProjects) {
+			// Projects Location
+			new Setting(contentDiv)
+				.setName("Projects location")
+				.setDesc(
+					"Folder path for projects (leave empty for vault root)",
+				)
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.projectsLocation = value;
+						await this.plugin.saveSettings();
+					};
+					new FolderSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("path/to/projects")
+						.setValue(this.plugin.settings.projectsLocation)
+						.onChange(async (value) => {
+							this.plugin.settings.projectsLocation = value;
+							await this.plugin.saveSettings();
+						});
+				});
+
+			// Projects Template
+			new Setting(contentDiv)
+				.setName("Projects template")
+				.setDesc("Template file to use when creating new projects")
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.projectsTemplatePath = value;
+						await this.plugin.saveSettings();
+					};
+					new FileSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("path/to/template.md")
+						.setValue(this.plugin.settings.projectsTemplatePath)
+						.onChange(async (value) => {
+							this.plugin.settings.projectsTemplatePath = value;
+							await this.plugin.saveSettings();
+						});
+				});
+		}
+	}
+
 	private displayPanelSettings(containerEl: HTMLElement): void {
 		const contentDiv = this.createCollapsibleSection(
 			containerEl,
 			"Zettelkasten Panel",
 			"Configure the Zettelkasten sidebar panel.",
 			true,
+			{
+				getValue: () => this.plugin.settings.enableZettelkastenPanel,
+				onChange: async (value) => {
+					this.plugin.settings.enableZettelkastenPanel = value;
+					await this.plugin.saveSettings();
+
+					// Activate or deactivate the view based on the setting
+					if (value) {
+						await this.plugin.activateView();
+					} else {
+						await this.plugin.deactivateView();
+					}
+
+					this.display(); // Refresh to show/hide settings
+				},
+			},
 		);
 
-		// Enable Zettelkasten Panel Toggle
-		new Setting(contentDiv)
-			.setName("Enable Zettelkasten panel")
-			.setDesc(
-				"Show the Zettelkasten panel in the left sidebar",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.enableZettelkastenPanel)
-					.onChange(async (value) => {
-						this.plugin.settings.enableZettelkastenPanel = value;
-						await this.plugin.saveSettings();
+		if (this.plugin.settings.enableZettelkastenPanel) {
 
-						// Activate or deactivate the view based on the setting
-						if (value) {
-							await this.plugin.activateView();
-						} else {
-							await this.plugin.deactivateView();
-						}
-					}),
-			);
+		// Show Note Sequences Toggle (only if note sequences are enabled)
+		if (this.plugin.settings.enableNoteSequence) {
+			new Setting(contentDiv)
+				.setName("Show note sequences")
+				.setDesc(
+					"Display the Note Sequences section in the panel. When disabled, the section will be hidden.",
+				)
+				.addToggle((toggle) =>
+					toggle
+						.setValue(this.plugin.settings.panelShowNoteSequence)
+						.onChange(async (value) => {
+							this.plugin.settings.panelShowNoteSequence = value;
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 
 		// Show File Lists Toggle
 		new Setting(contentDiv)
@@ -861,9 +948,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 		// Show File Icons Toggle
 		new Setting(contentDiv)
 			.setName("Show file icons")
-			.setDesc(
-				"Display file icons next to file names in the panel.",
-			)
+			.setDesc("Display file icons next to file names in the panel.")
 			.addToggle((toggle) =>
 				toggle
 					.setValue(this.plugin.settings.panelShowFileIcons)
@@ -895,7 +980,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					.setPlaceholder("Zettels")
 					.setValue(this.plugin.settings.panelZettelsName)
 					.onChange(async (value) => {
-						this.plugin.settings.panelZettelsName = value || "Zettels";
+						this.plugin.settings.panelZettelsName =
+							value || "Zettels";
 						await this.plugin.saveSettings();
 					}),
 			);
@@ -908,10 +994,27 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					.setPlaceholder("References")
 					.setValue(this.plugin.settings.panelReferencesName)
 					.onChange(async (value) => {
-						this.plugin.settings.panelReferencesName = value || "References";
+						this.plugin.settings.panelReferencesName =
+							value || "References";
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		if (this.plugin.settings.enableProjects) {
+			new Setting(contentDiv)
+				.setName("Projects section name")
+				.setDesc("Customize the display name for the Projects section")
+				.addText((text) =>
+					text
+						.setPlaceholder("Projects")
+						.setValue(this.plugin.settings.panelProjectsName)
+						.onChange(async (value) => {
+							this.plugin.settings.panelProjectsName =
+								value || "Projects";
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 
 		new Setting(contentDiv)
 			.setName("Bookmarks section name")
@@ -921,7 +1024,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					.setPlaceholder("Bookmarks")
 					.setValue(this.plugin.settings.panelBookmarksName)
 					.onChange(async (value) => {
-						this.plugin.settings.panelBookmarksName = value || "Bookmarks";
+						this.plugin.settings.panelBookmarksName =
+							value || "Bookmarks";
 						await this.plugin.saveSettings();
 					}),
 			);
@@ -988,14 +1092,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.panelInboxFilterTags[index] = value;
+						this.plugin.settings.panelInboxFilterTags[index] =
+							value;
 						await this.plugin.saveSettings();
 					};
 					new TagSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("tag-name")
 						.setValue(tag)
 						.onChange(async (value) => {
-							this.plugin.settings.panelInboxFilterTags[index] = value;
+							this.plugin.settings.panelInboxFilterTags[index] =
+								value;
 							await this.plugin.saveSettings();
 						});
 				})
@@ -1059,14 +1165,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.panelZettelsFilterTags[index] = value;
+						this.plugin.settings.panelZettelsFilterTags[index] =
+							value;
 						await this.plugin.saveSettings();
 					};
 					new TagSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("tag-name")
 						.setValue(tag)
 						.onChange(async (value) => {
-							this.plugin.settings.panelZettelsFilterTags[index] = value;
+							this.plugin.settings.panelZettelsFilterTags[index] =
+								value;
 							await this.plugin.saveSettings();
 						});
 				})
@@ -1130,14 +1238,17 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				.addText((text) => {
 					const onSelect = async (value: string) => {
 						text.setValue(value);
-						this.plugin.settings.panelReferencesFilterTags[index] = value;
+						this.plugin.settings.panelReferencesFilterTags[index] =
+							value;
 						await this.plugin.saveSettings();
 					};
 					new TagSuggest(this.app, text.inputEl, onSelect);
 					text.setPlaceholder("tag-name")
 						.setValue(tag)
 						.onChange(async (value) => {
-							this.plugin.settings.panelReferencesFilterTags[index] = value;
+							this.plugin.settings.panelReferencesFilterTags[
+								index
+							] = value;
 							await this.plugin.saveSettings();
 						});
 				})
@@ -1155,6 +1266,86 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						});
 				});
 		});
+
+		// Projects Dashboard (only if Projects is enabled)
+		if (this.plugin.settings.enableProjects) {
+			new Setting(contentDiv)
+				.setName("Projects dashboard")
+				.setDesc(
+					"Path to the file that opens when clicking the Projects heading",
+				)
+				.addText((text) => {
+					const onSelect = async (value: string) => {
+						text.setValue(value);
+						this.plugin.settings.panelProjectsDashboard = value;
+						await this.plugin.saveSettings();
+					};
+					new FileSuggest(this.app, text.inputEl, onSelect);
+					text.setPlaceholder("Projects/Projects.md")
+						.setValue(this.plugin.settings.panelProjectsDashboard)
+						.onChange(async (value) => {
+							this.plugin.settings.panelProjectsDashboard = value;
+							await this.plugin.saveSettings();
+						});
+				});
+
+			// Projects Filter Tags
+			const projectsFilterTagsSetting = new Setting(contentDiv)
+				.setName("Projects filter tags")
+				.setDesc(
+					"Tags to filter files in the Projects section. Leave empty to show all files. Click + to add more tags.",
+				);
+
+			projectsFilterTagsSetting.addButton((button) => {
+				button
+					.setButtonText("+")
+					.setTooltip("Add tag")
+					.onClick(async () => {
+						this.plugin.settings.panelProjectsFilterTags.push("");
+						await this.plugin.saveSettings();
+						this.display();
+					});
+			});
+
+			this.plugin.settings.panelProjectsFilterTags.forEach((tag, index) => {
+				new Setting(contentDiv)
+					.setClass("zettelkasten-ignored-folder-item")
+					.addText((text) => {
+						const onSelect = async (value: string) => {
+							text.setValue(value);
+							this.plugin.settings.panelProjectsFilterTags[index] =
+								value;
+							await this.plugin.saveSettings();
+						};
+						new TagSuggest(this.app, text.inputEl, onSelect);
+						text.setPlaceholder("#project")
+							.setValue(
+								this.plugin.settings.panelProjectsFilterTags[
+									index
+								],
+							)
+							.onChange(async (value) => {
+								this.plugin.settings.panelProjectsFilterTags[
+									index
+								] = value;
+								await this.plugin.saveSettings();
+							});
+					})
+					.addButton((button) => {
+						button
+							.setIcon("trash")
+							.setTooltip("Remove tag")
+							.onClick(async () => {
+								this.plugin.settings.panelProjectsFilterTags.splice(
+									index,
+									1,
+								);
+								await this.plugin.saveSettings();
+								this.display();
+							});
+					});
+			});
+		}
 
 		// Bookmarks List
 		const bookmarksSetting = new Setting(contentDiv)
@@ -1175,7 +1366,7 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 							this.plugin.settings.panelBookmarks.push(bookmark);
 							await this.plugin.saveSettings();
 							this.display();
-						}
+						},
 					);
 					modal.open();
 				});
@@ -1183,8 +1374,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 
 		// Display existing bookmarks
 		this.plugin.settings.panelBookmarks.forEach((bookmark, index) => {
-			const bookmarkSetting = new Setting(contentDiv)
-				.setClass("zettelkasten-ignored-folder-item");
+			const bookmarkSetting = new Setting(contentDiv).setClass(
+				"zettelkasten-ignored-folder-item",
+			);
 
 			// Type dropdown
 			bookmarkSetting.addDropdown((dropdown) => {
@@ -1194,11 +1386,16 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					.addOption("graph", "Graph")
 					.addOption("folder", "Folder")
 					.setValue(bookmark.type || "file")
-					.onChange(async (value: "file" | "search" | "graph" | "folder") => {
-						this.plugin.settings.panelBookmarks[index].type = value;
-						await this.plugin.saveSettings();
-						this.display(); // Refresh to show appropriate inputs
-					});
+					.onChange(
+						async (
+							value: "file" | "search" | "graph" | "folder",
+						) => {
+							this.plugin.settings.panelBookmarks[index].type =
+								value;
+							await this.plugin.saveSettings();
+							this.display(); // Refresh to show appropriate inputs
+						},
+					);
 			});
 
 			// Show different inputs based on type
@@ -1209,8 +1406,11 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						this.plugin.settings.panelBookmarks[index].path = value;
 						// Auto-fill title from file name if title is empty
 						if (!this.plugin.settings.panelBookmarks[index].title) {
-							const fileName = value.split('/').pop()?.replace('.md', '') || '';
-							this.plugin.settings.panelBookmarks[index].title = fileName;
+							const fileName =
+								value.split("/").pop()?.replace(".md", "") ||
+								"";
+							this.plugin.settings.panelBookmarks[index].title =
+								fileName;
 						}
 						await this.plugin.saveSettings();
 					};
@@ -1218,11 +1418,21 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					text.setPlaceholder("path/to/file.md")
 						.setValue(bookmark.path || "")
 						.onChange(async (value) => {
-							this.plugin.settings.panelBookmarks[index].path = value;
+							this.plugin.settings.panelBookmarks[index].path =
+								value;
 							// Auto-fill title from file name if title is empty
-							if (!this.plugin.settings.panelBookmarks[index].title) {
-								const fileName = value.split('/').pop()?.replace('.md', '') || '';
-								this.plugin.settings.panelBookmarks[index].title = fileName;
+							if (
+								!this.plugin.settings.panelBookmarks[index]
+									.title
+							) {
+								const fileName =
+									value
+										.split("/")
+										.pop()
+										?.replace(".md", "") || "";
+								this.plugin.settings.panelBookmarks[
+									index
+								].title = fileName;
 							}
 							await this.plugin.saveSettings();
 						});
@@ -1232,7 +1442,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					text.setPlaceholder("Search query")
 						.setValue(bookmark.query || "")
 						.onChange(async (value) => {
-							this.plugin.settings.panelBookmarks[index].query = value;
+							this.plugin.settings.panelBookmarks[index].query =
+								value;
 							await this.plugin.saveSettings();
 						});
 				});
@@ -1243,8 +1454,9 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 						this.plugin.settings.panelBookmarks[index].path = value;
 						// Auto-fill title from folder name if title is empty
 						if (!this.plugin.settings.panelBookmarks[index].title) {
-							const folderName = value.split('/').pop() || '';
-							this.plugin.settings.panelBookmarks[index].title = folderName;
+							const folderName = value.split("/").pop() || "";
+							this.plugin.settings.panelBookmarks[index].title =
+								folderName;
 						}
 						await this.plugin.saveSettings();
 					};
@@ -1252,11 +1464,17 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					text.setPlaceholder("path/to/folder")
 						.setValue(bookmark.path || "")
 						.onChange(async (value) => {
-							this.plugin.settings.panelBookmarks[index].path = value;
+							this.plugin.settings.panelBookmarks[index].path =
+								value;
 							// Auto-fill title from folder name if title is empty
-							if (!this.plugin.settings.panelBookmarks[index].title) {
-								const folderName = value.split('/').pop() || '';
-								this.plugin.settings.panelBookmarks[index].title = folderName;
+							if (
+								!this.plugin.settings.panelBookmarks[index]
+									.title
+							) {
+								const folderName = value.split("/").pop() || "";
+								this.plugin.settings.panelBookmarks[
+									index
+								].title = folderName;
 							}
 							await this.plugin.saveSettings();
 						});
@@ -1268,7 +1486,8 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 				text.setPlaceholder("Display name")
 					.setValue(bookmark.title)
 					.onChange(async (value) => {
-						this.plugin.settings.panelBookmarks[index].title = value;
+						this.plugin.settings.panelBookmarks[index].title =
+							value;
 						await this.plugin.saveSettings();
 					});
 			});
@@ -1284,46 +1503,6 @@ export class ZettelkastenSettingTab extends PluginSettingTab {
 					});
 			});
 		});
-	}
-
-	private displayExperimentalSettings(containerEl: HTMLElement): void {
-		const contentDiv = this.createCollapsibleSection(
-			containerEl,
-			"Experimental Features",
-			"Enable experimental features and commands.",
-			true,
-		);
-
-		// Note Sequence Settings
-		// Enable Note Sequence Toggle
-		const sequenceReorderSetting = new Setting(contentDiv).setName(
-			"Enable note sequence",
-		);
-
-		// Add custom description with line breaks
-		const descEl = sequenceReorderSetting.descEl;
-		descEl.empty();
-		descEl
-			.createDiv()
-			.setText(
-				"Enable the command to reorder child notes within a sequence.",
-			);
-		descEl.createEl("br");
-		descEl
-			.createDiv()
-			.setText("⚠️ Warning: This is an experimental feature.");
-
-		sequenceReorderSetting.addToggle((toggle) =>
-			toggle
-				.setValue(this.plugin.settings.enableNoteSequence)
-				.onChange(async (value) => {
-					this.plugin.settings.enableNoteSequence = value;
-					await this.plugin.saveSettings();
-				}),
-		);
-
-		// Add Alpha label to the name
-		const nameEl = sequenceReorderSetting.nameEl;
-		nameEl.innerHTML = "Enable note sequence <strong>(Alpha)</strong>";
+		}
 	}
 }

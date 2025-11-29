@@ -160,19 +160,14 @@ h1.zettelkasten-settings-title {
 	background-color: var(--background-modifier-hover);
 }
 
-/* Active dashboard highlighting - using same style as active files */
+/* Active dashboard highlighting */
 .zk-menu-header.is-active-dashboard {
-	background-color: var(--nav-item-background-active);
-	color: var(--nav-item-color-active);
+	background-color: var(--background-modifier-active-hover);
 }
 
 .zk-menu-header.is-active-dashboard .zk-menu-name {
-	color: var(--nav-item-color-active);
-	font-weight: 500;
-}
-
-.zk-menu-header.is-active-dashboard .zk-menu-icon {
-	color: var(--nav-item-color-active);
+	color: var(--text-accent);
+	font-weight: 600;
 }
 
 .zk-collapse-icon {
