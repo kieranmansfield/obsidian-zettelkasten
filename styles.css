@@ -9,527 +9,685 @@ If your plugin does not need CSS, delete this file.
 
 /* Subtle filename display beneath suggestion titles */
 .suggestion-note-filename {
-	font-size: 0.85em;
-	color: var(--text-muted);
-	opacity: 0.7;
-	margin-top: 2px;
-	font-family: var(--font-monospace);
+  font-size: 0.85em;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin-top: 2px;
+  font-family: var(--font-monospace);
 }
 
 /* Settings Page Title */
 h1.zettelkasten-settings-title {
-	font-weight: 600 !important;
-	font-size: 2.5em !important;
-	line-height: 4rem;
-	margin-bottom: 1.5em;
-	margin-top: 0;
-	padding-top: 0;
+  font-weight: 600 !important;
+  font-size: 2.5em !important;
+  line-height: 4rem;
+  margin-bottom: 1.5em;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 /* Mobile: Hide title */
 .is-mobile h1.zettelkasten-settings-title {
-	display: none;
+  display: none;
 }
 
 /* Mobile: Disable collapsible sections - keep all sections open */
 .is-mobile .zettelkasten-collapsible-section {
-	/* Force details element to stay open */
+  display: block;
 }
 
 .is-mobile .zettelkasten-collapsible-section summary {
-	/* Disable interaction with the toggle */
-	pointer-events: none;
-	cursor: default;
+  /* Disable interaction with the toggle */
+  pointer-events: none;
+  cursor: default;
 }
 
 .is-mobile .zettelkasten-collapsible-section summary h1::before {
-	/* Hide the arrow indicator */
-	display: none;
+  /* Hide the arrow indicator */
+  display: none;
 }
 
 /* Settings Section Headers */
 .vertical-tab-content h1,
 .mod-settings h1 {
-	margin-top: 0;
-	margin-bottom: 0.5em;
-	padding-top: 1em;
-	font-weight: 500;
-	font-size: 1.3em;
+  margin-top: 0;
+  margin-bottom: 0.5em;
+  padding-top: 1em;
+  font-weight: 500;
+  font-size: 1.3em;
 }
 
 .vertical-tab-content h1:first-child,
 .mod-settings h1:first-child {
-	margin-top: 0;
-	padding-top: 0;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 /* Settings Section Spacing */
 .settings-section {
-	margin-bottom: 6vh;
+  margin-bottom: 6vh;
 }
 
 .settings-section:last-child {
-	margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 /* Collapsible Section Styling */
 .zettelkasten-collapsible-section {
-	margin-top: 0;
-	margin-bottom: 6vh;
-	border: none;
+  margin-top: 0;
+  margin-bottom: 6vh;
+  border: none;
 }
 
 .zettelkasten-collapsible-section:first-of-type {
-	margin-top: 0;
+  margin-top: 0;
 }
 
 .zettelkasten-collapsible-section:last-of-type {
-	margin-bottom: 0;
+  margin-bottom: 0;
 }
 
 .zettelkasten-collapsible-section summary {
-	cursor: pointer;
-	user-select: none;
-	list-style: none;
-	margin-bottom: 0.5em;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  margin-bottom: 0.5em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .zettelkasten-collapsible-section summary::-webkit-details-marker {
-	display: none;
+  display: none;
 }
 
 .zettelkasten-collapsible-section summary .section-header {
-	display: flex;
-	align-items: center;
-	flex: 1;
+  display: flex;
+  align-items: center;
+  flex: 1;
 }
 
 .zettelkasten-collapsible-section summary h1 {
-	display: inline-block;
-	margin: 0;
-	padding: 0.5em 0;
-	font-size: 1.3em;
-	font-weight: 500;
+  display: inline-block;
+  margin: 0;
+  padding: 0.5em 0;
+  font-size: 1.3em;
+  font-weight: 500;
 }
 
 .zettelkasten-collapsible-section summary h1::before {
-	content: "▶";
-	display: inline-block;
-	transition: transform 0.2s;
-	margin-right: 0.5em;
-	color: var(--text-muted);
-	font-size: 0.7em;
+  content: '▶';
+  display: inline-block;
+  transition: transform 0.2s;
+  margin-right: 0.5em;
+  color: var(--text-muted);
+  font-size: 0.7em;
 }
 
 .zettelkasten-collapsible-section[open] summary h1::before {
-	transform: rotate(90deg);
+  transform: rotate(90deg);
 }
 
 .zettelkasten-collapsible-section summary:hover h1 {
-	color: var(--text-accent);
+  color: var(--text-accent);
 }
 
 .zettelkasten-collapsible-section summary .section-toggle {
-	margin-left: auto;
-	display: flex;
-	align-items: center;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
 }
 
 /* Zettelkasten Panel View */
 .zettelkasten-view {
-	padding: 10px;
+  padding: 10px;
 }
 
 .zk-menu-item {
-	margin-bottom: 8px;
+  margin-bottom: 8px;
 }
 
 .zk-menu-header {
-	display: flex;
-	align-items: center;
-	padding: 6px 8px;
-	cursor: pointer;
-	border-radius: 4px;
-	transition: background-color 0.1s;
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.1s;
 }
 
 .zk-menu-header:hover {
-	background-color: var(--background-modifier-hover);
+  background-color: var(--background-modifier-hover);
 }
 
 /* Active dashboard highlighting - using same style as active files */
 .zk-menu-header.is-active-dashboard {
-	background-color: var(--nav-item-background-active);
-	color: var(--nav-item-color-active);
+  background-color: var(--nav-item-background-active);
+  color: var(--nav-item-color-active);
 }
 
 .zk-menu-header.is-active-dashboard .zk-menu-name {
-	color: var(--nav-item-color-active);
-	font-weight: 500;
+  color: var(--nav-item-color-active);
+  font-weight: 500;
 }
 
 .zk-menu-header.is-active-dashboard .zk-menu-icon {
-	color: var(--nav-item-color-active);
+  color: var(--nav-item-color-active);
 }
 
 .zk-collapse-icon {
-	display: flex;
-	align-items: center;
-	margin-right: 4px;
-	color: var(--text-muted);
-	width: 16px;
-	height: 16px;
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
+  color: var(--text-muted);
+  width: 16px;
+  height: 16px;
 }
 
 .zk-collapse-icon svg {
-	width: 16px;
-	height: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .zk-menu-icon {
-	display: flex;
-	align-items: center;
-	margin-right: 8px;
-	color: var(--text-muted);
-	width: 16px;
-	height: 16px;
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+  color: var(--text-muted);
+  width: 16px;
+  height: 16px;
 }
 
 .zk-menu-icon svg {
-	width: 16px;
-	height: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .zk-menu-name {
-	flex: 1;
-	font-size: 14px;
-	font-weight: 500;
-	color: var(--text-normal);
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-normal);
 }
 
 .zk-menu-content {
-	padding-left: 28px;
-	margin-top: 4px;
-	margin-bottom: 4px;
+  padding-left: 28px;
+  margin-top: 4px;
+  margin-bottom: 4px;
 }
 
 .zk-folder-note-link {
-	padding: 4px 8px;
-	cursor: pointer;
-	border-radius: 3px;
-	font-size: 13px;
-	color: var(--text-muted);
-	transition: background-color 0.1s;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 13px;
+  color: var(--text-muted);
+  transition: background-color 0.1s;
 }
 
 .zk-folder-note-link:hover {
-	background-color: var(--background-modifier-hover);
-	color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 .zk-no-folder-note,
 .zk-no-folder,
 .zk-no-files {
-	padding: 4px 8px;
-	font-size: 12px;
-	color: var(--text-faint);
-	font-style: italic;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--text-faint);
+  font-style: italic;
 }
 
 .zk-file-link {
-	padding: 4px 8px;
-	cursor: pointer;
-	border-radius: 3px;
-	font-size: 13px;
-	color: var(--text-muted);
-	transition: background-color 0.1s;
-	margin-bottom: 2px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 13px;
+  color: var(--text-muted);
+  transition: background-color 0.1s;
+  margin-bottom: 2px;
 }
 
 .zk-file-link:hover {
-	background-color: var(--background-modifier-hover);
-	color: var(--text-normal);
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
 }
 
 .zk-bookmark-item {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 4px 8px;
-	cursor: pointer;
-	border-radius: 3px;
-	transition: background-color 0.1s;
-	margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.1s;
+  margin-bottom: 2px;
 }
 
 .zk-bookmark-item:hover {
-	background-color: var(--background-modifier-hover);
+  background-color: var(--background-modifier-hover);
 }
 
 .zk-bookmark-icon {
-	display: flex;
-	align-items: center;
-	flex-shrink: 0;
-	color: var(--text-muted);
-	width: 16px;
-	height: 16px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  width: 16px;
+  height: 16px;
 }
 
 .zk-bookmark-icon svg {
-	width: 16px;
-	height: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Modal styles */
 .bookmark-fields {
-	margin-top: 1em;
+  margin-top: 1em;
 }
 
 .modal-button-container {
-	display: flex;
-	justify-content: flex-end;
-	gap: 8px;
-	margin-top: 1.5em;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 1.5em;
 }
 
 /* Mobile-friendly bookmark settings */
 @media (max-width: 768px) {
-	.zettelkasten-ignored-folder-item .setting-item-control {
-		flex-wrap: wrap;
-		gap: 8px;
-	}
+  .zettelkasten-ignored-folder-item .setting-item-control {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 
-	.zettelkasten-ignored-folder-item .setting-item-control > * {
-		flex: 1 1 100%;
-		min-width: 0;
-	}
+  .zettelkasten-ignored-folder-item .setting-item-control > * {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
 
-	.zettelkasten-ignored-folder-item .setting-item-control select {
-		flex: 1 1 100%;
-	}
+  .zettelkasten-ignored-folder-item .setting-item-control select {
+    flex: 1 1 100%;
+  }
 
-	.zettelkasten-ignored-folder-item .setting-item-control input {
-		flex: 1 1 100%;
-	}
+  .zettelkasten-ignored-folder-item .setting-item-control input {
+    flex: 1 1 100%;
+  }
 
-	.zettelkasten-ignored-folder-item .setting-item-control button {
-		flex: 0 0 auto;
-		align-self: flex-end;
-	}
+  .zettelkasten-ignored-folder-item .setting-item-control button {
+    flex: 0 0 auto;
+    align-self: flex-end;
+  }
 }
 
 /* Disabled menu item */
 .zk-menu-item-disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .zk-menu-item-disabled .zk-menu-header {
-	cursor: not-allowed;
+  cursor: not-allowed;
 }
 
 .zk-menu-item-disabled .zk-menu-header:hover {
-	background-color: transparent;
+  background-color: transparent;
 }
 
 /* Note Sequences View */
 .note-sequences-view {
-	padding: 20px;
+  padding: 20px;
 }
 
 .sequence-empty-state {
-	text-align: center;
-	padding: 40px 20px;
-	color: var(--text-muted);
-	font-size: 16px;
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+  font-size: 16px;
 }
 
 /* Grid layout for sequence cards */
 .sequence-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-	gap: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 2rem 2rem 2rem 2rem;
 }
 
 /* Mobile: single column */
 @media (max-width: 768px) {
-	.sequence-grid {
-		grid-template-columns: 1fr;
-	}
+  .sequence-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Sequence card styling */
 .sequence-card {
-	background: var(--background-primary);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
-	overflow: hidden;
-	transition: all 0.2s ease;
-	display: flex;
-	flex-direction: column;
-	height: 320px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  height: 320px;
 }
 
 .sequence-card:hover {
-	border-color: var(--background-modifier-border-hover);
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--background-modifier-border-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* Card header */
 .sequence-card-header {
-	background: var(--background-secondary);
-	padding: 12px 16px;
-	border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .sequence-card-header-content {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	justify-content: space-between;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
 }
 
 .sequence-card-icon {
-	color: var(--text-accent);
-	display: flex;
-	align-items: center;
-	flex-shrink: 0;
+  color: var(--text-accent);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .sequence-card-icon svg {
-	width: 18px;
-	height: 18px;
+  width: 18px;
+  height: 18px;
 }
 
 .sequence-card-title {
-	font-weight: 600;
-	font-size: 14px;
-	color: var(--text-normal);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	flex: 1;
-	cursor: pointer;
-	transition: color 0.2s;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  cursor: pointer;
+  transition: color 0.2s;
 }
 
 .sequence-card-title:hover {
-	color: var(--text-accent);
+  color: var(--text-accent);
 }
 
 /* Action buttons */
 .sequence-card-actions {
-	display: flex;
-	gap: 8px;
-	align-items: center;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .sequence-card-action-btn {
-	cursor: pointer;
-	padding: 4px;
-	color: var(--text-muted);
-	transition: all 0.2s;
-	display: flex;
-	align-items: center;
-	border-radius: 4px;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--text-muted);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
 }
 
 .sequence-card-action-btn:hover {
-	color: var(--text-normal);
-	background: var(--background-modifier-hover);
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
 }
 
 .sequence-card-action-btn svg {
-	width: 16px;
-	height: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Card body */
 .sequence-card-body {
-	padding: 8px 12px;
-	overflow-y: auto;
-	flex: 1;
+  padding: 8px 12px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .sequence-card-empty {
-	color: var(--text-faint);
-	font-style: italic;
-	font-size: 13px;
-	text-align: center;
-	padding: 8px 0;
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: 13px;
+  text-align: center;
+  padding: 8px 0;
 }
 
 /* Child items in card */
 .sequence-child-item {
-	display: flex;
-	align-items: center;
-	padding: 6px 12px;
-	margin: 0 -4px;
-	transition: background-color 0.1s;
-	border-radius: 4px;
-	cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  margin: 0 -4px;
+  transition: background-color 0.1s;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .sequence-child-item:hover {
-	background-color: var(--background-modifier-hover);
+  background-color: var(--background-modifier-hover);
 }
 
 .sequence-child-title {
-	font-size: 13px;
-	color: var(--text-normal);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	flex: 1;
+  font-size: 13px;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
 /* Sequence Navigator View */
 .sequence-navigator-view {
-	padding: 0;
+  padding: 0;
 }
 
 .sequence-nav-empty {
-	text-align: center;
-	padding: 20px;
-	color: var(--text-muted);
-	font-size: 14px;
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 14px;
 }
 
 /* Use Obsidian's file explorer styles for consistency */
 .sequence-navigator-view .nav-files-container {
-	padding: 10px 0;
+  padding: 10px 0;
 }
 
 .sequence-navigator-view .tree-item {
-	width: 100%;
+  width: 100%;
 }
 
 .sequence-navigator-view .tree-item-self {
-	width: 100%;
-	display: flex;
-	align-items: center;
+  width: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .sequence-navigator-view .tree-item.is-active > .tree-item-self {
-	background-color: var(--background-modifier-active-hover);
-	color: var(--text-accent);
+  background-color: var(--background-modifier-active-hover);
+  color: var(--text-accent);
 }
 
 .sequence-navigator-view .collapse-icon {
-	cursor: pointer;
+  cursor: pointer;
 }
 
 .sequence-navigator-view .tree-item-icon.nav-file-title-icon svg {
-	width: 16px;
-	height: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .sequence-navigator-view .tree-item-inner {
-	flex: 1;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Import/Export Modal */
+.import-export-json-container {
+  margin-bottom: 0;
+}
+
+.import-export-json-textarea {
+  width: 100%;
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+  resize: vertical;
+  min-height: 100px;
+  padding: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-primary);
+}
+
+/* Remove bottom margin from settings containing textareas */
+.import-export-json-container + .setting-item {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 8px;
+}
+
+/* Zettelkasten View Tabs */
+.zk-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 0 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.zk-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.zk-tab:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.zk-tab.is-active {
+  background-color: var(--background-primary-alt);
+  border-bottom: 2px solid var(--interactive-accent);
+}
+
+.zk-tab-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.zk-tab-label {
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.zk-content {
+  padding: 8px;
+  overflow-y: auto;
+  max-height: calc(100vh - 100px);
+}
+
+/* Zettelkasten view: smooth collapse/expand for menu content */
+.zettelkasten-view .zk-menu-content {
+  overflow: hidden;
+  max-height: 1000px;
+  transition: max-height 220ms ease;
+}
+
+.zettelkasten-view .zk-menu-content.zk-collapsed {
+  max-height: 0;
+}
+
+/* File list container in zettelkasten view */
+.zettelkasten-view .nav-files-container {
+  padding: 0;
+  margin: 0;
+}
+
+/* File items in zettelkasten view */
+.zettelkasten-view .tree-item.nav-file {
+  margin: 0;
+  padding: 0;
+}
+
+.zettelkasten-view .tree-item-self.nav-file-title {
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.1s;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.zettelkasten-view .tree-item-self.nav-file-title:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Active file highlighting */
+.zettelkasten-view .tree-item-self.nav-file-title.is-active {
+  background-color: var(--nav-item-background-active);
+  color: var(--nav-item-color-active);
+}
+
+.zettelkasten-view .tree-item-self.nav-file-title.is-active .tree-item-inner {
+  color: var(--nav-item-color-active);
+  font-weight: 500;
+}
+
+/* File title content */
+.zettelkasten-view .tree-item-inner.nav-file-title-content {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-normal);
+}
+
+/* Mobile-specific styling for file lists */
+.is-mobile .zettelkasten-view .tree-item-self.nav-file-title {
+  padding: 8px 12px;
+  min-height: 44px; /* iOS recommended touch target */
+  display: flex;
+  align-items: center;
+}
+
+.is-mobile .zettelkasten-view .tree-item-inner.nav-file-title-content {
+  font-size: 14px;
+}
+
+/* Dragging support */
+.zettelkasten-view .tree-item-self.nav-file-title[draggable='true'] {
+  cursor: grab;
+}
+
+.zettelkasten-view .tree-item-self.nav-file-title:active {
+  cursor: grabbing;
+}
+
+/* Ensure proper spacing in collapsed/expanded state */
+.zettelkasten-view .zk-menu-content .nav-files-container {
+  margin-top: 4px;
+}
+
+/* Menu name container cursor */
+.zk-menu-name-container {
+  flex: 1;
+  cursor: pointer;
 }

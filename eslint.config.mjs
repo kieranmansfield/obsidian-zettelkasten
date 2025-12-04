@@ -1,10 +1,10 @@
-import eslint from '@eslint/js';
-import tseslint from '@typescript-eslint/eslint-plugin';
-import tsparser from '@typescript-eslint/parser';
+import eslint from '@eslint/js'
+import tseslint from '@typescript-eslint/eslint-plugin'
+import tsparser from '@typescript-eslint/parser'
 
 export default [
   {
-    ignores: ['node_modules/**', 'dist/**', 'build/**', 'main.js']
+    ignores: ['node_modules/**', 'dist/**', 'build/**', 'main.js', 'srcOLD'],
   },
   eslint.configs.recommended,
   {
@@ -12,7 +12,7 @@ export default [
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        sourceType: 'module'
+        sourceType: 'module',
       },
       globals: {
         console: 'readonly',
@@ -23,11 +23,11 @@ export default [
         module: 'readonly',
         require: 'readonly',
         exports: 'writable',
-        global: 'readonly'
-      }
+        global: 'readonly',
+      },
     },
     plugins: {
-      '@typescript-eslint': tseslint
+      '@typescript-eslint': tseslint,
     },
     rules: {
       ...tseslint.configs['eslint-recommended'].overrides[0].rules,
@@ -36,7 +36,7 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { args: 'none' }],
       '@typescript-eslint/ban-ts-comment': 'off',
       'no-prototype-builtins': 'off',
-      '@typescript-eslint/no-empty-function': 'off'
-    }
-  }
-];
+      '@typescript-eslint/no-empty-function': 'off',
+    },
+  },
+]

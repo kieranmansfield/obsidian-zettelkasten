@@ -1,79 +1,132 @@
-import { App, FuzzySuggestModal, FuzzyMatch, TFile } from "obsidian";
+import { App, FuzzySuggestModal, FuzzyMatch, TFile } from 'obsidian'
 
-// Modal for suggesting and selecting Zettel notes
-export class ZettelSuggester extends FuzzySuggestModal<string> {
-	private titles: Map<string, TFile>;
-	private completion: (file: TFile) => void;
-	private initialQuery: string;
-	private showFilename: boolean;
+interface ZettelItem {
+  file: TFile
+  displayText: string
+  isAlias: boolean
+}
 
-	constructor(
-		app: App,
-		titles: Map<string, TFile>,
-		search: string | undefined,
-		completion: (file: TFile) => void,
-		showFilename: boolean = false,
-	) {
-		super(app);
-		this.initialQuery = search ?? "";
-		this.titles = titles;
-		this.completion = completion;
-		this.showFilename = showFilename;
-		this.emptyStateText = "No zettels found";
-		this.setPlaceholder("Search for a zettel...");
-	}
+/**
+ * Modal for suggesting and selecting Zettel notes
+ * Enhanced to work like quick switcher:
+ * - Uses title from frontmatter first, then filename
+ * - Shows aliases as additional entries
+ * - Doesn't auto-select until arrow key pressed
+ */
+export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
+  private items: ZettelItem[] = []
+  private completion: (file: TFile) => void
+  private initialQuery: string
+  private hasInteracted: boolean = false
 
-	onOpen() {
-		super.onOpen();
-		this.inputEl.value = this.initialQuery;
-		const event = new Event("input");
-		this.inputEl.dispatchEvent(event);
-	}
+  constructor(
+    app: App,
+    files: TFile[],
+    search: string | undefined,
+    completion: (file: TFile) => void
+  ) {
+    super(app)
+    this.initialQuery = search ?? ''
+    this.completion = completion
+    this.emptyStateText = 'No zettels found'
+    this.setPlaceholder('Search for a zettel...')
 
-	getItems(): string[] {
-		return Array.from(this.titles.keys()).sort();
-	}
+    // Build items list with title, filename, and aliases
+    files.forEach((file) => {
+      const cache = this.app.metadataCache.getFileCache(file)
+      const title = cache?.frontmatter?.title
 
-	getItemText(item: string): string {
-		return item;
-	}
+      // Add main entry (using title if available, otherwise filename)
+      this.items.push({
+        file,
+        displayText: title || file.basename,
+        isAlias: false,
+      })
 
-	renderSuggestion(value: FuzzyMatch<string>, el: HTMLElement) {
-		const file = this.titles.get(value.item);
-		if (!file) return;
+      // Add aliases as additional entries
+      const aliases = cache?.frontmatter?.aliases
+      if (aliases && Array.isArray(aliases)) {
+        aliases.forEach((alias: string) => {
+          this.items.push({
+            file,
+            displayText: alias,
+            isAlias: true,
+          })
+        })
+      }
+    })
 
-		const cache = this.app.metadataCache.getFileCache(file);
-		const title = cache?.frontmatter?.title || file.basename;
+    // Override the default key handler to track interaction
+    this.scope.register([], 'ArrowDown', (evt: KeyboardEvent) => {
+      this.hasInteracted = true
+      return false // Let the default handler run
+    })
 
-		// Main title
-		const titleEl = el.createDiv({ cls: "suggestion-title" });
-		titleEl.setText(title);
+    this.scope.register([], 'ArrowUp', (evt: KeyboardEvent) => {
+      this.hasInteracted = true
+      return false // Let the default handler run
+    })
+  }
 
-		// Highlight matches
-		const matches = value.match.matches;
-		if (matches && matches.length > 0) {
-			const start = matches[0][0];
-			const end = matches[0][1];
-			const range = new Range();
-			const text = titleEl.firstChild;
+  onOpen() {
+    super.onOpen()
+    this.inputEl.value = this.initialQuery
+    const event = new Event('input')
+    this.inputEl.dispatchEvent(event)
 
-			if (text) {
-				range.setStart(text, start);
-				range.setEnd(text, end);
-				range.surroundContents(document.createElement("b"));
-			}
-		}
+    // Remove initial selection
+    setTimeout(() => {
+      const selectedEl = this.modalEl.querySelector('.suggestion-item.is-selected')
+      if (selectedEl && !this.hasInteracted) {
+        selectedEl.removeClass('is-selected')
+      }
+    }, 10)
+  }
 
-		// Show filename beneath title if enabled
-		if (this.showFilename) {
-			const filenameEl = el.createDiv({
-				cls: "suggestion-note-filename",
-			});
-			filenameEl.setText(file.basename);
-		}
-	}
+  getItems(): ZettelItem[] {
+    return this.items
+  }
 
-	onChooseItem(item: string, _evt: MouseEvent | KeyboardEvent) {
-		this.completion(this.titles.get(item)!);
-	}
+  getItemText(item: ZettelItem): string {
+    return item.displayText
+  }
+
+  renderSuggestion(value: FuzzyMatch<ZettelItem>, el: HTMLElement) {
+    const item = value.item
+    const cache = this.app.metadataCache.getFileCache(item.file)
+    const title = cache?.frontmatter?.title || item.file.basename
+
+    // Main title
+    const titleEl = el.createDiv({ cls: 'suggestion-title' })
+    titleEl.setText(item.displayText)
+
+    // Show "alias of [title]" if this is an alias
+    if (item.isAlias) {
+      const aliasEl = el.createDiv({ cls: 'suggestion-note-filename' })
+      aliasEl.setText(`alias of ${title}`)
+    } else if (cache?.frontmatter?.title) {
+      // Show filename if we're displaying a title
+      const filenameEl = el.createDiv({ cls: 'suggestion-note-filename' })
+      filenameEl.setText(item.file.basename)
+    }
+
+    // Highlight matches
+    const matches = value.match.matches
+    if (matches && matches.length > 0) {
+      const start = matches[0][0]
+      const end = matches[0][1]
+      const range = new Range()
+      const text = titleEl.firstChild
+
+      if (text) {
+        range.setStart(text, start)
+        range.setEnd(text, end)
+        range.surroundContents(document.createElement('b'))
+      }
+    }
+  }
+
+  onChooseItem(item: ZettelItem, _evt: MouseEvent | KeyboardEvent) {
+    this.completion(item.file)
+  }
 }

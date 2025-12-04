@@ -1,159 +1,196 @@
-import { App, FuzzySuggestModal, FuzzyMatch, TFile } from "obsidian";
+import { App, FuzzySuggestModal, FuzzyMatch, TFile } from 'obsidian'
+
+interface ZettelItem {
+  file: TFile | null
+  displayText: string
+  isAlias: boolean
+  isNew: boolean
+}
 
 /**
  * Modal for creating a new note with autocomplete to detect existing notes
- * Uses FuzzySuggestModal for a quick switcher-like interface
+ * Enhanced to work like quick switcher:
+ * - Uses title from frontmatter first, then filename
+ * - Shows aliases as additional entries
+ * - Doesn't auto-select until arrow key pressed
+ * - Can create new zettel if nothing matches
  */
-export class CreateNoteWithSuggestModal extends FuzzySuggestModal<string> {
-	private notesMap: Map<string, TFile>;
-	private onSubmit: (title: string, existingFile?: TFile) => void;
-	private isProcessing = false;
-	private showFilename: boolean;
+export class CreateNoteWithSuggestModal extends FuzzySuggestModal<ZettelItem> {
+  private items: ZettelItem[] = []
+  private onSubmit: (title: string, existingFile?: TFile) => void
+  private isProcessing = false
+  private hasInteracted: boolean = false
 
-	constructor(
-		app: App,
-		notesMap: Map<string, TFile>,
-		onSubmit: (title: string, existingFile?: TFile) => void,
-		showFilename: boolean = false,
-	) {
-		super(app);
-		this.notesMap = notesMap;
-		this.onSubmit = onSubmit;
-		this.showFilename = showFilename;
-		this.setPlaceholder("Enter note title...");
-		this.setInstructions([
-			{ command: "↵", purpose: "create or open note" },
-			{ command: "esc", purpose: "cancel" },
-		]);
-	}
+  constructor(app: App, files: TFile[], onSubmit: (title: string, existingFile?: TFile) => void) {
+    super(app)
+    this.onSubmit = onSubmit
+    this.setPlaceholder('Enter note title...')
+    this.setInstructions([
+      { command: '↵', purpose: 'create or open note' },
+      { command: 'esc', purpose: 'cancel' },
+    ])
 
-	onOpen() {
-		super.onOpen();
+    // Build items list with title, filename, and aliases
+    files.forEach((file) => {
+      const cache = this.app.metadataCache.getFileCache(file)
+      const title = cache?.frontmatter?.title
 
-		// Unregister default Enter handler and add our own
-		const scope = this.scope as { keys?: Array<{ key: string }> };
-		if (scope.keys) {
-			scope.keys = scope.keys.filter((k) => k.key !== "Enter");
-		}
+      // Add main entry (using title if available, otherwise filename)
+      this.items.push({
+        file,
+        displayText: title || file.basename,
+        isAlias: false,
+        isNew: false,
+      })
 
-		this.scope.register([], "Enter", (evt: KeyboardEvent) => {
-			evt.preventDefault();
-			evt.stopPropagation();
+      // Add aliases as additional entries
+      const aliases = cache?.frontmatter?.aliases
+      if (aliases && Array.isArray(aliases)) {
+        aliases.forEach((alias: string) => {
+          this.items.push({
+            file,
+            displayText: alias,
+            isAlias: true,
+            isNew: false,
+          })
+        })
+      }
+    })
 
-			// Prevent multiple executions
-			if (this.isProcessing) {
-				return false;
-			}
-			this.isProcessing = true;
+    // Override the default key handler to track interaction
+    this.scope.register([], 'ArrowDown', (evt: KeyboardEvent) => {
+      this.hasInteracted = true
+      return false // Let the default handler run
+    })
 
-			const inputValue = this.inputEl.value.trim();
+    this.scope.register([], 'ArrowUp', (evt: KeyboardEvent) => {
+      this.hasInteracted = true
+      return false // Let the default handler run
+    })
 
-			// Check if there's a selected suggestion (highlighted item)
-			const modalEl = this.modalEl as HTMLElement & {
-				querySelector: (selector: string) => Element | null;
-			};
-			const selectedEl = modalEl?.querySelector(
-				".suggestion-item.is-selected",
-			);
-			let selectedTitle: string | undefined;
+    // Unregister default Enter handler and add our own
+    const scope = this.scope as { keys?: Array<{ key: string }> }
+    if (scope.keys) {
+      scope.keys = scope.keys.filter((k) => k.key !== 'Enter')
+    }
 
-			if (selectedEl) {
-				// Get the title from the selected suggestion
-				const titleEl = selectedEl.querySelector(".suggestion-title");
-				if (titleEl) {
-					selectedTitle = titleEl.textContent || undefined;
-				}
-			}
+    this.scope.register([], 'Enter', (evt: KeyboardEvent) => {
+      evt.preventDefault()
+      evt.stopPropagation()
 
-			// If no input and no selection, do nothing
-			if (!inputValue && !selectedTitle) {
-				this.isProcessing = false;
-				return false;
-			}
+      // Prevent multiple executions
+      if (this.isProcessing) {
+        return false
+      }
+      this.isProcessing = true
 
-			// Determine which file to open
-			let fileToOpen: TFile | undefined;
+      const inputValue = this.inputEl.value.trim()
 
-			if (selectedTitle) {
-				// Use the highlighted/selected suggestion
-				fileToOpen = this.notesMap.get(selectedTitle);
-			} else if (inputValue) {
-				// No selection - check for exact match
-				for (const [title, file] of this.notesMap.entries()) {
-					if (title.toLowerCase() === inputValue.toLowerCase()) {
-						fileToOpen = file;
-						break;
-					}
-				}
-			}
+      // Check if there's a selected suggestion (highlighted item)
+      const modalEl = this.modalEl as HTMLElement & {
+        querySelector: (selector: string) => Element | null
+      }
+      const selectedEl = modalEl?.querySelector('.suggestion-item.is-selected')
 
-			this.close();
+      // If no input and no selection, do nothing
+      if (!inputValue && !selectedEl) {
+        this.isProcessing = false
+        return false
+      }
 
-			// Use setTimeout to ensure modal closes before opening file
-			setTimeout(() => {
-				if (fileToOpen) {
-					// Pass both the title and the existing file
-					const cache =
-						this.app.metadataCache.getFileCache(fileToOpen);
-					const title =
-						cache?.frontmatter?.title || fileToOpen.basename;
-					this.onSubmit(title, fileToOpen);
-				} else if (inputValue) {
-					this.onSubmit(inputValue);
-				}
-			}, 50);
+      let fileToOpen: TFile | undefined
 
-			return false;
-		});
-	}
+      if (selectedEl && this.hasInteracted) {
+        // User has selected an item with arrow keys
+        const titleEl = selectedEl.querySelector('.suggestion-title')
+        if (titleEl) {
+          const selectedText = titleEl.textContent || ''
+          const foundItem = this.items.find((item) => item.displayText === selectedText)
+          if (foundItem && foundItem.file) {
+            fileToOpen = foundItem.file
+          }
+        }
+      }
 
-	getItems(): string[] {
-		return Array.from(this.notesMap.keys()).sort();
-	}
+      this.close()
 
-	getItemText(item: string): string {
-		return item;
-	}
+      // Use setTimeout to ensure modal closes before creating/opening file
+      setTimeout(() => {
+        if (fileToOpen) {
+          // Open existing file
+          const cache = this.app.metadataCache.getFileCache(fileToOpen)
+          const title = cache?.frontmatter?.title || fileToOpen.basename
+          this.onSubmit(title, fileToOpen)
+        } else if (inputValue) {
+          // Create new zettel
+          this.onSubmit(inputValue)
+        }
+      }, 50)
 
-	renderSuggestion(value: FuzzyMatch<string>, el: HTMLElement) {
-		const file = this.notesMap.get(value.item);
-		if (!file) return;
+      return false
+    })
+  }
 
-		const cache = this.app.metadataCache.getFileCache(file);
-		const title = cache?.frontmatter?.title || file.basename;
+  onOpen() {
+    super.onOpen()
 
-		// Main title
-		const titleEl = el.createDiv({ cls: "suggestion-title" });
-		titleEl.setText(title);
+    // Remove initial selection
+    setTimeout(() => {
+      const selectedEl = this.modalEl.querySelector('.suggestion-item.is-selected')
+      if (selectedEl && !this.hasInteracted) {
+        selectedEl.removeClass('is-selected')
+      }
+    }, 10)
+  }
 
-		// Highlight matches
-		const matches = value.match.matches;
-		if (matches && matches.length > 0) {
-			const start = matches[0][0];
-			const end = matches[0][1];
-			const range = new Range();
-			const text = titleEl.firstChild;
+  getItems(): ZettelItem[] {
+    return this.items
+  }
 
-			if (text) {
-				range.setStart(text, start);
-				range.setEnd(text, end);
-				range.surroundContents(document.createElement("b"));
-			}
-		}
+  getItemText(item: ZettelItem): string {
+    return item.displayText
+  }
 
-		// Show filename beneath title if enabled
-		if (this.showFilename) {
-			const filenameEl = el.createDiv({
-				cls: "suggestion-note-filename",
-			});
-			filenameEl.setText(file.basename);
-		}
-	}
+  renderSuggestion(value: FuzzyMatch<ZettelItem>, el: HTMLElement) {
+    const item = value.item
+    if (!item.file) return
 
-	onChooseItem(item: string, evt: MouseEvent | KeyboardEvent) {
-		const file = this.notesMap.get(item);
-		if (file) {
-			this.app.workspace.getLeaf().openFile(file);
-		}
-	}
+    const cache = this.app.metadataCache.getFileCache(item.file)
+    const title = cache?.frontmatter?.title || item.file.basename
+
+    // Main title
+    const titleEl = el.createDiv({ cls: 'suggestion-title' })
+    titleEl.setText(item.displayText)
+
+    // Show "alias of [title]" if this is an alias
+    if (item.isAlias) {
+      const aliasEl = el.createDiv({ cls: 'suggestion-note-filename' })
+      aliasEl.setText(`alias of ${title}`)
+    } else if (cache?.frontmatter?.title) {
+      // Show filename if we're displaying a title
+      const filenameEl = el.createDiv({ cls: 'suggestion-note-filename' })
+      filenameEl.setText(item.file.basename)
+    }
+
+    // Highlight matches
+    const matches = value.match.matches
+    if (matches && matches.length > 0) {
+      const start = matches[0][0]
+      const end = matches[0][1]
+      const range = new Range()
+      const text = titleEl.firstChild
+
+      if (text) {
+        range.setStart(text, start)
+        range.setEnd(text, end)
+        range.surroundContents(document.createElement('b'))
+      }
+    }
+  }
+
+  onChooseItem(item: ZettelItem, evt: MouseEvent | KeyboardEvent) {
+    if (item.file) {
+      this.app.workspace.getLeaf().openFile(item.file)
+    }
+  }
 }
