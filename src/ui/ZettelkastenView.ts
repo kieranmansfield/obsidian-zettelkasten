@@ -1,5 +1,17 @@
-import { ItemView, WorkspaceLeaf, TFile, setIcon } from 'obsidian'
+import {
+  ItemView,
+  WorkspaceLeaf,
+  TFile,
+  TFolder,
+  setIcon,
+  Menu,
+  MenuItem as ObsidianMenuItem,
+  getAllTags,
+} from 'obsidian'
 import type ZettelkastenPlugin from '../main'
+import { VIEW_TYPE_NOTE_SEQUENCES } from './NoteSequencesView'
+import { NoteSequence, SequenceNode } from 'src/base/noteSequence'
+import type { Bookmark } from 'src/base/settings'
 
 export const VIEW_TYPE_ZETTELKASTEN = 'zettelkasten-view'
 
@@ -7,14 +19,17 @@ interface MenuItem {
   name: string
   icon: string
   folder: string
+  dashboardNote?: string
+  showFiles: boolean
   filterFunc?: (file: TFile) => boolean
+  useFolderFilter: boolean // false for tag-based detection
 }
 
 /**
  * ZettelkastenView
  *
  * Sidebar view displaying folders for different note types
- * (Fleeting/Inbox, Zettels, Literature/References, Index)
+ * (Fleeting/Inbox, Zettels, Literature/References, Index, Note Sequences)
  */
 export class ZettelkastenView extends ItemView {
   private plugin: ZettelkastenPlugin
@@ -25,6 +40,33 @@ export class ZettelkastenView extends ItemView {
     super(leaf)
     this.plugin = plugin
     this.registerEvents()
+    this.loadCollapsedSections()
+  }
+
+  private collapsedStorageKey: string = 'obsidian-zettelkasten.collapsedSections'
+
+  private loadCollapsedSections(): void {
+    try {
+      const raw = window.localStorage.getItem(this.collapsedStorageKey)
+      if (!raw) return
+      const arr = JSON.parse(raw)
+      if (Array.isArray(arr)) {
+        arr.forEach((s) => this.collapsedSections.add(s))
+      }
+    } catch (e) {
+      console.error('Failed to load collapsed sections', e)
+    }
+  }
+
+  private saveCollapsedSections(): void {
+    try {
+      window.localStorage.setItem(
+        this.collapsedStorageKey,
+        JSON.stringify(Array.from(this.collapsedSections))
+      )
+    } catch (e) {
+      console.error('Failed to save collapsed sections', e)
+    }
   }
 
   private registerEvents(): void {
@@ -84,162 +126,235 @@ export class ZettelkastenView extends ItemView {
     const indexSettings = settings.getIndex()
     const viewSettings = settings.getZettelkastenView()
 
-    // Render dashboard notes first
-    if (viewSettings.dashboardNotes && viewSettings.dashboardNotes.length > 0) {
-      this.createDashboardSection(container, viewSettings.dashboardNotes)
-    }
-
     const menuItems: MenuItem[] = []
 
     // Fleeting Notes (Inbox)
     if (viewSettings.showInbox && fleetingSettings.enabled) {
-      const folder = viewSettings.inboxFilterFolder || fleetingSettings.folder
+      const useTagDetection = fleetingSettings.detectionMode === 'tag'
       menuItems.push({
-        name: 'Inbox',
+        name: viewSettings.inboxName || 'Inbox',
         icon: 'inbox',
-        folder: folder,
-        filterFunc: viewSettings.inboxFilterTag
-          ? (file: TFile) => this.hasTag(file, viewSettings.inboxFilterTag)
-          : undefined,
+        folder: fleetingSettings.folder,
+        dashboardNote: viewSettings.dashboardFleetingNote,
+        showFiles: viewSettings.showInboxFiles,
+        useFolderFilter: !useTagDetection,
+        filterFunc: (file: TFile) => {
+          // Check detection mode
+          if (useTagDetection) {
+            if (!this.hasTag(file, fleetingSettings.tag)) {
+              return false
+            }
+          }
+          // else folder-based - will be filtered by folder in getFilesForItem
+
+          // Apply additional filter tag if specified
+          if (viewSettings.inboxFilterTag) {
+            return this.hasTag(file, viewSettings.inboxFilterTag)
+          }
+
+          return true
+        },
       })
     }
 
     // Zettel Notes
     if (viewSettings.showZettels && zettelSettings.enabled) {
-      const folder = viewSettings.zettelsFilterFolder || zettelSettings.defaultFolder || ''
+      const useTagDetection = zettelSettings.zettelDetectionMode === 'tag'
       menuItems.push({
-        name: 'Zettels',
-        icon: 'file-text',
-        folder: folder,
+        name: viewSettings.zettelsName || 'Zettels',
+        icon: 'gallery-vertical-end',
+        folder: zettelSettings.defaultFolder || '',
+        dashboardNote: viewSettings.dashboardZettelNote,
+        showFiles: viewSettings.showZettelFiles,
+        useFolderFilter: !useTagDetection,
         filterFunc: (file: TFile) => {
-          // Filter to only show zettel notes (with ZettelId)
-          const zettelIdPattern = /^\d{17}/
-          const hasZettelId = zettelIdPattern.test(file.basename)
-
-          // Apply tag filter if specified
-          if (viewSettings.zettelsFilterTag) {
-            return hasZettelId && this.hasTag(file, viewSettings.zettelsFilterTag)
+          // Check detection mode
+          if (useTagDetection) {
+            if (!this.hasTag(file, zettelSettings.zettelTag)) {
+              return false
+            }
+          } else {
+            // Folder-based: also check for ZettelId pattern
+            const zettelIdPattern = /^\d{17}/
+            if (!zettelIdPattern.test(file.basename)) {
+              return false
+            }
           }
 
-          return hasZettelId
+          // Apply additional filter tag if specified
+          if (viewSettings.zettelsFilterTag) {
+            return this.hasTag(file, viewSettings.zettelsFilterTag)
+          }
+
+          return true
         },
       })
     }
 
-    // Literature Notes (References)
-    if (viewSettings.showReferences && literatureSettings.enabled) {
-      const folder = viewSettings.referencesFilterFolder || literatureSettings.folder
+    // Literature Notes
+    // Support both old 'showReferences' and new 'showLiterature' for backward compatibility
+    const showLiterature = viewSettings.showLiterature ?? viewSettings.showReferences ?? true
+    const showLiteratureFiles =
+      viewSettings.showLiteratureFiles ?? viewSettings.showReferenceFiles ?? true
+    const literatureFilterTag =
+      viewSettings.literatureFilterTag || viewSettings.referencesFilterTag || ''
+
+    if (showLiterature && literatureSettings.enabled) {
+      const useTagDetection = literatureSettings.detectionMode === 'tag'
       menuItems.push({
-        name: 'References',
+        name: viewSettings.literatureName || 'Literature',
         icon: 'book-open',
-        folder: folder,
-        filterFunc: viewSettings.referencesFilterTag
-          ? (file: TFile) => this.hasTag(file, viewSettings.referencesFilterTag)
-          : undefined,
+        folder: literatureSettings.folder,
+        dashboardNote: viewSettings.dashboardLiteratureNote,
+        showFiles: showLiteratureFiles,
+        useFolderFilter: !useTagDetection,
+        filterFunc: (file: TFile) => {
+          // Check detection mode
+          if (useTagDetection) {
+            if (!this.hasTag(file, literatureSettings.tag)) {
+              return false
+            }
+          }
+          // else folder-based - will be filtered by folder in getFilesForItem
+
+          // Apply additional filter tag if specified
+          if (literatureFilterTag) {
+            return this.hasTag(file, literatureFilterTag)
+          }
+
+          return true
+        },
       })
     }
 
     // Index Notes
     if (viewSettings.showIndex && indexSettings.enabled) {
-      const folder = viewSettings.indexFilterFolder || indexSettings.folder
+      const useTagDetection = indexSettings.detectionMode === 'tag'
       menuItems.push({
-        name: 'Index',
+        name: viewSettings.indexName || 'Index',
         icon: 'list',
-        folder: folder,
-        filterFunc: viewSettings.indexFilterTag
-          ? (file: TFile) => this.hasTag(file, viewSettings.indexFilterTag)
-          : undefined,
+        folder: indexSettings.folder,
+        dashboardNote: viewSettings.dashboardIndexNote,
+        showFiles: viewSettings.showIndexFiles,
+        useFolderFilter: !useTagDetection,
+        filterFunc: (file: TFile) => {
+          // Check detection mode
+          if (useTagDetection) {
+            if (!this.hasTag(file, indexSettings.tag)) {
+              return false
+            }
+          }
+          // else folder-based - will be filtered by folder in getFilesForItem
+
+          // Apply additional filter tag if specified
+          if (viewSettings.indexFilterTag) {
+            return this.hasTag(file, viewSettings.indexFilterTag)
+          }
+
+          return true
+        },
+      })
+    }
+
+    // Projects
+    const projectSettings = settings.getProjects()
+    if (viewSettings.showProjects && projectSettings.enabled) {
+      const useTagDetection = projectSettings.detectionMode === 'tag'
+      menuItems.push({
+        name: viewSettings.projectsName || 'Projects',
+        icon: 'folder-kanban',
+        folder: projectSettings.folder,
+        dashboardNote: viewSettings.dashboardProjectsNote,
+        showFiles: viewSettings.showProjectFiles,
+        useFolderFilter: !useTagDetection,
+        filterFunc: (file: TFile) => {
+          // Check detection mode
+          if (useTagDetection) {
+            if (!this.hasTag(file, projectSettings.tag)) {
+              return false
+            }
+          }
+          // else folder-based - will be filtered by folder in getFilesForItem
+
+          // Apply additional filter tag if specified
+          if (viewSettings.projectsFilterTag) {
+            return this.hasTag(file, viewSettings.projectsFilterTag)
+          }
+
+          return true
+        },
       })
     }
 
     menuItems.forEach((item) => {
       this.createMenuItem(container, item)
     })
-  }
 
-  /**
-   * Create dashboard section with pinned notes
-   */
-  private createDashboardSection(container: HTMLElement, notePaths: string[]): void {
-    const itemEl = container.createDiv({ cls: 'zk-menu-item' })
+    // Bookmarks section
+    this.createBookmarksSection(container)
 
-    // Header
-    const headerEl = itemEl.createDiv({ cls: 'zk-menu-header' })
-    const collapseIconEl = headerEl.createDiv({ cls: 'zk-collapse-icon' })
-    const isCollapsed = this.collapsedSections.has('Dashboard')
-
-    setIcon(collapseIconEl, isCollapsed ? 'chevron-right' : 'chevron-down')
-
-    const iconEl = headerEl.createDiv({ cls: 'zk-menu-icon' })
-    setIcon(iconEl, 'star')
-
-    const nameContainer = headerEl.createDiv({ cls: 'zk-menu-name-container' })
-    nameContainer.createSpan({ cls: 'zk-menu-name', text: 'Dashboard' })
-
-    // Content area
-    const contentEl = itemEl.createDiv({ cls: 'zk-menu-content' })
-    if (isCollapsed) {
-      contentEl.style.display = 'none'
+    // Note Sequences section
+    const sequenceSettings = settings.getNoteSequences()
+    if (sequenceSettings.enabled && sequenceSettings.showSequencesView) {
+      this.createNoteSequencesSection(container)
     }
-
-    // Add click handler
-    headerEl.addEventListener('click', async (e) => {
-      e.stopPropagation()
-      const isCurrentlyCollapsed = this.collapsedSections.has('Dashboard')
-
-      if (isCurrentlyCollapsed) {
-        this.collapsedSections.delete('Dashboard')
-        contentEl.style.display = 'block'
-        setIcon(collapseIconEl, 'chevron-down')
-      } else {
-        this.collapsedSections.add('Dashboard')
-        contentEl.style.display = 'none'
-        setIcon(collapseIconEl, 'chevron-right')
-      }
-    })
-    headerEl.style.cursor = 'pointer'
-
-    // Display dashboard notes
-    const dashboardFiles: TFile[] = []
-    notePaths.forEach((path) => {
-      const file = this.app.vault.getAbstractFileByPath(path)
-      if (file instanceof TFile) {
-        dashboardFiles.push(file)
-      }
-    })
-
-    this.displayFiles(contentEl, dashboardFiles)
   }
 
   /**
    * Check if a file has a specific tag
+   * Checks both inline tags and frontmatter tags
    */
   private hasTag(file: TFile, tag: string): boolean {
     const cache = this.app.metadataCache.getFileCache(file)
-    if (!cache || !cache.tags) {
+    if (!cache) {
+      return false
+    }
+
+    // Get all tags (both inline and frontmatter)
+    const fileTags = getAllTags(cache)
+    if (!fileTags || fileTags.length === 0) {
       return false
     }
 
     // Normalize tag (add # if missing)
     const normalizedTag = tag.startsWith('#') ? tag : `#${tag}`
 
-    return cache.tags.some((t) => t.tag === normalizedTag)
+    return fileTags.includes(normalizedTag)
   }
 
   private createMenuItem(container: HTMLElement, item: MenuItem): void {
+    // Menu item container
     const itemEl = container.createDiv({ cls: 'zk-menu-item' })
 
-    // Get files for this section first to determine if we show collapse icon
-    const files = this.getFilesForItem(item)
-    const hasFiles = files.length > 0
+    // Get files if enabled
+    let files: TFile[] = []
+    if (item.showFiles) {
+      files = this.getFilesForItem(item)
+    }
 
-    // Header with icon and name
+    // Check dashboard file
+    let dashboardFile: TFile | null = null
+    if (item.dashboardNote) {
+      const file = this.app.vault.getAbstractFileByPath(item.dashboardNote)
+      if (file instanceof TFile) {
+        dashboardFile = file
+      }
+    }
+
+    // Check if dashboard is active
+    const activeFile = this.app.workspace.getActiveFile()
+    const isDashboardActive = dashboardFile && activeFile?.path === dashboardFile.path
+
+    // Header with icon, arrow, and title
     const headerEl = itemEl.createDiv({ cls: 'zk-menu-header' })
+    if (isDashboardActive) {
+      headerEl.addClass('is-active-dashboard')
+    }
 
-    // Collapse icon (only show if there are files)
-    const isCollapsed = this.collapsedSections.has(item.name)
+    // Collapse chevron (only show if file lists are enabled)
     const collapseIconEl = headerEl.createDiv({ cls: 'zk-collapse-icon' })
-    if (hasFiles) {
+    if (item.showFiles) {
+      const isCollapsed = this.collapsedSections.has(item.name)
       setIcon(collapseIconEl, isCollapsed ? 'chevron-right' : 'chevron-down')
     }
 
@@ -247,22 +362,30 @@ export class ZettelkastenView extends ItemView {
     const iconEl = headerEl.createDiv({ cls: 'zk-menu-icon' })
     setIcon(iconEl, item.icon)
 
-    // Item name (no count)
-    const nameContainer = headerEl.createDiv({ cls: 'zk-menu-name-container' })
-    const nameEl = nameContainer.createSpan({ cls: 'zk-menu-name', text: item.name })
+    // Item name
+    headerEl.createDiv({ cls: 'zk-menu-name', text: item.name })
 
-    // Content area (collapsible)
+    // Content area for files
     const contentEl = itemEl.createDiv({ cls: 'zk-menu-content' })
-    // Auto-collapse if no files, or respect user's collapse state if there are files
-    if (!hasFiles || isCollapsed) {
+    if (item.showFiles) {
+      const isCollapsed = this.collapsedSections.has(item.name)
+      if (isCollapsed) {
+        contentEl.style.display = 'none'
+      }
+    } else {
+      // Hide content area when file lists are disabled
       contentEl.style.display = 'none'
     }
 
-    // Add click handler to header for collapse/expand (only if there are files)
-    if (hasFiles) {
-      headerEl.addEventListener('click', async (e) => {
-        e.stopPropagation()
+    // Add click handler to header
+    headerEl.addEventListener('click', async (e) => {
+      e.stopPropagation()
 
+      // If file lists are enabled and clicking on the collapse icon, toggle collapse
+      if (
+        item.showFiles &&
+        (e.target === collapseIconEl || collapseIconEl.contains(e.target as Node))
+      ) {
         const isCurrentlyCollapsed = this.collapsedSections.has(item.name)
 
         if (isCurrentlyCollapsed) {
@@ -274,14 +397,25 @@ export class ZettelkastenView extends ItemView {
           contentEl.style.display = 'none'
           setIcon(collapseIconEl, 'chevron-right')
         }
-      })
-      headerEl.style.cursor = 'pointer'
-    } else {
-      headerEl.style.cursor = 'default'
+        this.saveCollapsedSections()
+      } else if (
+        !item.showFiles ||
+        !(e.target === collapseIconEl || collapseIconEl.contains(e.target as Node))
+      ) {
+        // Open the dashboard file when not clicking collapse icon or when file lists are disabled
+        if (dashboardFile) {
+          await this.app.workspace.getLeaf(false).openFile(dashboardFile)
+        }
+      }
+    })
+
+    // Display files (only if enabled)
+    if (item.showFiles) {
+      this.displayFiles(contentEl, files)
     }
 
-    // Display files
-    this.displayFiles(contentEl, files)
+    // Append the item to the container
+    container.appendChild(itemEl)
   }
 
   private getFilesForItem(item: MenuItem): TFile[] {
@@ -289,14 +423,22 @@ export class ZettelkastenView extends ItemView {
 
     let files: TFile[]
 
-    if (!item.folder) {
-      // If no folder (e.g., root), get all markdown files
+    // If using tag-based detection, search all files
+    // If using folder-based detection, filter by folder
+    if (!item.useFolderFilter) {
+      // Tag-based: get all markdown files
       files = allFiles
     } else {
-      // Filter files in the folder
-      files = allFiles.filter(
-        (file) => file.path.startsWith(item.folder + '/') || file.parent?.path === item.folder
-      )
+      // Folder-based: filter files in the folder
+      if (!item.folder) {
+        // If no folder (e.g., root), get all markdown files
+        files = allFiles
+      } else {
+        // Filter files in the folder (recursively)
+        files = allFiles.filter(
+          (file) => file.path.startsWith(item.folder + '/') || file.parent?.path === item.folder
+        )
+      }
     }
 
     // Apply additional filter if provided
@@ -316,26 +458,30 @@ export class ZettelkastenView extends ItemView {
       return
     }
 
+    // Create a file list container using Obsidian's native classes
+    const fileListContainer = container.createDiv({ cls: 'nav-files-container' })
+
     const activeFile = this.app.workspace.getActiveFile()
 
     files.forEach((file) => {
-      const fileEl = container.createDiv({ cls: 'tree-item nav-file' })
+      const fileEl = fileListContainer.createDiv({ cls: 'tree-item nav-file' })
 
-      // Inner container
-      const fileItemSelf = fileEl.createDiv({ cls: 'tree-item-self nav-file-title' })
+      // Inner container with native Obsidian classes
+      const fileItemSelf = fileEl.createDiv({ cls: 'tree-item-self is-clickable nav-file-title' })
 
-      // Highlight if this is the active file with purple background
+      // Set the data attributes that Obsidian's file explorer uses
+      fileItemSelf.setAttribute('data-path', file.path)
+
+      // Highlight if this is the active file
       if (activeFile && file.path === activeFile.path) {
         fileItemSelf.addClass('is-active')
-        fileItemSelf.style.backgroundColor = 'var(--interactive-accent)'
-        fileItemSelf.style.color = 'var(--text-on-accent)'
       }
 
       // File title (from frontmatter or filename)
       const cache = this.app.metadataCache.getFileCache(file)
       const title = cache?.frontmatter?.title || file.basename
 
-      // Inner content
+      // Inner content with proper nesting
       const fileInner = fileItemSelf.createDiv({ cls: 'tree-item-inner nav-file-title-content' })
       fileInner.setText(title)
 
@@ -345,32 +491,353 @@ export class ZettelkastenView extends ItemView {
         await this.app.workspace.getLeaf(false).openFile(file)
       })
 
-      // Context menu
+      // Context menu with native feel
       fileItemSelf.addEventListener('contextmenu', (e) => {
         e.preventDefault()
-        const menu = new (require('obsidian') as any).Menu()
+        e.stopPropagation()
+        const menu = new Menu()
 
-        menu.addItem((item: any) => {
+        menu.addItem((item: ObsidianMenuItem) => {
+          item
+            .setTitle('Open')
+            .setIcon('file')
+            .onClick(async () => {
+              await this.app.workspace.getLeaf(false).openFile(file)
+            })
+        })
+
+        menu.addItem((item: ObsidianMenuItem) => {
           item
             .setTitle('Open in new tab')
-            .setIcon('external-link')
+            .setIcon('lucide-file-plus')
             .onClick(async () => {
               await this.app.workspace.getLeaf('tab').openFile(file)
             })
         })
 
-        menu.addItem((item: any) => {
+        menu.addItem((item: ObsidianMenuItem) => {
           item
-            .setTitle('Open in new pane')
-            .setIcon('columns-2')
+            .setTitle('Open to the right')
+            .setIcon('lucide-separator-vertical')
             .onClick(async () => {
               await this.app.workspace.getLeaf('split').openFile(file)
             })
         })
 
+        menu.addSeparator()
+
+        menu.addItem((item: ObsidianMenuItem) => {
+          item
+            .setTitle('Reveal in navigation')
+            .setIcon('lucide-folder-open')
+            .onClick(() => {
+              // Reveal file in the main file explorer
+              const fileExplorer = this.app.workspace.getLeavesOfType('file-explorer')[0]
+              if (fileExplorer) {
+                const view = fileExplorer.view as { revealInFolder?: (file: TFile) => void }
+                if (view && view.revealInFolder) {
+                  view.revealInFolder(file)
+                }
+              }
+            })
+        })
+
         menu.showAtMouseEvent(e)
       })
+
+      // Add drag support for native feel
+      fileItemSelf.setAttribute('draggable', 'true')
+      fileItemSelf.addEventListener('dragstart', (e) => {
+        e.dataTransfer?.setData('text/plain', file.path)
+        e.dataTransfer!.effectAllowed = 'move'
+      })
     })
+  }
+
+  /**
+   * Create Bookmarks section with saved bookmarks
+   */
+  private createBookmarksSection(container: HTMLElement): void {
+    const settings = this.plugin.getSettingsManager()
+    const viewSettings = settings.getZettelkastenView()
+    const bookmarksName = viewSettings.bookmarksName || 'Bookmarks'
+
+    const itemEl = container.createDiv({ cls: 'zk-menu-item' })
+    const headerEl = itemEl.createDiv({ cls: 'zk-menu-header' })
+
+    // Collapse icon
+    const collapseIconEl = headerEl.createDiv({ cls: 'zk-collapse-icon' })
+    const isCollapsed = this.collapsedSections.has(bookmarksName)
+    setIcon(collapseIconEl, isCollapsed ? 'chevron-right' : 'chevron-down')
+
+    // Item icon
+    const iconEl = headerEl.createDiv({ cls: 'zk-menu-icon' })
+    setIcon(iconEl, 'bookmark')
+
+    // Item name
+    headerEl.createDiv({ cls: 'zk-menu-name', text: bookmarksName })
+
+    // Content area (collapsible)
+    const contentEl = itemEl.createDiv({ cls: 'zk-menu-content' })
+    if (isCollapsed) {
+      contentEl.style.display = 'none'
+    }
+
+    // Add click handler to header (toggle collapse)
+    headerEl.addEventListener('click', async (e) => {
+      e.stopPropagation()
+
+      const isCurrentlyCollapsed = this.collapsedSections.has(bookmarksName)
+
+      if (isCurrentlyCollapsed) {
+        this.collapsedSections.delete(bookmarksName)
+        contentEl.style.display = 'block'
+        setIcon(collapseIconEl, 'chevron-down')
+      } else {
+        this.collapsedSections.add(bookmarksName)
+        contentEl.style.display = 'none'
+        setIcon(collapseIconEl, 'chevron-right')
+      }
+      this.saveCollapsedSections()
+    })
+
+    // Display bookmarks
+    this.displayBookmarks(contentEl)
+  }
+
+  /**
+   * Display bookmarks in the content area
+   */
+  private displayBookmarks(container: HTMLElement): void {
+    const settings = this.plugin.getSettingsManager()
+    const viewSettings = settings.getZettelkastenView()
+    const bookmarks = viewSettings.bookmarks
+
+    if (bookmarks.length === 0) {
+      container.createDiv({
+        cls: 'zk-no-files',
+        text: 'No bookmarks yet',
+      })
+      return
+    }
+
+    // Create a file list container using Obsidian's native classes
+    const bookmarkListContainer = container.createDiv({ cls: 'nav-files-container' })
+
+    bookmarks.forEach((bookmark) => {
+      const bookmarkEl = bookmarkListContainer.createDiv({ cls: 'tree-item nav-file' })
+      const bookmarkItemSelf = bookmarkEl.createDiv({
+        cls: 'tree-item-self is-clickable nav-file-title',
+      })
+
+      // Icon based on type
+      let iconName = 'file'
+      switch (bookmark.type) {
+        case 'file':
+          iconName = 'file-text'
+          break
+        case 'search':
+          iconName = 'search'
+          break
+        case 'graph':
+          iconName = 'git-branch-plus'
+          break
+        case 'folder':
+          iconName = 'folder'
+          break
+      }
+
+      const iconEl = bookmarkItemSelf.createDiv({ cls: 'tree-item-icon' })
+      setIcon(iconEl, iconName)
+
+      // Title
+      const titleEl = bookmarkItemSelf.createDiv({ cls: 'tree-item-inner nav-file-title-content' })
+      titleEl.setText(bookmark.title)
+
+      // Click handler
+      bookmarkItemSelf.addEventListener('click', async (e) => {
+        e.stopPropagation()
+        await this.handleBookmarkClick(bookmark)
+      })
+    })
+  }
+
+  /**
+   * Handle clicking on a bookmark
+   */
+  private async handleBookmarkClick(bookmark: Bookmark): Promise<void> {
+    switch (bookmark.type) {
+      case 'file':
+        if (bookmark.path) {
+          const file = this.app.vault.getAbstractFileByPath(bookmark.path)
+          if (file instanceof TFile) {
+            await this.app.workspace.getLeaf(false).openFile(file)
+          }
+        }
+        break
+
+      case 'search':
+        if (bookmark.query) {
+          // Open search view with the query
+          const searchLeaf = this.app.workspace.getLeavesOfType('search')[0]
+          if (searchLeaf) {
+            this.app.workspace.revealLeaf(searchLeaf)
+            // @ts-ignore - accessing internal API
+            searchLeaf.view.setQuery(bookmark.query)
+          }
+        }
+        break
+
+      case 'graph':
+        // Open graph view
+        this.app.workspace.getLeaf(false).setViewState({
+          type: 'graph',
+          active: true,
+        })
+        break
+
+      case 'folder':
+        if (bookmark.path) {
+          const folder = this.app.vault.getAbstractFileByPath(bookmark.path)
+          if (folder instanceof TFolder) {
+            // Reveal folder in file explorer
+            const fileExplorer = this.app.workspace.getLeavesOfType('file-explorer')[0]
+            if (fileExplorer && fileExplorer.view) {
+              // @ts-ignore - accessing internal API
+              fileExplorer.view.revealInFolder(folder)
+            }
+          }
+        }
+        break
+    }
+  }
+
+  /**
+   * Create Note Sequences section - simple link to open view
+   */
+  private createNoteSequencesSection(container: HTMLElement): void {
+    const itemEl = container.createDiv({ cls: 'zk-menu-item' })
+    const headerEl = itemEl.createDiv({ cls: 'zk-menu-header' })
+
+    // Optional collapse icon (for alignment)
+    headerEl.createDiv({ cls: 'zk-collapse-icon' })
+
+    const iconEl = headerEl.createDiv({ cls: 'zk-menu-icon' })
+    setIcon(iconEl, 'layers')
+
+    const nameContainer = headerEl.createDiv({ cls: 'zk-menu-name-container' })
+    nameContainer.createSpan({ cls: 'zk-menu-name', text: 'Note Sequences' })
+
+    // Click handler for dashboard
+    headerEl.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      await this.app.workspace.getLeaf('tab').setViewState({
+        type: VIEW_TYPE_NOTE_SEQUENCES,
+        active: true,
+      })
+    })
+    headerEl.style.cursor = 'pointer'
+  }
+
+  /**
+   * Create a card for a root note without children
+   */
+  private createRootOnlyCard(container: HTMLElement, file: TFile): void {
+    const card = container.createDiv({ cls: 'sequence-card' })
+
+    // Card header
+    const header = card.createDiv({ cls: 'sequence-card-header' })
+    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
+
+    // Icon
+    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
+    setIcon(iconEl, 'file')
+
+    // Title (clickable)
+    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
+    const cache = this.app.metadataCache.getFileCache(file)
+    const title = cache?.frontmatter?.title || file.basename
+    titleEl.setText(title)
+    titleEl.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      await this.app.workspace.getLeaf(false).openFile(file)
+    })
+
+    // Card body
+    const body = card.createDiv({ cls: 'sequence-card-body' })
+    body.createDiv({
+      cls: 'sequence-card-empty',
+      text: 'No children',
+    })
+  }
+
+  /**
+   * Create a card for a note sequence
+   */
+  private createSequenceCard(container: HTMLElement, sequence: NoteSequence): void {
+    const card = container.createDiv({ cls: 'sequence-card' })
+
+    // Card header with parent note
+    const header = card.createDiv({ cls: 'sequence-card-header' })
+    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
+
+    // Parent icon
+    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
+    setIcon(iconEl, 'layers')
+
+    // Parent title (clickable)
+    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
+    const cache = this.app.metadataCache.getFileCache(sequence.root.file)
+    const title = cache?.frontmatter?.title || sequence.root.file.basename
+    titleEl.setText(title)
+    titleEl.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      await this.app.workspace.getLeaf(false).openFile(sequence.root.file)
+    })
+
+    // Action buttons container
+    const actionsEl = headerContent.createDiv({ cls: 'sequence-card-actions' })
+
+    // Open in new tab button
+    const openBtn = actionsEl.createDiv({
+      cls: 'sequence-card-action-btn',
+      attr: { 'aria-label': 'Open sequence in new tab' },
+    })
+    setIcon(openBtn, 'external-link')
+    openBtn.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      await this.app.workspace.getLeaf(true).openFile(sequence.root.file)
+    })
+
+    // Card body with children
+    const body = card.createDiv({ cls: 'sequence-card-body' })
+
+    if (sequence.allNodes.length === 0) {
+      body.createDiv({
+        cls: 'sequence-card-empty',
+        text: 'No children',
+      })
+    } else {
+      // Render all nodes (already flattened in allNodes)
+      sequence.allNodes.forEach((node: SequenceNode) => {
+        const item = body.createDiv({
+          cls: 'sequence-child-item',
+          attr: { style: `padding-left: ${12 + node.level * 20}px` },
+        })
+
+        // Child title
+        const childTitleEl = item.createDiv({ cls: 'sequence-child-title' })
+        const childCache = this.app.metadataCache.getFileCache(node.file)
+        const childTitle = childCache?.frontmatter?.title || node.file.basename
+        childTitleEl.setText(childTitle)
+
+        // Click handler to open the file
+        item.addEventListener('click', async (e) => {
+          e.stopPropagation()
+          await this.app.workspace.getLeaf(false).openFile(node.file)
+        })
+      })
+    }
   }
 
   async onClose(): Promise<void> {

@@ -31,6 +31,9 @@ export { nextSiblingCommand } from './nextSibling'
 export { nextChildCommand } from './nextChild'
 export { nextSequenceCommand } from './nextSequence'
 
+// Bookmark management commands
+export { addBookmarkCommand, removeBookmarkCommand } from './manageBookmarks'
+
 // Add more command exports here as you create them
 
 /*

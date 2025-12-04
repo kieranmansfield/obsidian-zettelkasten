@@ -33,7 +33,7 @@ h1.zettelkasten-settings-title {
 
 /* Mobile: Disable collapsible sections - keep all sections open */
 .is-mobile .zettelkasten-collapsible-section {
-  /* Force details element to stay open */
+  display: block;
 }
 
 .is-mobile .zettelkasten-collapsible-section summary {
@@ -557,4 +557,137 @@ h1.zettelkasten-settings-title {
   border-top: none;
   padding-top: 0;
   margin-top: 8px;
+}
+
+/* Zettelkasten View Tabs */
+.zk-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 0 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.zk-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.zk-tab:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.zk-tab.is-active {
+  background-color: var(--background-primary-alt);
+  border-bottom: 2px solid var(--interactive-accent);
+}
+
+.zk-tab-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.zk-tab-label {
+  font-size: 0.9em;
+  font-weight: 500;
+}
+
+.zk-content {
+  padding: 8px;
+  overflow-y: auto;
+  max-height: calc(100vh - 100px);
+}
+
+/* Zettelkasten view: smooth collapse/expand for menu content */
+.zettelkasten-view .zk-menu-content {
+  overflow: hidden;
+  max-height: 1000px;
+  transition: max-height 220ms ease;
+}
+
+.zettelkasten-view .zk-menu-content.zk-collapsed {
+  max-height: 0;
+}
+
+/* File list container in zettelkasten view */
+.zettelkasten-view .nav-files-container {
+  padding: 0;
+  margin: 0;
+}
+
+/* File items in zettelkasten view */
+.zettelkasten-view .tree-item.nav-file {
+  margin: 0;
+  padding: 0;
+}
+
+.zettelkasten-view .tree-item-self.nav-file-title {
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.1s;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.zettelkasten-view .tree-item-self.nav-file-title:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+/* Active file highlighting */
+.zettelkasten-view .tree-item-self.nav-file-title.is-active {
+  background-color: var(--nav-item-background-active);
+  color: var(--nav-item-color-active);
+}
+
+.zettelkasten-view .tree-item-self.nav-file-title.is-active .tree-item-inner {
+  color: var(--nav-item-color-active);
+  font-weight: 500;
+}
+
+/* File title content */
+.zettelkasten-view .tree-item-inner.nav-file-title-content {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-normal);
+}
+
+/* Mobile-specific styling for file lists */
+.is-mobile .zettelkasten-view .tree-item-self.nav-file-title {
+  padding: 8px 12px;
+  min-height: 44px; /* iOS recommended touch target */
+  display: flex;
+  align-items: center;
+}
+
+.is-mobile .zettelkasten-view .tree-item-inner.nav-file-title-content {
+  font-size: 14px;
+}
+
+/* Dragging support */
+.zettelkasten-view .tree-item-self.nav-file-title[draggable='true'] {
+  cursor: grab;
+}
+
+.zettelkasten-view .tree-item-self.nav-file-title:active {
+  cursor: grabbing;
+}
+
+/* Ensure proper spacing in collapsed/expanded state */
+.zettelkasten-view .zk-menu-content .nav-files-container {
+  margin-top: 4px;
+}
+
+/* Menu name container cursor */
+.zk-menu-name-container {
+  flex: 1;
+  cursor: pointer;
 }

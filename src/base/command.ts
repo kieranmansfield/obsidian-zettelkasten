@@ -1,4 +1,4 @@
-import type { App, Command } from 'obsidian'
+import type { App, Command, Plugin } from 'obsidian'
 import type FileService from '../service/file.service'
 import type BoxService from '../service/box.service'
 import type BoxManager from '../core/boxManager.class'
@@ -59,6 +59,7 @@ export interface BaseCommand extends Omit<Command, 'callback'> {
 export interface CommandContext {
   // Core services
   app: App
+  plugin?: Plugin
 
   // Plugin services (add as needed)
   fileService?: FileService

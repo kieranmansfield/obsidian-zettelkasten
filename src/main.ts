@@ -101,43 +101,26 @@ export default class ZettelkastenPlugin extends Plugin {
    * Register views for Note Sequences and Zettelkasten Sidebar
    */
   private registerViews(): void {
-    const sequenceSettings = this.settingsManager.getNoteSequences()
-    const zettelkastenViewSettings = this.settingsManager.getZettelkastenView()
     const boxSettings = this.settingsManager.getBoxes()
     const rootFolder = boxSettings.rootFolder
 
-    // Register Zettelkasten Sidebar View
-    if (zettelkastenViewSettings.enabled) {
-      this.registerView(VIEW_TYPE_ZETTELKASTEN, (leaf) => new ZettelkastenView(leaf, this))
-    }
+    // Always register view types (even if disabled) to prevent ghost icons
+    this.registerView(VIEW_TYPE_ZETTELKASTEN, (leaf) => new ZettelkastenView(leaf, this))
 
-    if (!sequenceSettings.enabled) {
-      return
-    }
+    this.registerView(
+      VIEW_TYPE_NOTE_SEQUENCES,
+      (leaf) => new NoteSequencesView(leaf, this.noteSequenceService, rootFolder)
+    )
 
-    // Register Note Sequences View
-    if (sequenceSettings.showSequencesView) {
-      this.registerView(
-        VIEW_TYPE_NOTE_SEQUENCES,
-        (leaf) => new NoteSequencesView(leaf, this.noteSequenceService, rootFolder)
-      )
-    }
+    this.registerView(
+      VIEW_TYPE_NOTE_SEQUENCES_BASES,
+      (leaf) => new NoteSequencesBasesView(leaf, this.noteSequenceService, rootFolder)
+    )
 
-    // Register Note Sequences Bases View
-    if (sequenceSettings.showSequencesView) {
-      this.registerView(
-        VIEW_TYPE_NOTE_SEQUENCES_BASES,
-        (leaf) => new NoteSequencesBasesView(leaf, this.noteSequenceService, rootFolder)
-      )
-    }
-
-    // Register Sequence Navigator View
-    if (sequenceSettings.showSequenceNavigator) {
-      this.registerView(
-        VIEW_TYPE_SEQUENCE_NAVIGATOR,
-        (leaf) => new SequenceNavigatorView(leaf, this.noteSequenceService)
-      )
-    }
+    this.registerView(
+      VIEW_TYPE_SEQUENCE_NAVIGATOR,
+      (leaf) => new SequenceNavigatorView(leaf, this.noteSequenceService)
+    )
   }
 
   /**
@@ -162,6 +145,7 @@ export default class ZettelkastenPlugin extends Plugin {
     // Build command context with all dependencies
     const context: CommandContext = {
       app: this.app,
+      plugin: this,
       fileService: this.fileService,
       boxService: this.boxService,
       boxManager: this.boxManager,
@@ -199,6 +183,8 @@ export default class ZettelkastenPlugin extends Plugin {
       .add(commands.nextSiblingCommand)
       .add(commands.nextChildCommand)
       .add(commands.nextSequenceCommand)
+      .add(commands.addBookmarkCommand)
+      .add(commands.removeBookmarkCommand)
       .registerAll(this.getEnabledCommandsFromSettings())
   }
 

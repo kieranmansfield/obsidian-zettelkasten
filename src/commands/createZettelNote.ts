@@ -1,17 +1,17 @@
 import type { CommandFactory } from '../base/command'
-import { CreateZettelFuzzyModal } from '../ui/CreateZettelFuzzyModal'
-import { TFile } from 'obsidian'
+import { CreateNoteWithSuggestModal } from '../ui/CreateNoteWithSuggestModal'
+import { Notice, TFile } from 'obsidian'
 
 /**
- * Command: Create New Zettel Note
+ * Command: Create Zettel
  *
  * Creates a new atomic zettel with a unique ZettelId
- * Uses fuzzy search to find existing zettels or create new ones
+ * Ported from master branch - DO NOT MODIFY FUNCTIONALITY
  */
 export const createZettelNoteCommand: CommandFactory = (context) => {
   return {
-    id: 'create-zettel-note',
-    name: 'Create Zettel Note',
+    id: 'create-new-note',
+    name: 'Create Zettel',
     icon: 'file-plus',
 
     metadata: {
@@ -22,18 +22,19 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
     },
 
     execute: async () => {
-      if (!context.zettelNote || !context.settingsManager || !context.fileService || !context.boxManager) {
+      if (!context.zettelNote || !context.settingsManager || !context.fileService) {
         console.error('Required services not available')
         return
       }
 
       const settings = context.settingsManager.getZettel()
 
-      // Show fuzzy modal for finding or creating zettels
-      new CreateZettelFuzzyModal(
+      // Get existing zettel notes for autocomplete
+      const zettels = getZettelFiles(context.app)
+
+      new CreateNoteWithSuggestModal(
         context.app,
-        context.settingsManager,
-        context.boxManager,
+        zettels,
         async (title: string) => {
           try {
             // Load template from file or use inline template
@@ -48,20 +49,42 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
               content: templateContent.replace('{{title}}', title),
             })
 
-            console.log('Created zettel:', result)
+            new Notice(`Created zettel: ${result.filename}`)
 
-            // Open the newly created file in the editor if settings.openOnCreate is true
+            // Open the newly created file in the editor
             if (settings.openOnCreate) {
               const file = context.app.vault.getAbstractFileByPath(result.path)
               if (file instanceof TFile) {
                 await context.app.workspace.getLeaf().openFile(file)
               }
             }
-          } catch (err) {
-            console.error('Failed to create zettel:', err)
+          } catch (error: any) {
+            new Notice(`Error creating zettel: ${error.message}`)
+            console.error('Failed to create zettel:', error)
           }
         }
       ).open()
     },
   }
+}
+
+/**
+ * Get all zettel files
+ * Adapted from master's getNoteTitlesByTag to work with folder-based detection
+ */
+function getZettelFiles(app: any): TFile[] {
+  const files = app.vault.getMarkdownFiles()
+  const zettels: TFile[] = []
+
+  for (const file of files) {
+    // Check if file has a zettel ID (17 digits at start of filename)
+    const zettelIdPattern = /^\d{17}/
+    if (!zettelIdPattern.test(file.basename)) {
+      continue
+    }
+
+    zettels.push(file)
+  }
+
+  return zettels
 }

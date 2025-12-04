@@ -6,6 +6,7 @@ import {
   FleetingSettings,
   IndexSettings,
   LiteratureSettings,
+  ProjectSettings,
   BoxConfig,
   ZettelDetectionMode,
   ZettelkastenViewSettings,
@@ -17,6 +18,9 @@ import {
  */
 export const DEFAULT_ZETTEL_SETTINGS: ZettelSettings = {
   enabled: true,
+  zettelDetectionMode: ZettelDetectionMode.FOLDER,
+  zettelTag: 'zettel',
+  zettelIdFormat: 'YYYYMMDDHHmmssSSS',
   defaultFolder: '',
   templatePath: '',
   template: '# {{title}}\n\n',
@@ -31,6 +35,8 @@ export const DEFAULT_ZETTEL_SETTINGS: ZettelSettings = {
  */
 export const DEFAULT_FLEETING_SETTINGS: FleetingSettings = {
   enabled: true,
+  detectionMode: ZettelDetectionMode.FOLDER,
+  tag: 'fleeting',
   folder: 'fleeting',
   templatePath: '',
   template: '# {{title}}\n\n',
@@ -42,6 +48,8 @@ export const DEFAULT_FLEETING_SETTINGS: FleetingSettings = {
  */
 export const DEFAULT_INDEX_SETTINGS: IndexSettings = {
   enabled: true,
+  detectionMode: ZettelDetectionMode.FOLDER,
+  tag: 'index',
   folder: 'index',
   templatePath: '',
   template: '# {{title}}\n\n## Overview\n\n## Notes\n\n',
@@ -53,6 +61,8 @@ export const DEFAULT_INDEX_SETTINGS: IndexSettings = {
  */
 export const DEFAULT_LITERATURE_SETTINGS: LiteratureSettings = {
   enabled: true,
+  detectionMode: ZettelDetectionMode.FOLDER,
+  tag: 'literature',
   folder: 'literature',
   templatePath: '',
   template:
@@ -61,23 +71,50 @@ export const DEFAULT_LITERATURE_SETTINGS: LiteratureSettings = {
 }
 
 /**
+ * Default project settings
+ */
+export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
+  enabled: false,
+  detectionMode: ZettelDetectionMode.FOLDER,
+  tag: 'project',
+  folder: 'projects',
+  templatePath: '',
+  template: '# {{title}}\n\n## Overview\n\n## Tasks\n\n',
+  openOnCreate: true,
+}
+
+/**
  * Default Zettelkasten view settings
  */
 export const DEFAULT_ZETTELKASTEN_VIEW_SETTINGS: ZettelkastenViewSettings = {
   enabled: true,
+  inboxName: 'Inbox',
+  zettelsName: 'Zettels',
+  literatureName: 'Literature',
+  indexName: 'Index',
+  projectsName: 'Projects',
+  bookmarksName: 'Bookmarks',
   showInbox: true,
+  showInboxFiles: true,
   showZettels: true,
-  showReferences: true,
+  showZettelFiles: true,
+  showLiterature: true,
+  showLiteratureFiles: true,
   showIndex: true,
-  dashboardNotes: [],
+  showIndexFiles: true,
+  showProjects: false,
+  showProjectFiles: true,
+  dashboardFleetingNote: '',
+  dashboardZettelNote: '',
+  dashboardLiteratureNote: '',
+  dashboardIndexNote: '',
+  dashboardProjectsNote: '',
   inboxFilterTag: '',
-  inboxFilterFolder: '',
   zettelsFilterTag: '',
-  zettelsFilterFolder: '',
-  referencesFilterTag: '',
-  referencesFilterFolder: '',
+  literatureFilterTag: '',
   indexFilterTag: '',
-  indexFilterFolder: '',
+  projectsFilterTag: '',
+  bookmarks: [],
 }
 
 /**
@@ -114,8 +151,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
   general: {
     ignoredFolders: [],
-    zettelDetectionMode: ZettelDetectionMode.FOLDER,
-    zettelIdFormat: 'YYYYMMDDHHmmssSSS',
   },
 
   commands: {
@@ -135,6 +170,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   fleeting: { ...DEFAULT_FLEETING_SETTINGS },
   index: { ...DEFAULT_INDEX_SETTINGS },
   literature: { ...DEFAULT_LITERATURE_SETTINGS },
+  projects: { ...DEFAULT_PROJECT_SETTINGS },
   zettelkastenView: { ...DEFAULT_ZETTELKASTEN_VIEW_SETTINGS },
   noteSequences: { ...DEFAULT_NOTE_SEQUENCE_SETTINGS },
 }

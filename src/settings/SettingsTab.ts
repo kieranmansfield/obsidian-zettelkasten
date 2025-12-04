@@ -3,6 +3,7 @@ import type ZettelkastenPlugin from '../main'
 import { FilenameFormat, BoxMode, ZettelDetectionMode } from '../base/settings'
 import { FolderSuggest } from '../ui/FolderSuggest'
 import { FileSuggest } from '../ui/FileSuggest'
+import { TagSuggest } from '../ui/TagSuggest'
 import { BoxConfigModal } from '../ui/BoxConfigModal'
 import { ImportExportModal } from '../ui/ImportExportModal'
 import { CommandsModal } from '../ui/CommandsModal'
@@ -61,6 +62,9 @@ export default class SettingsTab extends PluginSettingTab {
 
       // Literature Note Settings with enable/disable
       this.displayLiteratureSettings(containerEl)
+
+      // Project Note Settings with enable/disable
+      this.displayProjectSettings(containerEl)
     }
 
     // Zettelkasten View (shown regardless of box mode)
@@ -152,33 +156,6 @@ export default class SettingsTab extends PluginSettingTab {
 
     const sectionEl = containerEl.createDiv({ cls: 'settings-section' })
     sectionEl.createEl('h1', { text: 'General' })
-
-    // Zettel Detection Mode
-    new Setting(sectionEl)
-      .setName('Zettel Detection Mode')
-      .setDesc('How to identify zettel notes: by folder location or by tags')
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption(ZettelDetectionMode.FOLDER, 'Folder-based')
-          .addOption(ZettelDetectionMode.TAG, 'Tag-based')
-          .setValue(generalSettings.zettelDetectionMode)
-          .onChange(async (value) => {
-            await settings.updateGeneral({ zettelDetectionMode: value as ZettelDetectionMode })
-          })
-      })
-
-    // Zettel ID Format
-    new Setting(sectionEl)
-      .setName('Zettel ID Format')
-      .setDesc('Format for ZettelId timestamps (e.g., YYYYMMDDHHmmssSSS)')
-      .addText((text) => {
-        text
-          .setPlaceholder('YYYYMMDDHHmmssSSS')
-          .setValue(generalSettings.zettelIdFormat)
-          .onChange(async (value) => {
-            await settings.updateGeneral({ zettelIdFormat: value || 'YYYYMMDDHHmmssSSS' })
-          })
-      })
 
     // Manage Commands
     new Setting(sectionEl)
@@ -408,6 +385,53 @@ export default class SettingsTab extends PluginSettingTab {
 
     if (!zettelSettings.enabled) return
 
+    // Zettel Detection Mode
+    new Setting(content)
+      .setName('Zettel Detection Mode')
+      .setDesc('How to identify zettel notes: by folder location or by tags')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption(ZettelDetectionMode.FOLDER, 'Folder-based')
+          .addOption(ZettelDetectionMode.TAG, 'Tag-based')
+          .setValue(zettelSettings.zettelDetectionMode)
+          .onChange(async (value) => {
+            await settings.updateZettel({ zettelDetectionMode: value as ZettelDetectionMode })
+            this.display() // Refresh to show/hide tag input
+          })
+      })
+
+    // Zettel Tag (only shown if TAG mode)
+    if (zettelSettings.zettelDetectionMode === ZettelDetectionMode.TAG) {
+      new Setting(content)
+        .setName('Zettel Tag')
+        .setDesc('Tag to identify zettel notes (e.g., "zettel" or "#zettel")')
+        .addText((text) => {
+          text
+            .setPlaceholder('zettel')
+            .setValue(zettelSettings.zettelTag)
+            .onChange(async (value) => {
+              await settings.updateZettel({ zettelTag: value || 'zettel' })
+            })
+          new TagSuggest(this.app, text.inputEl, async (value) => {
+            text.setValue(value)
+            await settings.updateZettel({ zettelTag: value })
+          })
+        })
+    }
+
+    // Zettel ID Format
+    new Setting(content)
+      .setName('Zettel ID Format')
+      .setDesc('Format for ZettelId timestamps (e.g., YYYYMMDDHHmmssSSS)')
+      .addText((text) => {
+        text
+          .setPlaceholder('YYYYMMDDHHmmssSSS')
+          .setValue(zettelSettings.zettelIdFormat)
+          .onChange(async (value) => {
+            await settings.updateZettel({ zettelIdFormat: value || 'YYYYMMDDHHmmssSSS' })
+          })
+      })
+
     new Setting(content)
       .setName('Default Folder')
       .setDesc('Folder for zettel notes (relative to box root, leave empty for box root)')
@@ -629,6 +653,54 @@ export default class SettingsTab extends PluginSettingTab {
   }
 
   /**
+   * Project Note Settings Section
+   */
+  private displayProjectSettings(containerEl: HTMLElement): void {
+    const settings = this.plugin.getSettingsManager()
+    const projectSettings = settings.getProjects()
+
+    const content = this.createCollapsibleSection(
+      containerEl,
+      'Project Notes',
+      'Notes for organizing and tracking projects, tasks, and long-term work.',
+      false,
+      {
+        getValue: () => projectSettings.enabled,
+        onChange: async (enabled) => {
+          await settings.updateProjects({ enabled })
+        },
+      }
+    )
+
+    if (!projectSettings.enabled) return
+
+    new Setting(content)
+      .setName('Folder')
+      .setDesc('Folder for project notes')
+      .addText((text) => {
+        text
+          .setPlaceholder('projects')
+          .setValue(projectSettings.folder)
+          .onChange(async (value) => {
+            await settings.updateProjects({ folder: value || 'projects' })
+          })
+      })
+
+    this.addTemplateFileSetting(content, 'Project', projectSettings, async (templatePath) => {
+      await settings.updateProjects({ templatePath })
+    })
+
+    new Setting(content)
+      .setName('Open on Create')
+      .setDesc('Open newly created project notes in the editor')
+      .addToggle((toggle) => {
+        toggle.setValue(projectSettings.openOnCreate).onChange(async (value) => {
+          await settings.updateProjects({ openOnCreate: value })
+        })
+      })
+  }
+
+  /**
    * Note Sequences Settings Section
    */
   private displayZettelkastenViewSettings(containerEl: HTMLElement): void {
@@ -650,12 +722,99 @@ export default class SettingsTab extends PluginSettingTab {
 
     if (!viewSettings.enabled) return
 
+    // Section Names
+    new Setting(content).setName('Section Names').setHeading()
+
+    new Setting(content)
+      .setName('Inbox Section Name')
+      .setDesc('Custom name for the inbox section in sidebar')
+      .addText((text) => {
+        text
+          .setPlaceholder('Inbox')
+          .setValue(viewSettings.inboxName || 'Inbox')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ inboxName: value })
+          })
+      })
+
+    new Setting(content)
+      .setName('Zettels Section Name')
+      .setDesc('Custom name for the zettels section in sidebar')
+      .addText((text) => {
+        text
+          .setPlaceholder('Zettels')
+          .setValue(viewSettings.zettelsName || 'Zettels')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ zettelsName: value })
+          })
+      })
+
+    new Setting(content)
+      .setName('Literature Section Name')
+      .setDesc('Custom name for the literature section in sidebar')
+      .addText((text) => {
+        text
+          .setPlaceholder('Literature')
+          .setValue(viewSettings.literatureName || 'Literature')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ literatureName: value })
+          })
+      })
+
+    new Setting(content)
+      .setName('Index Section Name')
+      .setDesc('Custom name for the index section in sidebar')
+      .addText((text) => {
+        text
+          .setPlaceholder('Index')
+          .setValue(viewSettings.indexName || 'Index')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ indexName: value })
+          })
+      })
+
+    new Setting(content)
+      .setName('Projects Section Name')
+      .setDesc('Custom name for the projects section in sidebar')
+      .addText((text) => {
+        text
+          .setPlaceholder('Projects')
+          .setValue(viewSettings.projectsName || 'Projects')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ projectsName: value })
+          })
+      })
+
+    new Setting(content)
+      .setName('Bookmarks Section Name')
+      .setDesc('Custom name for the bookmarks section in sidebar')
+      .addText((text) => {
+        text
+          .setPlaceholder('Bookmarks')
+          .setValue(viewSettings.bookmarksName || 'Bookmarks')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ bookmarksName: value })
+          })
+      })
+
+    // Section Visibility
+    new Setting(content).setName('Section Visibility').setHeading()
+
     new Setting(content)
       .setName('Show Inbox')
       .setDesc('Display fleeting notes section in sidebar')
       .addToggle((toggle) => {
         toggle.setValue(viewSettings.showInbox).onChange(async (value) => {
           await settings.updateZettelkastenView({ showInbox: value })
+        })
+      })
+
+    new Setting(content)
+      .setName('Show Inbox Files')
+      .setDesc('Display files list under inbox section')
+      .addToggle((toggle) => {
+        toggle.setValue(viewSettings.showInboxFiles).onChange(async (value) => {
+          await settings.updateZettelkastenView({ showInboxFiles: value })
         })
       })
 
@@ -669,11 +828,29 @@ export default class SettingsTab extends PluginSettingTab {
       })
 
     new Setting(content)
-      .setName('Show References')
+      .setName('Show Zettel Files')
+      .setDesc('Display files list under zettels section')
+      .addToggle((toggle) => {
+        toggle.setValue(viewSettings.showZettelFiles).onChange(async (value) => {
+          await settings.updateZettelkastenView({ showZettelFiles: value })
+        })
+      })
+
+    new Setting(content)
+      .setName('Show Literature')
       .setDesc('Display literature notes section in sidebar')
       .addToggle((toggle) => {
-        toggle.setValue(viewSettings.showReferences).onChange(async (value) => {
-          await settings.updateZettelkastenView({ showReferences: value })
+        toggle.setValue(viewSettings.showLiterature ?? true).onChange(async (value) => {
+          await settings.updateZettelkastenView({ showLiterature: value })
+        })
+      })
+
+    new Setting(content)
+      .setName('Show Literature Files')
+      .setDesc('Display files list under literature section')
+      .addToggle((toggle) => {
+        toggle.setValue(viewSettings.showLiteratureFiles ?? true).onChange(async (value) => {
+          await settings.updateZettelkastenView({ showLiteratureFiles: value })
         })
       })
 
@@ -686,46 +863,128 @@ export default class SettingsTab extends PluginSettingTab {
         })
       })
 
-    // Dashboard notes
-    content.createEl('h3', { text: 'Dashboard Notes' })
+    new Setting(content)
+      .setName('Show Index Files')
+      .setDesc('Display files list under index section')
+      .addToggle((toggle) => {
+        toggle.setValue(viewSettings.showIndexFiles).onChange(async (value) => {
+          await settings.updateZettelkastenView({ showIndexFiles: value })
+        })
+      })
 
     new Setting(content)
-      .setName('Dashboard Notes')
-      .setDesc('Comma-separated file paths for pinned dashboard notes (e.g., "MOC.md, Todo.md")')
-      .addTextArea((text) => {
+      .setName('Show Projects')
+      .setDesc('Display projects section in sidebar')
+      .addToggle((toggle) => {
+        toggle.setValue(viewSettings.showProjects ?? false).onChange(async (value) => {
+          await settings.updateZettelkastenView({ showProjects: value })
+        })
+      })
+
+    new Setting(content)
+      .setName('Show Project Files')
+      .setDesc('Display files list under projects section')
+      .addToggle((toggle) => {
+        toggle.setValue(viewSettings.showProjectFiles ?? true).onChange(async (value) => {
+          await settings.updateZettelkastenView({ showProjectFiles: value })
+        })
+      })
+
+    // Dashboard notes
+    content.createEl('h3', { text: 'Dashboard Notes' })
+    content.createEl('p', {
+      text: 'Specify a dashboard note for each section. Click the section heading to open its dashboard.',
+      cls: 'setting-item-description',
+    })
+
+    new Setting(content)
+      .setName('Inbox Dashboard Note')
+      .setDesc('Dashboard note for the Inbox/Fleeting section')
+      .addText((text) => {
         text
-          .setValue(viewSettings.dashboardNotes.join(', '))
-          .setPlaceholder('MOC.md, Todo.md')
+          .setValue(viewSettings.dashboardFleetingNote)
+          .setPlaceholder('fleeting-moc.md')
           .onChange(async (value) => {
-            const paths = value
-              .split(',')
-              .map((p) => p.trim())
-              .filter((p) => p.length > 0)
-            await settings.updateZettelkastenView({ dashboardNotes: paths })
+            await settings.updateZettelkastenView({ dashboardFleetingNote: value })
           })
-        text.inputEl.rows = 3
+        new FileSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ dashboardFleetingNote: value })
+        })
+      })
+
+    new Setting(content)
+      .setName('Zettel Dashboard Note')
+      .setDesc('Dashboard note for the Zettels section')
+      .addText((text) => {
+        text
+          .setValue(viewSettings.dashboardZettelNote)
+          .setPlaceholder('zettel-moc.md')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ dashboardZettelNote: value })
+          })
+        new FileSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ dashboardZettelNote: value })
+        })
+      })
+
+    new Setting(content)
+      .setName('References Dashboard Note')
+      .setDesc('Dashboard note for the References/Literature section')
+      .addText((text) => {
+        text
+          .setValue(viewSettings.dashboardLiteratureNote)
+          .setPlaceholder('literature-moc.md')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ dashboardLiteratureNote: value })
+          })
+        new FileSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ dashboardLiteratureNote: value })
+        })
+      })
+
+    new Setting(content)
+      .setName('Index Dashboard Note')
+      .setDesc('Dashboard note for the Index section')
+      .addText((text) => {
+        text
+          .setValue(viewSettings.dashboardIndexNote)
+          .setPlaceholder('index-moc.md')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ dashboardIndexNote: value })
+          })
+        new FileSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ dashboardIndexNote: value })
+        })
+      })
+
+    new Setting(content)
+      .setName('Projects Dashboard Note')
+      .setDesc('Dashboard note for the Projects section')
+      .addText((text) => {
+        text
+          .setValue(viewSettings.dashboardProjectsNote || '')
+          .setPlaceholder('projects-moc.md')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ dashboardProjectsNote: value })
+          })
+        new FileSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ dashboardProjectsNote: value })
+        })
       })
 
     // Filtering options
-    content.createEl('h3', { text: 'Section Filters' })
+    content.createEl('h3', { text: 'Section Tag Filters' })
     content.createEl('p', {
-      text: 'Optionally filter sections by folder or tag. Leave blank to use default folder settings.',
+      text: 'Optionally filter sections by tag. Leave blank to show all notes from the configured folders.',
       cls: 'setting-item-description',
     })
 
     // Inbox filters
-    new Setting(content)
-      .setName('Inbox Filter Folder')
-      .setDesc('Override default inbox folder (leave blank to use Fleeting folder)')
-      .addText((text) => {
-        text
-          .setPlaceholder('inbox')
-          .setValue(viewSettings.inboxFilterFolder)
-          .onChange(async (value) => {
-            await settings.updateZettelkastenView({ inboxFilterFolder: value })
-          })
-      })
-
     new Setting(content)
       .setName('Inbox Filter Tag')
       .setDesc('Filter inbox by tag (e.g., "inbox" or "#inbox")')
@@ -736,21 +995,13 @@ export default class SettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             await settings.updateZettelkastenView({ inboxFilterTag: value })
           })
+        new TagSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ inboxFilterTag: value })
+        })
       })
 
     // Zettels filters
-    new Setting(content)
-      .setName('Zettels Filter Folder')
-      .setDesc('Override default zettels folder (leave blank to use Zettel folder)')
-      .addText((text) => {
-        text
-          .setPlaceholder('zettels')
-          .setValue(viewSettings.zettelsFilterFolder)
-          .onChange(async (value) => {
-            await settings.updateZettelkastenView({ zettelsFilterFolder: value })
-          })
-      })
-
     new Setting(content)
       .setName('Zettels Filter Tag')
       .setDesc('Filter zettels by tag (e.g., "zettel" or "#zettel")')
@@ -761,46 +1012,30 @@ export default class SettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             await settings.updateZettelkastenView({ zettelsFilterTag: value })
           })
+        new TagSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ zettelsFilterTag: value })
+        })
       })
 
     // References filters
     new Setting(content)
-      .setName('References Filter Folder')
-      .setDesc('Override default references folder (leave blank to use Literature folder)')
-      .addText((text) => {
-        text
-          .setPlaceholder('references')
-          .setValue(viewSettings.referencesFilterFolder)
-          .onChange(async (value) => {
-            await settings.updateZettelkastenView({ referencesFilterFolder: value })
-          })
-      })
-
-    new Setting(content)
-      .setName('References Filter Tag')
-      .setDesc('Filter references by tag (e.g., "literature" or "#literature")')
+      .setName('Literature Filter Tag')
+      .setDesc('Filter literature notes by tag (e.g., "literature" or "#literature")')
       .addText((text) => {
         text
           .setPlaceholder('#literature')
-          .setValue(viewSettings.referencesFilterTag)
+          .setValue(viewSettings.literatureFilterTag || '')
           .onChange(async (value) => {
-            await settings.updateZettelkastenView({ referencesFilterTag: value })
+            await settings.updateZettelkastenView({ literatureFilterTag: value })
           })
+        new TagSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ literatureFilterTag: value })
+        })
       })
 
     // Index filters
-    new Setting(content)
-      .setName('Index Filter Folder')
-      .setDesc('Override default index folder (leave blank to use Index folder)')
-      .addText((text) => {
-        text
-          .setPlaceholder('index')
-          .setValue(viewSettings.indexFilterFolder)
-          .onChange(async (value) => {
-            await settings.updateZettelkastenView({ indexFilterFolder: value })
-          })
-      })
-
     new Setting(content)
       .setName('Index Filter Tag')
       .setDesc('Filter index by tag (e.g., "index" or "#index")')
@@ -811,6 +1046,27 @@ export default class SettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             await settings.updateZettelkastenView({ indexFilterTag: value })
           })
+        new TagSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ indexFilterTag: value })
+        })
+      })
+
+    // Projects filters
+    new Setting(content)
+      .setName('Projects Filter Tag')
+      .setDesc('Filter projects by tag (e.g., "project" or "#project")')
+      .addText((text) => {
+        text
+          .setPlaceholder('#project')
+          .setValue(viewSettings.projectsFilterTag || '')
+          .onChange(async (value) => {
+            await settings.updateZettelkastenView({ projectsFilterTag: value })
+          })
+        new TagSuggest(this.app, text.inputEl, async (value) => {
+          text.setValue(value)
+          await settings.updateZettelkastenView({ projectsFilterTag: value })
+        })
       })
   }
 

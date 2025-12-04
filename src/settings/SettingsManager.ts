@@ -9,6 +9,7 @@ import type {
   FleetingSettings,
   IndexSettings,
   LiteratureSettings,
+  ProjectSettings,
   NoteSequenceSettings,
 } from 'src/base/settings'
 
@@ -114,6 +115,13 @@ export default class SettingsManager {
   }
 
   /**
+   * Get project note settings
+   */
+  getProjects() {
+    return { ...this.settings.projects }
+  }
+
+  /**
    * Get Zettelkasten view settings
    */
   getZettelkastenView() {
@@ -180,6 +188,14 @@ export default class SettingsManager {
    */
   async updateLiterature(literature: Partial<typeof this.settings.literature>): Promise<void> {
     this.settings.literature = { ...this.settings.literature, ...literature }
+    await this.save()
+  }
+
+  /**
+   * Update project note settings
+   */
+  async updateProjects(projects: Partial<typeof this.settings.projects>): Promise<void> {
+    this.settings.projects = { ...this.settings.projects, ...projects }
     await this.save()
   }
 
