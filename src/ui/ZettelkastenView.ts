@@ -10,7 +10,6 @@ import {
 } from 'obsidian'
 import type ZettelkastenPlugin from '../main'
 import { VIEW_TYPE_NOTE_SEQUENCES } from './NoteSequencesView'
-import { NoteSequence, SequenceNode } from 'src/base/noteSequence'
 import type { Bookmark } from 'src/base/settings'
 
 export const VIEW_TYPE_ZETTELKASTEN = 'zettelkasten-view'
@@ -737,107 +736,6 @@ export class ZettelkastenView extends ItemView {
       })
     })
     headerEl.style.cursor = 'pointer'
-  }
-
-  /**
-   * Create a card for a root note without children
-   */
-  private createRootOnlyCard(container: HTMLElement, file: TFile): void {
-    const card = container.createDiv({ cls: 'sequence-card' })
-
-    // Card header
-    const header = card.createDiv({ cls: 'sequence-card-header' })
-    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
-
-    // Icon
-    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
-    setIcon(iconEl, 'file')
-
-    // Title (clickable)
-    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
-    const cache = this.app.metadataCache.getFileCache(file)
-    const title = cache?.frontmatter?.title || file.basename
-    titleEl.setText(title)
-    titleEl.addEventListener('click', async (e) => {
-      e.stopPropagation()
-      await this.app.workspace.getLeaf(false).openFile(file)
-    })
-
-    // Card body
-    const body = card.createDiv({ cls: 'sequence-card-body' })
-    body.createDiv({
-      cls: 'sequence-card-empty',
-      text: 'No children',
-    })
-  }
-
-  /**
-   * Create a card for a note sequence
-   */
-  private createSequenceCard(container: HTMLElement, sequence: NoteSequence): void {
-    const card = container.createDiv({ cls: 'sequence-card' })
-
-    // Card header with parent note
-    const header = card.createDiv({ cls: 'sequence-card-header' })
-    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
-
-    // Parent icon
-    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
-    setIcon(iconEl, 'layers')
-
-    // Parent title (clickable)
-    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
-    const cache = this.app.metadataCache.getFileCache(sequence.root.file)
-    const title = cache?.frontmatter?.title || sequence.root.file.basename
-    titleEl.setText(title)
-    titleEl.addEventListener('click', async (e) => {
-      e.stopPropagation()
-      await this.app.workspace.getLeaf(false).openFile(sequence.root.file)
-    })
-
-    // Action buttons container
-    const actionsEl = headerContent.createDiv({ cls: 'sequence-card-actions' })
-
-    // Open in new tab button
-    const openBtn = actionsEl.createDiv({
-      cls: 'sequence-card-action-btn',
-      attr: { 'aria-label': 'Open sequence in new tab' },
-    })
-    setIcon(openBtn, 'external-link')
-    openBtn.addEventListener('click', async (e) => {
-      e.stopPropagation()
-      await this.app.workspace.getLeaf(true).openFile(sequence.root.file)
-    })
-
-    // Card body with children
-    const body = card.createDiv({ cls: 'sequence-card-body' })
-
-    if (sequence.allNodes.length === 0) {
-      body.createDiv({
-        cls: 'sequence-card-empty',
-        text: 'No children',
-      })
-    } else {
-      // Render all nodes (already flattened in allNodes)
-      sequence.allNodes.forEach((node: SequenceNode) => {
-        const item = body.createDiv({
-          cls: 'sequence-child-item',
-          attr: { style: `padding-left: ${12 + node.level * 20}px` },
-        })
-
-        // Child title
-        const childTitleEl = item.createDiv({ cls: 'sequence-child-title' })
-        const childCache = this.app.metadataCache.getFileCache(node.file)
-        const childTitle = childCache?.frontmatter?.title || node.file.basename
-        childTitleEl.setText(childTitle)
-
-        // Click handler to open the file
-        item.addEventListener('click', async (e) => {
-          e.stopPropagation()
-          await this.app.workspace.getLeaf(false).openFile(node.file)
-        })
-      })
-    }
   }
 
   async onClose(): Promise<void> {

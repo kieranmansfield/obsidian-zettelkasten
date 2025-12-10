@@ -105,6 +105,7 @@ export class SequenceNavigatorView extends ItemView {
       cls: 'nav-files-container',
     })
 
+    // Render the full tree including the root/parent
     this.renderNode(treeContainer, root, 0)
   }
 

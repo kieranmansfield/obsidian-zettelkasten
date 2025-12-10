@@ -39,23 +39,23 @@ export default class ZettelkastenPlugin extends Plugin {
     // Add settings tab
     this.addSettingTab(new SettingsTab(this.app, this))
 
+    // Initialize services immediately (don't wait for layout ready)
+    this.initializeServices()
+
+    // Initialize note types
+    this.initializeNoteTypes()
+
+    // Register views BEFORE layout is ready to prevent ghost icons
+    // Views must be registered before Obsidian restores the workspace layout
+    this.registerViews()
+
+    // Register Bases views
+    this.registerBasesViews()
+
+    // Register commands after layout is ready
     this.app.workspace.onLayoutReady(async () => {
       try {
-        // Initialize services
-        this.initializeServices()
-
-        // Initialize note types
-        this.initializeNoteTypes()
-
-        // Register views
-        this.registerViews()
-
-        // Register Bases views
-        this.registerBasesViews()
-
-        // Register all commands
         this.registerCommands()
-
         console.log('Zettelkasten plugin loaded successfully')
       } catch (err) {
         console.error('Error during plugin initialization:', err)
@@ -170,7 +170,7 @@ export default class ZettelkastenPlugin extends Plugin {
       .add(commands.openZettelCommand)
       .add(commands.openIndexCommand)
       .add(commands.openNoteSequencesViewCommand)
-      .add(commands.openNoteSequencesBasesViewCommand)
+      // .add(commands.openNoteSequencesBasesViewCommand)
       .add(commands.openSequenceNavigatorViewCommand)
       .add(commands.openSequenceCommandPaletteCommand)
       .add(commands.openZettelkastenViewCommand)

@@ -1,7 +1,6 @@
-import { ItemView, WorkspaceLeaf, setIcon, TFile } from 'obsidian'
+import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian'
 import type { NoteSequence } from '../base/noteSequence'
 import type NoteSequenceService from '../service/noteSequence.service'
-import { getFileTitle } from '../base/fileHelpers'
 
 export const VIEW_TYPE_NOTE_SEQUENCES = 'note-sequences-view'
 
@@ -108,44 +107,29 @@ export class NoteSequencesView extends ItemView {
     // Create grid container for cards
     const gridContainer = container.createDiv({ cls: 'sequence-grid' })
 
-    // Display each root zettel with its children as a card
+    // Display only root zettels that have children
     rootZettels.forEach((rootFile) => {
       const sequence = this.sequenceService.getSequenceForFile(rootFile)
       if (sequence) {
-        this.createSequenceCard(gridContainer, sequence)
-      } else {
-        this.createRootOnlyCard(gridContainer, rootFile)
+        // Only show cards that have children (level > 0)
+        const childNodes = sequence.allNodes.filter((node) => node.level > 0)
+        if (childNodes.length > 0) {
+          this.createSequenceCard(gridContainer, sequence)
+        }
       }
     })
-  }
 
-  private createRootOnlyCard(container: HTMLElement, file: TFile): void {
-    const card = container.createDiv({ cls: 'sequence-card' })
-
-    // Card header
-    const header = card.createDiv({ cls: 'sequence-card-header' })
-    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
-
-    // Icon
-    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
-    setIcon(iconEl, 'file')
-
-    // Title (clickable)
-    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
-    const cache = this.app.metadataCache.getFileCache(file)
-    const title = cache?.frontmatter?.title || file.basename
-    titleEl.setText(title)
-    titleEl.addEventListener('click', async (e) => {
-      e.stopPropagation()
-      await this.app.workspace.getLeaf(false).openFile(file)
-    })
-
-    // Card body
-    const body = card.createDiv({ cls: 'sequence-card-body' })
-    body.createDiv({
-      cls: 'sequence-card-empty',
-      text: 'No children',
-    })
+    // Show message if no sequences with children found
+    if (gridContainer.children.length === 0) {
+      const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
+      emptyState.createEl('h3', {
+        text: 'No note sequences with children found',
+      })
+      emptyState.createEl('p', {
+        text: 'Create child notes using "Indent Zettel" or "Assign Child" commands',
+        cls: 'setting-item-description',
+      })
+    }
   }
 
   private createSequenceCard(container: HTMLElement, sequence: NoteSequence): void {
@@ -186,17 +170,23 @@ export class NoteSequencesView extends ItemView {
     // Card body with children
     const body = card.createDiv({ cls: 'sequence-card-body' })
 
-    if (sequence.allNodes.length === 0) {
+    // Filter out the root node (level 0) since it's already shown in the header
+    const childNodes = sequence.allNodes.filter((node) => node.level > 0)
+
+    if (childNodes.length === 0) {
       body.createDiv({
         cls: 'sequence-card-empty',
         text: 'No children',
       })
     } else {
-      // Render all nodes (already flattened in allNodes)
-      sequence.allNodes.forEach((node) => {
+      // Render child nodes only (excluding root)
+      childNodes.forEach((node) => {
+        // Adjust level for indent since we're excluding root (level 0)
+        // First children (level 1) should have minimal indent
+        const adjustedLevel = node.level - 1
         const item = body.createDiv({
           cls: 'sequence-child-item',
-          attr: { style: `padding-left: ${12 + node.level * 20}px` },
+          attr: { style: `padding-left: ${12 + adjustedLevel * 20}px` },
         })
 
         // Child title/filename

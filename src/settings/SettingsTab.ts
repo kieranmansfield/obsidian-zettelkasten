@@ -37,9 +37,10 @@ export default class SettingsTab extends PluginSettingTab {
     const settings = this.plugin.getSettingsManager()
     const boxSettings = settings.getBoxes()
 
-    // Plugin header
-    containerEl.createEl('h1', {
-      text: 'Zettelkasten Settings',
+    // Plugin header - wrap in div for better control
+    const headerDiv = containerEl.createDiv({ cls: 'zettelkasten-settings-header' })
+    headerDiv.createEl('h1', {
+      text: 'Zettelkasten',
       cls: 'zettelkasten-settings-title',
     })
 
