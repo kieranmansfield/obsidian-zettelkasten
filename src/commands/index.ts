@@ -16,7 +16,7 @@ export { openNoteSequencesViewCommand } from './openNoteSequencesView'
 export { openSequenceNavigatorViewCommand } from './openSequenceNavigatorView'
 export { openSequenceCommandPaletteCommand } from './openSequenceCommandPalette'
 export { openZettelkastenViewCommand } from './openZettelkastenView'
-export { openNoteSequencesBasesViewCommand } from './openNoteSequencesBasesView'
+// export { openNoteSequencesBasesViewCommand } from './openNoteSequencesBasesView'
 
 // Note Sequence manipulation commands
 export { indentZettelCommand } from './indentZettel'

@@ -10,8 +10,8 @@ import {
 } from 'obsidian'
 import type ZettelkastenPlugin from '../main'
 import { VIEW_TYPE_NOTE_SEQUENCES } from './NoteSequencesView'
-import { NoteSequence, SequenceNode } from 'src/base/noteSequence'
 import type { Bookmark } from 'src/base/settings'
+import { ZettelDetectionMode } from 'src/base/settings'
 
 export const VIEW_TYPE_ZETTELKASTEN = 'zettelkasten-view'
 
@@ -49,9 +49,13 @@ export class ZettelkastenView extends ItemView {
     try {
       const raw = window.localStorage.getItem(this.collapsedStorageKey)
       if (!raw) return
-      const arr = JSON.parse(raw)
+      const arr: unknown = JSON.parse(raw)
       if (Array.isArray(arr)) {
-        arr.forEach((s) => this.collapsedSections.add(s))
+        arr.forEach((s: unknown) => {
+          if (typeof s === 'string') {
+            this.collapsedSections.add(s)
+          }
+        })
       }
     } catch (e) {
       console.error('Failed to load collapsed sections', e)
@@ -110,6 +114,7 @@ export class ZettelkastenView extends ItemView {
     return 'square-library'
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()
@@ -130,7 +135,7 @@ export class ZettelkastenView extends ItemView {
 
     // Fleeting Notes (Inbox)
     if (viewSettings.showInbox && fleetingSettings.enabled) {
-      const useTagDetection = fleetingSettings.detectionMode === 'tag'
+      const useTagDetection = fleetingSettings.detectionMode === ZettelDetectionMode.TAG
       menuItems.push({
         name: viewSettings.inboxName || 'Inbox',
         icon: 'inbox',
@@ -159,7 +164,7 @@ export class ZettelkastenView extends ItemView {
 
     // Zettel Notes
     if (viewSettings.showZettels && zettelSettings.enabled) {
-      const useTagDetection = zettelSettings.zettelDetectionMode === 'tag'
+      const useTagDetection = zettelSettings.zettelDetectionMode === ZettelDetectionMode.TAG
       menuItems.push({
         name: viewSettings.zettelsName || 'Zettels',
         icon: 'gallery-vertical-end',
@@ -200,7 +205,7 @@ export class ZettelkastenView extends ItemView {
       viewSettings.literatureFilterTag || viewSettings.referencesFilterTag || ''
 
     if (showLiterature && literatureSettings.enabled) {
-      const useTagDetection = literatureSettings.detectionMode === 'tag'
+      const useTagDetection = literatureSettings.detectionMode === ZettelDetectionMode.TAG
       menuItems.push({
         name: viewSettings.literatureName || 'Literature',
         icon: 'book-open',
@@ -229,7 +234,7 @@ export class ZettelkastenView extends ItemView {
 
     // Index Notes
     if (viewSettings.showIndex && indexSettings.enabled) {
-      const useTagDetection = indexSettings.detectionMode === 'tag'
+      const useTagDetection = indexSettings.detectionMode === ZettelDetectionMode.TAG
       menuItems.push({
         name: viewSettings.indexName || 'Index',
         icon: 'list',
@@ -259,7 +264,7 @@ export class ZettelkastenView extends ItemView {
     // Projects
     const projectSettings = settings.getProjects()
     if (viewSettings.showProjects && projectSettings.enabled) {
-      const useTagDetection = projectSettings.detectionMode === 'tag'
+      const useTagDetection = projectSettings.detectionMode === ZettelDetectionMode.TAG
       menuItems.push({
         name: viewSettings.projectsName || 'Projects',
         icon: 'folder-kanban',
@@ -370,15 +375,15 @@ export class ZettelkastenView extends ItemView {
     if (item.showFiles) {
       const isCollapsed = this.collapsedSections.has(item.name)
       if (isCollapsed) {
-        contentEl.style.display = 'none'
+        contentEl.addClass('is-collapsed')
       }
     } else {
       // Hide content area when file lists are disabled
-      contentEl.style.display = 'none'
+      contentEl.addClass('is-collapsed')
     }
 
     // Add click handler to header
-    headerEl.addEventListener('click', async (e) => {
+    headerEl.addEventListener('click', (e) => {
       e.stopPropagation()
 
       // If file lists are enabled and clicking on the collapse icon, toggle collapse
@@ -390,11 +395,11 @@ export class ZettelkastenView extends ItemView {
 
         if (isCurrentlyCollapsed) {
           this.collapsedSections.delete(item.name)
-          contentEl.style.display = 'block'
+          contentEl.removeClass('is-collapsed')
           setIcon(collapseIconEl, 'chevron-down')
         } else {
           this.collapsedSections.add(item.name)
-          contentEl.style.display = 'none'
+          contentEl.addClass('is-collapsed')
           setIcon(collapseIconEl, 'chevron-right')
         }
         this.saveCollapsedSections()
@@ -404,7 +409,7 @@ export class ZettelkastenView extends ItemView {
       ) {
         // Open the dashboard file when not clicking collapse icon or when file lists are disabled
         if (dashboardFile) {
-          await this.app.workspace.getLeaf(false).openFile(dashboardFile)
+          void this.app.workspace.getLeaf(false).openFile(dashboardFile)
         }
       }
     })
@@ -479,16 +484,18 @@ export class ZettelkastenView extends ItemView {
 
       // File title (from frontmatter or filename)
       const cache = this.app.metadataCache.getFileCache(file)
-      const title = cache?.frontmatter?.title || file.basename
+      const frontmatterTitle = cache?.frontmatter?.title as unknown
+      const title =
+        (typeof frontmatterTitle === 'string' ? frontmatterTitle : null) || file.basename
 
       // Inner content with proper nesting
       const fileInner = fileItemSelf.createDiv({ cls: 'tree-item-inner nav-file-title-content' })
       fileInner.setText(title)
 
       // Click handler to open file
-      fileItemSelf.addEventListener('click', async (e) => {
+      fileItemSelf.addEventListener('click', (e) => {
         e.stopPropagation()
-        await this.app.workspace.getLeaf(false).openFile(file)
+        void this.app.workspace.getLeaf(false).openFile(file)
       })
 
       // Context menu with native feel
@@ -580,22 +587,22 @@ export class ZettelkastenView extends ItemView {
     // Content area (collapsible)
     const contentEl = itemEl.createDiv({ cls: 'zk-menu-content' })
     if (isCollapsed) {
-      contentEl.style.display = 'none'
+      contentEl.addClass('is-collapsed')
     }
 
     // Add click handler to header (toggle collapse)
-    headerEl.addEventListener('click', async (e) => {
+    headerEl.addEventListener('click', (e) => {
       e.stopPropagation()
 
       const isCurrentlyCollapsed = this.collapsedSections.has(bookmarksName)
 
       if (isCurrentlyCollapsed) {
         this.collapsedSections.delete(bookmarksName)
-        contentEl.style.display = 'block'
+        contentEl.removeClass('is-collapsed')
         setIcon(collapseIconEl, 'chevron-down')
       } else {
         this.collapsedSections.add(bookmarksName)
-        contentEl.style.display = 'none'
+        contentEl.addClass('is-collapsed')
         setIcon(collapseIconEl, 'chevron-right')
       }
       this.saveCollapsedSections()
@@ -655,9 +662,9 @@ export class ZettelkastenView extends ItemView {
       titleEl.setText(bookmark.title)
 
       // Click handler
-      bookmarkItemSelf.addEventListener('click', async (e) => {
+      bookmarkItemSelf.addEventListener('click', (e) => {
         e.stopPropagation()
-        await this.handleBookmarkClick(bookmark)
+        void this.handleBookmarkClick(bookmark)
       })
     })
   }
@@ -681,16 +688,18 @@ export class ZettelkastenView extends ItemView {
           // Open search view with the query
           const searchLeaf = this.app.workspace.getLeavesOfType('search')[0]
           if (searchLeaf) {
-            this.app.workspace.revealLeaf(searchLeaf)
-            // @ts-ignore - accessing internal API
-            searchLeaf.view.setQuery(bookmark.query)
+            void this.app.workspace.revealLeaf(searchLeaf)
+             
+            ;(searchLeaf.view as unknown as { setQuery: (query: string) => void }).setQuery(
+              bookmark.query
+            )
           }
         }
         break
 
       case 'graph':
         // Open graph view
-        this.app.workspace.getLeaf(false).setViewState({
+        void this.app.workspace.getLeaf(false).setViewState({
           type: 'graph',
           active: true,
         })
@@ -703,8 +712,10 @@ export class ZettelkastenView extends ItemView {
             // Reveal folder in file explorer
             const fileExplorer = this.app.workspace.getLeavesOfType('file-explorer')[0]
             if (fileExplorer && fileExplorer.view) {
-              // @ts-ignore - accessing internal API
-              fileExplorer.view.revealInFolder(folder)
+               
+              ;(
+                fileExplorer.view as unknown as { revealInFolder: (folder: unknown) => void }
+              ).revealInFolder(folder)
             }
           }
         }
@@ -729,117 +740,17 @@ export class ZettelkastenView extends ItemView {
     nameContainer.createSpan({ cls: 'zk-menu-name', text: 'Note Sequences' })
 
     // Click handler for dashboard
-    headerEl.addEventListener('click', async (e) => {
+    headerEl.addEventListener('click', (e) => {
       e.stopPropagation()
-      await this.app.workspace.getLeaf('tab').setViewState({
+      void this.app.workspace.getLeaf('tab').setViewState({
         type: VIEW_TYPE_NOTE_SEQUENCES,
         active: true,
       })
     })
-    headerEl.style.cursor = 'pointer'
+    headerEl.addClass('is-clickable')
   }
 
-  /**
-   * Create a card for a root note without children
-   */
-  private createRootOnlyCard(container: HTMLElement, file: TFile): void {
-    const card = container.createDiv({ cls: 'sequence-card' })
-
-    // Card header
-    const header = card.createDiv({ cls: 'sequence-card-header' })
-    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
-
-    // Icon
-    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
-    setIcon(iconEl, 'file')
-
-    // Title (clickable)
-    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
-    const cache = this.app.metadataCache.getFileCache(file)
-    const title = cache?.frontmatter?.title || file.basename
-    titleEl.setText(title)
-    titleEl.addEventListener('click', async (e) => {
-      e.stopPropagation()
-      await this.app.workspace.getLeaf(false).openFile(file)
-    })
-
-    // Card body
-    const body = card.createDiv({ cls: 'sequence-card-body' })
-    body.createDiv({
-      cls: 'sequence-card-empty',
-      text: 'No children',
-    })
-  }
-
-  /**
-   * Create a card for a note sequence
-   */
-  private createSequenceCard(container: HTMLElement, sequence: NoteSequence): void {
-    const card = container.createDiv({ cls: 'sequence-card' })
-
-    // Card header with parent note
-    const header = card.createDiv({ cls: 'sequence-card-header' })
-    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
-
-    // Parent icon
-    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
-    setIcon(iconEl, 'layers')
-
-    // Parent title (clickable)
-    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
-    const cache = this.app.metadataCache.getFileCache(sequence.root.file)
-    const title = cache?.frontmatter?.title || sequence.root.file.basename
-    titleEl.setText(title)
-    titleEl.addEventListener('click', async (e) => {
-      e.stopPropagation()
-      await this.app.workspace.getLeaf(false).openFile(sequence.root.file)
-    })
-
-    // Action buttons container
-    const actionsEl = headerContent.createDiv({ cls: 'sequence-card-actions' })
-
-    // Open in new tab button
-    const openBtn = actionsEl.createDiv({
-      cls: 'sequence-card-action-btn',
-      attr: { 'aria-label': 'Open sequence in new tab' },
-    })
-    setIcon(openBtn, 'external-link')
-    openBtn.addEventListener('click', async (e) => {
-      e.stopPropagation()
-      await this.app.workspace.getLeaf(true).openFile(sequence.root.file)
-    })
-
-    // Card body with children
-    const body = card.createDiv({ cls: 'sequence-card-body' })
-
-    if (sequence.allNodes.length === 0) {
-      body.createDiv({
-        cls: 'sequence-card-empty',
-        text: 'No children',
-      })
-    } else {
-      // Render all nodes (already flattened in allNodes)
-      sequence.allNodes.forEach((node: SequenceNode) => {
-        const item = body.createDiv({
-          cls: 'sequence-child-item',
-          attr: { style: `padding-left: ${12 + node.level * 20}px` },
-        })
-
-        // Child title
-        const childTitleEl = item.createDiv({ cls: 'sequence-child-title' })
-        const childCache = this.app.metadataCache.getFileCache(node.file)
-        const childTitle = childCache?.frontmatter?.title || node.file.basename
-        childTitleEl.setText(childTitle)
-
-        // Click handler to open the file
-        item.addEventListener('click', async (e) => {
-          e.stopPropagation()
-          await this.app.workspace.getLeaf(false).openFile(node.file)
-        })
-      })
-    }
-  }
-
+  // eslint-disable-next-line @typescript-eslint/require-await
   async onClose(): Promise<void> {
     // Clear any pending refresh timeout
     if (this.refreshTimeout) {

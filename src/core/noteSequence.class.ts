@@ -5,7 +5,6 @@ import type {
   SequenceMetadata,
   SequenceBuildOptions,
 } from '../base/noteSequence'
-import ZettelId from './zettelId.class'
 
 /**
  * NoteSequence

@@ -11,12 +11,9 @@
     "importHelpers": true,
     "isolatedModules": true,
     "strictNullChecks": true,
-    "lib": ["DOM", "ES5", "ES6", "ES7"]
-    // "strict": true
+    "lib": ["DOM", "ES5", "ES6", "ES7"],
+    "strict": true
   },
-  // "include": ["**/*.ts", "src/00 core/newZettel.ts"],
-  // "exclude": ["src/classes/newZettel.ts"]
-
-  "include": ["src/main.ts", "src/00 core/zettels/ids.ts"],
-  "exclude": ["main.js"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["main.js", "src-stable/**/*", "node_modules/**/*", "src/old ui/**/*"]
 }

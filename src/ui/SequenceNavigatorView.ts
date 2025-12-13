@@ -47,13 +47,14 @@ export class SequenceNavigatorView extends ItemView {
   }
 
   getDisplayText(): string {
-    return 'Note Sequence'
+    return 'Note sequence'
   }
 
   getIcon(): string {
     return 'layers'
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()
@@ -105,6 +106,7 @@ export class SequenceNavigatorView extends ItemView {
       cls: 'nav-files-container',
     })
 
+    // Render the full tree including the root/parent
     this.renderNode(treeContainer, root, 0)
   }
 
@@ -159,7 +161,9 @@ export class SequenceNavigatorView extends ItemView {
 
     // File title
     const cache = this.app.metadataCache.getFileCache(node.file)
-    const title = cache?.frontmatter?.title || node.file.basename
+    const frontmatterTitle: unknown = cache?.frontmatter?.title
+    const title =
+      (typeof frontmatterTitle === 'string' ? frontmatterTitle : null) || node.file.basename
 
     treeItemSelf.createDiv({
       cls: 'tree-item-inner nav-file-title-content',
@@ -167,12 +171,12 @@ export class SequenceNavigatorView extends ItemView {
     })
 
     // Click handler to open file
-    treeItemSelf.addEventListener('mousedown', async (e) => {
+    treeItemSelf.addEventListener('mousedown', (e) => {
       // Only handle left mouse button
       if (e.button === 0) {
         e.preventDefault()
         e.stopPropagation()
-        await this.app.workspace.getLeaf(false).openFile(node.file)
+        void this.app.workspace.getLeaf(false).openFile(node.file)
       }
     })
 

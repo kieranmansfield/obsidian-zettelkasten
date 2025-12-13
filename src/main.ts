@@ -1,4 +1,4 @@
-import { Plugin } from 'obsidian'
+import { Plugin, addIcon } from 'obsidian'
 import FileService from './service/file.service'
 import ZettelNote from './core/zettelNote.class'
 import FleetingNote from './core/fleetingNote.class'
@@ -33,29 +33,42 @@ export default class ZettelkastenPlugin extends Plugin {
   async onload() {
     console.log('Loading Zettelkasten plugin')
 
+    // Register custom icon for plugin settings
+    addIcon(
+      'zettelkasten-icon',
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor">
+        <rect x="10" y="30" width="15" height="50" stroke-width="2" fill="currentColor" opacity="0.3"/>
+        <rect x="28" y="25" width="15" height="55" stroke-width="2" fill="currentColor" opacity="0.4"/>
+        <rect x="46" y="28" width="15" height="52" stroke-width="2" fill="currentColor" opacity="0.5"/>
+        <rect x="64" y="22" width="15" height="58" stroke-width="2" fill="currentColor" opacity="0.3"/>
+        <rect x="82" y="26" width="15" height="54" stroke-width="2" fill="currentColor" opacity="0.4"/>
+        <line x1="5" y1="82" x2="100" y2="82" stroke-width="3"/>
+      </svg>`
+    )
+
     // Load settings first
     await this.loadSettings()
 
     // Add settings tab
     this.addSettingTab(new SettingsTab(this.app, this))
 
-    this.app.workspace.onLayoutReady(async () => {
+    // Initialize services immediately (don't wait for layout ready)
+    this.initializeServices()
+
+    // Initialize note types
+    this.initializeNoteTypes()
+
+    // Register views BEFORE layout is ready to prevent ghost icons
+    // Views must be registered before Obsidian restores the workspace layout
+    this.registerViews()
+
+    // Register Bases views
+    this.registerBasesViews()
+
+    // Register commands after layout is ready
+    this.app.workspace.onLayoutReady(() => {
       try {
-        // Initialize services
-        this.initializeServices()
-
-        // Initialize note types
-        this.initializeNoteTypes()
-
-        // Register views
-        this.registerViews()
-
-        // Register Bases views
-        this.registerBasesViews()
-
-        // Register all commands
         this.registerCommands()
-
         console.log('Zettelkasten plugin loaded successfully')
       } catch (err) {
         console.error('Error during plugin initialization:', err)
@@ -77,7 +90,7 @@ export default class ZettelkastenPlugin extends Plugin {
   private initializeServices(): void {
     const boxSettings = this.settingsManager.getBoxes()
 
-    this.fileService = new FileService(this.app.vault)
+    this.fileService = new FileService(this.app)
     this.boxService = new BoxService(
       this.app.vault,
       boxSettings.defaultBox || boxSettings.rootFolder,
@@ -170,7 +183,7 @@ export default class ZettelkastenPlugin extends Plugin {
       .add(commands.openZettelCommand)
       .add(commands.openIndexCommand)
       .add(commands.openNoteSequencesViewCommand)
-      .add(commands.openNoteSequencesBasesViewCommand)
+      // .add(commands.openNoteSequencesBasesViewCommand)
       .add(commands.openSequenceNavigatorViewCommand)
       .add(commands.openSequenceCommandPaletteCommand)
       .add(commands.openZettelkastenViewCommand)
@@ -231,9 +244,5 @@ export default class ZettelkastenPlugin extends Plugin {
     console.log('Unloading Zettelkasten plugin')
 
     // Detach all custom views
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_NOTE_SEQUENCES)
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_NOTE_SEQUENCES_BASES)
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_SEQUENCE_NAVIGATOR)
   }
 }

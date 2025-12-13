@@ -29,7 +29,7 @@ export class BoxConfigModal extends Modal {
     // Box Name (not editable for default box)
     if (!this.isDefault) {
       new Setting(contentEl)
-        .setName('Box Name')
+        .setName('Box name')
         .setDesc('Name of this box')
         .addText((text) => {
           text.setValue(this.boxConfig.name).onChange((value) => {
@@ -38,7 +38,7 @@ export class BoxConfigModal extends Modal {
         })
 
       new Setting(contentEl)
-        .setName('Box Value')
+        .setName('Box value')
         .setDesc('Folder path or tag name for this box')
         .addText((text) => {
           text.setValue(this.boxConfig.value).onChange((value) => {
@@ -48,10 +48,10 @@ export class BoxConfigModal extends Modal {
     }
 
     // Zettel Settings
-    contentEl.createEl('h3', { text: 'Zettel Notes' })
+    contentEl.createEl('h3', { text: 'Zettel notes' })
 
     new Setting(contentEl)
-      .setName('Enable Zettel Notes')
+      .setName('Enable zettel notes')
       .setDesc('Allow creating zettel notes in this box')
       .addToggle((toggle) => {
         toggle.setValue(this.boxConfig.zettel.enabled).onChange((value) => {
@@ -62,7 +62,7 @@ export class BoxConfigModal extends Modal {
 
     if (this.boxConfig.zettel.enabled) {
       new Setting(contentEl)
-        .setName('Default Folder')
+        .setName('Default folder')
         .setDesc('Folder for zettel notes (relative to box)')
         .addText((text) => {
           text.setValue(this.boxConfig.zettel.defaultFolder).onChange((value) => {
@@ -71,12 +71,12 @@ export class BoxConfigModal extends Modal {
         })
 
       new Setting(contentEl)
-        .setName('Filename Format')
+        .setName('Filename format')
         .setDesc('How zettel filenames should be formatted')
         .addDropdown((dropdown) => {
           dropdown
-            .addOption(FilenameFormat.ID_ONLY, 'ID Only')
-            .addOption(FilenameFormat.ID_TITLE, 'ID + Title')
+            .addOption(FilenameFormat.ID_ONLY, 'ID only')
+            .addOption(FilenameFormat.ID_TITLE, 'ID + title')
             .setValue(this.boxConfig.zettel.filenameFormat)
             .onChange((value) => {
               this.boxConfig.zettel.filenameFormat = value as FilenameFormat
@@ -96,7 +96,7 @@ export class BoxConfigModal extends Modal {
       }
 
       new Setting(contentEl)
-        .setName('Template File')
+        .setName('Template file')
         .setDesc('Path to template file (leave empty for default)')
         .addText((text) => {
           new FileSuggest(this.app, text.inputEl, (value) => {
@@ -111,9 +111,9 @@ export class BoxConfigModal extends Modal {
     }
 
     // Fleeting Settings
-    contentEl.createEl('h3', { text: 'Fleeting Notes' })
+    contentEl.createEl('h3', { text: 'Fleeting notes' })
 
-    new Setting(contentEl).setName('Enable Fleeting Notes').addToggle((toggle) => {
+    new Setting(contentEl).setName('Enable fleeting notes').addToggle((toggle) => {
       toggle.setValue(this.boxConfig.fleeting.enabled).onChange((value) => {
         this.boxConfig.fleeting.enabled = value
         this.onOpen()
@@ -127,7 +127,7 @@ export class BoxConfigModal extends Modal {
         })
       })
 
-      new Setting(contentEl).setName('Template File').addText((text) => {
+      new Setting(contentEl).setName('Template file').addText((text) => {
         new FileSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
           this.boxConfig.fleeting.templatePath = value
@@ -140,9 +140,9 @@ export class BoxConfigModal extends Modal {
     }
 
     // Index Settings
-    contentEl.createEl('h3', { text: 'Index Notes' })
+    contentEl.createEl('h3', { text: 'Index notes' })
 
-    new Setting(contentEl).setName('Enable Index Notes').addToggle((toggle) => {
+    new Setting(contentEl).setName('Enable index notes').addToggle((toggle) => {
       toggle.setValue(this.boxConfig.index.enabled).onChange((value) => {
         this.boxConfig.index.enabled = value
         this.onOpen()
@@ -156,7 +156,7 @@ export class BoxConfigModal extends Modal {
         })
       })
 
-      new Setting(contentEl).setName('Template File').addText((text) => {
+      new Setting(contentEl).setName('Template file').addText((text) => {
         new FileSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
           this.boxConfig.index.templatePath = value
@@ -169,9 +169,9 @@ export class BoxConfigModal extends Modal {
     }
 
     // Literature Settings
-    contentEl.createEl('h3', { text: 'Literature Notes' })
+    contentEl.createEl('h3', { text: 'Literature notes' })
 
-    new Setting(contentEl).setName('Enable Literature Notes').addToggle((toggle) => {
+    new Setting(contentEl).setName('Enable literature notes').addToggle((toggle) => {
       toggle.setValue(this.boxConfig.literature.enabled).onChange((value) => {
         this.boxConfig.literature.enabled = value
         this.onOpen()
@@ -185,7 +185,7 @@ export class BoxConfigModal extends Modal {
         })
       })
 
-      new Setting(contentEl).setName('Template File').addText((text) => {
+      new Setting(contentEl).setName('Template file').addText((text) => {
         new FileSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
           this.boxConfig.literature.templatePath = value

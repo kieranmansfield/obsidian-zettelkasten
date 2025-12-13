@@ -14,31 +14,33 @@ export const openSequenceNavigatorViewCommand: CommandFactory = (context) => {
 
     metadata: {
       category: 'note-sequences',
-      description: 'Open sidebar view showing current note\'s sequence tree',
+      description: "Open sidebar view showing current note's sequence tree",
       canBeDisabled: true,
       enabledByDefault: true,
     },
 
-    execute: async () => {
-      const { workspace } = context.app
+    execute: () => {
+      void (async () => {
+        const { workspace } = context.app
 
-      // Check if view is already open
-      const existing = workspace.getLeavesOfType(VIEW_TYPE_SEQUENCE_NAVIGATOR)
-      if (existing.length > 0) {
-        // Focus existing view
-        workspace.revealLeaf(existing[0])
-        return
-      }
+        // Check if view is already open
+        const existing = workspace.getLeavesOfType(VIEW_TYPE_SEQUENCE_NAVIGATOR)
+        if (existing.length > 0) {
+          // Focus existing view
+          void workspace.revealLeaf(existing[0])
+          return
+        }
 
-      // Open new view in right sidebar
-      const leaf = workspace.getRightLeaf(false)
-      if (leaf) {
-        await leaf.setViewState({
-          type: VIEW_TYPE_SEQUENCE_NAVIGATOR,
-          active: true,
-        })
-        workspace.revealLeaf(leaf)
-      }
+        // Open new view in right sidebar
+        const leaf = workspace.getRightLeaf(false)
+        if (leaf) {
+          await leaf.setViewState({
+            type: VIEW_TYPE_SEQUENCE_NAVIGATOR,
+            active: true,
+          })
+          void workspace.revealLeaf(leaf)
+        }
+      })()
     },
   }
 }

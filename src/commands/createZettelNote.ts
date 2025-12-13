@@ -1,6 +1,6 @@
 import type { CommandFactory } from '../base/command'
 import { CreateNoteWithSuggestModal } from '../ui/CreateNoteWithSuggestModal'
-import { Notice, TFile } from 'obsidian'
+import { Notice, TFile, App } from 'obsidian'
 
 /**
  * Command: Create Zettel
@@ -21,7 +21,7 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
       enabledByDefault: true,
     },
 
-    execute: async () => {
+    execute: () => {
       if (!context.zettelNote || !context.settingsManager || !context.fileService) {
         console.error('Required services not available')
         return
@@ -32,10 +32,8 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
       // Get existing zettel notes for autocomplete
       const zettels = getZettelFiles(context.app)
 
-      new CreateNoteWithSuggestModal(
-        context.app,
-        zettels,
-        async (title: string) => {
+      new CreateNoteWithSuggestModal(context.app, zettels, (title: string) => {
+        void (async () => {
           try {
             // Load template from file or use inline template
             const templateContent = await context.fileService!.loadTemplate(
@@ -58,12 +56,13 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
                 await context.app.workspace.getLeaf().openFile(file)
               }
             }
-          } catch (error: any) {
-            new Notice(`Error creating zettel: ${error.message}`)
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            new Notice(`Error creating zettel: ${errorMessage}`)
             console.error('Failed to create zettel:', error)
           }
-        }
-      ).open()
+        })()
+      }).open()
     },
   }
 }
@@ -72,7 +71,7 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
  * Get all zettel files
  * Adapted from master's getNoteTitlesByTag to work with folder-based detection
  */
-function getZettelFiles(app: any): TFile[] {
+function getZettelFiles(app: App): TFile[] {
   const files = app.vault.getMarkdownFiles()
   const zettels: TFile[] = []
 

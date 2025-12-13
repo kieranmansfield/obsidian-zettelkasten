@@ -173,25 +173,24 @@ export default class NoteSequenceService {
    * Reorder a sequence (complex operation involving file renames)
    * This is a placeholder for now - full implementation will be added later
    */
-  async reorderSequence(
+  reorderSequence(
     rootFile: TFile,
     newOrder: TFile[],
     indentLevels: Map<TFile, number>,
     options?: SequenceReorderOptions
-  ): Promise<SequenceReorderResult> {
-    const opts: SequenceReorderOptions = {
-      compactIds: true,
-      updateLinks: true,
-      dryRun: false,
-      ...options,
-    }
-
+  ): SequenceReorderResult {
     // TODO: Implement full reordering logic
     // This involves:
     // 1. Generating new IDs based on newOrder and indentLevels
     // 2. Renaming files in correct order to avoid conflicts
     // 3. Updating any internal links if needed
     // 4. Handling errors and rollback
+
+    // Avoid unused variable warning - will be used when implemented
+    void rootFile
+    void newOrder
+    void indentLevels
+    void options
 
     return {
       success: false,

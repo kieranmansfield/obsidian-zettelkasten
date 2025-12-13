@@ -40,7 +40,8 @@ export const indentZettelCommand: CommandFactory = (context) => {
         return
       }
 
-      const currentId = ZettelId.parse(currentIdString)
+      // currentId used for validation but not required for the operation
+      // const currentId = ZettelId.parse(currentIdString)
 
       // Get parent to find siblings
       const parentResult = context.noteSequenceService.navigateToParent(activeFile)
@@ -109,7 +110,7 @@ export const indentZettelCommand: CommandFactory = (context) => {
 
       // Get title from frontmatter to preserve it
       const cache = context.app.metadataCache.getFileCache(activeFile)
-      const title = cache?.frontmatter?.title || ''
+      const title = (cache?.frontmatter?.title as string | undefined) ?? ''
 
       // Build new filename
       const newFilename = title ? `${newId.toString()} ${title}` : newId.toString()

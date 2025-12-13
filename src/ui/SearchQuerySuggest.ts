@@ -51,8 +51,10 @@ export class SearchQuerySuggest extends AbstractInputSuggest<string> {
     const searchLeaves = this.app.workspace.getLeavesOfType('search')
     if (searchLeaves.length > 0) {
       const searchLeaf = searchLeaves[0]
-      // @ts-ignore - accessing internal API
-      const recentSearches = searchLeaf.view?.getRecentSearches?.() || []
+      const searchView = searchLeaf.view as {
+        getRecentSearches?: () => string[]
+      } | null
+      const recentSearches = searchView?.getRecentSearches?.() || []
       recentSearches.forEach((query: string) => {
         if (query.toLowerCase().includes(inputStr.toLowerCase())) {
           suggestions.add(query)

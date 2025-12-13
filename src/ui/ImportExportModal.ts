@@ -22,21 +22,21 @@ export class ImportExportModal extends Modal {
     const { contentEl } = this
 
     contentEl.empty()
-    contentEl.createEl('h2', { text: 'Import/Export Settings' })
+    contentEl.createEl('h2', { text: 'Import/export settings' })
 
     // Export Section
-    contentEl.createEl('h3', { text: 'Export Settings' })
+    contentEl.createEl('h3', { text: 'Export settings' })
 
     new Setting(contentEl)
       .setName('Export')
       .setDesc('Export all settings as JSON to clipboard or view below')
       .addButton((button) => {
         button
-          .setButtonText('Export to Clipboard')
+          .setButtonText('Export to clipboard')
           .setCta()
           .onClick(() => {
             this.exportedJson = this.settingsManager.export()
-            navigator.clipboard.writeText(this.exportedJson)
+            void navigator.clipboard.writeText(this.exportedJson)
             new Notice('Settings exported to clipboard')
           })
       })
@@ -59,11 +59,11 @@ export class ImportExportModal extends Modal {
     }
 
     // Import Section
-    contentEl.createEl('h3', { text: 'Import Settings' })
+    contentEl.createEl('h3', { text: 'Import settings' })
 
     new Setting(contentEl)
       .setName('Import')
-      .setDesc('Paste JSON settings below and click Import to restore settings')
+      .setDesc('Paste JSON settings below and click import to restore settings')
 
     const importContainer = contentEl.createDiv({ cls: 'import-export-json-container' })
     const importTextArea = importContainer.createEl('textarea', {
@@ -92,7 +92,7 @@ export class ImportExportModal extends Modal {
             this.onComplete()
             this.close()
           } catch (err) {
-            new Notice('Failed to import settings: Invalid JSON')
+            new Notice('Failed to import settings: invalid JSON')
             console.error(err)
           }
         })

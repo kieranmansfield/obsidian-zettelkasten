@@ -52,13 +52,14 @@ export class NoteSequencesBasesView extends ItemView {
   }
 
   getDisplayText(): string {
-    return 'Sequence Bases'
+    return 'Sequence bases'
   }
 
   getIcon(): string {
     return 'network'
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()
@@ -120,11 +121,11 @@ export class NoteSequencesBasesView extends ItemView {
     // Title (clickable)
     const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
     const cache = this.app.metadataCache.getFileCache(file)
-    const title = cache?.frontmatter?.title || file.basename
+    const title = (cache?.frontmatter?.title as string | undefined) || file.basename
     titleEl.setText(title)
-    titleEl.addEventListener('click', async (e) => {
+    titleEl.addEventListener('click', (e) => {
       e.stopPropagation()
-      await this.app.workspace.getLeaf(false).openFile(file)
+      void this.app.workspace.getLeaf(false).openFile(file)
     })
 
     // Card body
@@ -149,11 +150,11 @@ export class NoteSequencesBasesView extends ItemView {
     // Base title/filename (clickable)
     const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
     const cache = this.app.metadataCache.getFileCache(sequence.root.file)
-    const title = cache?.frontmatter?.title || sequence.root.file.basename
+    const title = (cache?.frontmatter?.title as string | undefined) || sequence.root.file.basename
     titleEl.setText(title)
-    titleEl.addEventListener('click', async (e) => {
+    titleEl.addEventListener('click', (e) => {
       e.stopPropagation()
-      await this.app.workspace.getLeaf(false).openFile(sequence.root.file)
+      void this.app.workspace.getLeaf(false).openFile(sequence.root.file)
     })
 
     // Sequence count badge
@@ -169,9 +170,9 @@ export class NoteSequencesBasesView extends ItemView {
       attr: { 'aria-label': 'Open base note in new tab' },
     })
     setIcon(openBtn, 'external-link')
-    openBtn.addEventListener('click', async (e) => {
+    openBtn.addEventListener('click', (e) => {
       e.stopPropagation()
-      await this.app.workspace.getLeaf(true).openFile(sequence.root.file)
+      void this.app.workspace.getLeaf(true).openFile(sequence.root.file)
     })
 
     // Card body with complete sequence (all children)
@@ -193,18 +194,20 @@ export class NoteSequencesBasesView extends ItemView {
         // Child title/filename
         const childTitleEl = item.createDiv({ cls: 'sequence-child-title' })
         const childCache = this.app.metadataCache.getFileCache(node.file)
-        const childTitle = childCache?.frontmatter?.title || node.file.basename
+        const childTitle =
+          (childCache?.frontmatter?.title as string | undefined) || node.file.basename
         childTitleEl.setText(childTitle)
 
         // Click handler to open the file
-        item.addEventListener('click', async (e) => {
+        item.addEventListener('click', (e) => {
           e.stopPropagation()
-          await this.app.workspace.getLeaf(false).openFile(node.file)
+          void this.app.workspace.getLeaf(false).openFile(node.file)
         })
       })
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async onClose(): Promise<void> {
     // Clear any pending refresh timeout
     if (this.refreshTimeout) {

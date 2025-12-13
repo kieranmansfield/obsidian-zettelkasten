@@ -1,7 +1,8 @@
 import type { CommandFactory } from '../base/command'
-import { Notice, FuzzySuggestModal } from 'obsidian'
+import { App, Notice, FuzzySuggestModal } from 'obsidian'
 import type { TFile } from 'obsidian'
 import ZettelId from '../core/zettelId.class'
+import { FilenameFormat } from '../base/settings'
 
 /**
  * Modal for selecting a parent zettel
@@ -9,9 +10,9 @@ import ZettelId from '../core/zettelId.class'
 class ParentSelectorModal extends FuzzySuggestModal<TFile> {
   private zettels: TFile[]
   private currentFile: TFile
-  private onChoose: (file: TFile) => Promise<void>
+  private onChoose: (file: TFile) => void
 
-  constructor(app: any, zettels: TFile[], currentFile: TFile, onChoose: (file: TFile) => Promise<void>) {
+  constructor(app: App, zettels: TFile[], currentFile: TFile, onChoose: (file: TFile) => void) {
     super(app)
     this.zettels = zettels.filter((f) => f.path !== currentFile.path) // Exclude current file
     this.currentFile = currentFile
@@ -25,11 +26,22 @@ class ParentSelectorModal extends FuzzySuggestModal<TFile> {
 
   getItemText(file: TFile): string {
     const cache = this.app.metadataCache.getFileCache(file)
-    return cache?.frontmatter?.title || file.basename
+    const title: unknown = cache?.frontmatter?.title
+    // Only use title if it's actually a string
+    return typeof title === 'string' && title.length > 0 ? title : file.basename
   }
 
-  async onChooseItem(file: TFile) {
-    await this.onChoose(file)
+  renderSuggestion(value: { item: TFile }, el: HTMLElement): void {
+    const file = value.item
+    const cache = this.app.metadataCache.getFileCache(file)
+    const title: unknown = cache?.frontmatter?.title
+    const displayTitle = typeof title === 'string' && title.length > 0 ? title : file.basename
+
+    el.createDiv({ cls: 'suggestion-title', text: displayTitle })
+  }
+
+  onChooseItem(file: TFile): void {
+    this.onChoose(file)
   }
 }
 
@@ -51,7 +63,7 @@ export const assignParentCommand: CommandFactory = (context) => {
       enabledByDefault: true,
     },
 
-    execute: async () => {
+    execute: () => {
       const activeFile = context.app.workspace.getActiveFile()
       if (!activeFile) {
         new Notice('No active file')
@@ -74,7 +86,7 @@ export const assignParentCommand: CommandFactory = (context) => {
       // Get all zettel files in the same folder
       const allFiles = context.app.vault
         .getMarkdownFiles()
-        .filter((f) => f.path.startsWith(activeFile.parent?.path || ''))
+        .filter((f) => f.parent?.path === activeFile.parent?.path)
 
       const zettelFiles = allFiles.filter((f) => {
         const id = core.extractZettelId(f.basename)
@@ -87,58 +99,76 @@ export const assignParentCommand: CommandFactory = (context) => {
       }
 
       // Show modal to select parent
-      const modal = new ParentSelectorModal(context.app, zettelFiles, activeFile, async (parentFile) => {
-        const parentIdString = core.extractZettelId(parentFile.basename)
+      const modal = new ParentSelectorModal(context.app, zettelFiles, activeFile, (parentFile) => {
+        void (async () => {
+          const parentIdString = core.extractZettelId(parentFile.basename)
 
-        if (!parentIdString) {
-          new Notice('Selected file is not a valid zettel')
-          return
-        }
-
-        const parentId = ZettelId.parse(parentIdString)
-
-        // Find existing children of parent
-        const existingChildren = core.findChildren(parentFile, allFiles, true)
-        let newId: ZettelId
-
-        if (existingChildren.length === 0) {
-          // First child
-          newId = parentId.nextChild()
-        } else {
-          // Find the last child and get next sibling
-          const lastChild = existingChildren[existingChildren.length - 1]
-          const lastChildIdString = core.extractZettelId(lastChild.basename)
-          if (!lastChildIdString) {
-            new Notice('Error finding last child')
+          if (!parentIdString) {
+            new Notice('Selected file is not a valid zettel')
             return
           }
-          const lastChildId = ZettelId.parse(lastChildIdString)
-          const nextSiblingId = lastChildId.nextSibling()
-          if (!nextSiblingId) {
-            new Notice('Error generating new ID')
-            return
+
+          const parentId = ZettelId.parse(parentIdString)
+
+          // Find existing children of parent
+          const existingChildren = core.findChildren(parentFile, allFiles, true)
+          let newId: ZettelId
+
+          if (existingChildren.length === 0) {
+            // First child
+            newId = parentId.nextChild()
+          } else {
+            // Find the last child and get next sibling
+            const lastChild = existingChildren[existingChildren.length - 1]
+            const lastChildIdString = core.extractZettelId(lastChild.basename)
+            if (!lastChildIdString) {
+              new Notice('Error finding last child')
+              return
+            }
+            const lastChildId = ZettelId.parse(lastChildIdString)
+            const nextSiblingId = lastChildId.nextSibling()
+            if (!nextSiblingId) {
+              new Notice('Error generating new ID')
+              return
+            }
+            newId = nextSiblingId
           }
-          newId = nextSiblingId
-        }
 
-        // Get title from frontmatter to preserve it
-        const cache = context.app.metadataCache.getFileCache(activeFile)
-        const title = cache?.frontmatter?.title || ''
+          // Get title from frontmatter to preserve it
+          const cache = context.app.metadataCache.getFileCache(activeFile)
+          const title = (cache?.frontmatter?.title as string | undefined) ?? ''
 
-        // Build new filename
-        const newFilename = title ? `${newId.toString()} ${title}` : newId.toString()
+          // Get zettel settings to respect filename format
+          const zettelSettings = context.settingsManager!.getZettel()
+          const idString = newId.toString()
 
-        // Rename the file
-        const result = await context.fileService!.rename({
-          file: activeFile,
-          newName: newFilename,
-        })
+          // Build new filename based on settings
+          let newFilename: string
+          if (zettelSettings.filenameFormat === FilenameFormat.ID_ONLY) {
+            newFilename = idString
+          } else {
+            // ID_TITLE format with configured separator
+            const separator = zettelSettings.separator || '⁝'
+            newFilename = title ? `${idString} ${separator} ${title}` : idString
+          }
 
-        if (result) {
-          new Notice(`Assigned ${parentFile.basename} as parent`)
-        } else {
-          new Notice('Failed to assign parent')
-        }
+          // Ensure .md extension is included
+          if (!newFilename.endsWith('.md')) {
+            newFilename = `${newFilename}.md`
+          }
+
+          // Rename the file
+          const result = await context.fileService!.rename({
+            file: activeFile,
+            newName: newFilename,
+          })
+
+          if (result) {
+            new Notice(`Assigned ${parentFile.basename} as parent`)
+          } else {
+            new Notice('Failed to assign parent')
+          }
+        })()
       })
 
       modal.open()

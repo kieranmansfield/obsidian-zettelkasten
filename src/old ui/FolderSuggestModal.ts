@@ -5,11 +5,16 @@ import type ZettelkastenPlugin from "../../main";
  * Modal for selecting a folder from the vault
  */
 export class FolderSuggestModal extends FuzzySuggestModal<TFolder> {
+	private plugin: ZettelkastenPlugin;
+	private onSelect: (folder: TFolder) => void;
+
 	constructor(
-		private plugin: ZettelkastenPlugin,
-		private onSelect: (folder: TFolder) => void,
+		plugin: ZettelkastenPlugin,
+		onSelect: (folder: TFolder) => void,
 	) {
 		super(plugin.app);
+		this.plugin = plugin;
+		this.onSelect = onSelect;
 		this.setPlaceholder("Select a folder to fix filenames...");
 	}
 

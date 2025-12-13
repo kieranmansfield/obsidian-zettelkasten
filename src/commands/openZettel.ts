@@ -1,6 +1,6 @@
 import type { CommandFactory } from '../base/command'
 import { ZettelSuggester } from '../ui/ZettelSuggester'
-import { MarkdownView, TFile } from 'obsidian'
+import { MarkdownView, TFile, App } from 'obsidian'
 
 /**
  * Command: Open Zettel
@@ -21,12 +21,12 @@ export const openZettelCommand: CommandFactory = (context) => {
       enabledByDefault: true,
     },
 
-    execute: async () => {
+    execute: () => {
       const zettels = getZettelFiles(context.app)
       const selectedText = getCurrentlySelectedText(context.app)
 
       new ZettelSuggester(context.app, zettels, selectedText, (file: TFile) => {
-        context.app.workspace.getLeaf().openFile(file)
+        void context.app.workspace.getLeaf().openFile(file)
       }).open()
     },
   }
@@ -36,7 +36,7 @@ export const openZettelCommand: CommandFactory = (context) => {
  * Get all zettel files
  * Adapted from master's getNoteTitlesByTag to work with folder-based detection
  */
-function getZettelFiles(app: any): TFile[] {
+function getZettelFiles(app: App): TFile[] {
   const files = app.vault.getMarkdownFiles()
   const zettels: TFile[] = []
 
@@ -56,7 +56,7 @@ function getZettelFiles(app: any): TFile[] {
 /**
  * Get currently selected text in active editor
  */
-function getCurrentlySelectedText(app: any): string | undefined {
+function getCurrentlySelectedText(app: App): string | undefined {
   const view = app.workspace.getActiveViewOfType(MarkdownView)
   if (!view) {
     return undefined

@@ -19,7 +19,7 @@ export const openBoxPaletteCommand: CommandFactory = (context) => {
       enabledByDefault: true,
     },
 
-    execute: async () => {
+    execute: () => {
       if (!context.boxManager || !context.settingsManager) {
         console.error('Required services not available')
         return

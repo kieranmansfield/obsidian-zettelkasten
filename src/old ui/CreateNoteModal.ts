@@ -14,26 +14,32 @@ export class CreateNoteModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl("h2", { text: "Create New Note" });
+		contentEl.createEl("h2", { text: "Create new note" });
 
 		const form = contentEl.createEl("form");
-		form.style.display = "flex";
-		form.style.flexDirection = "column";
-		form.style.gap = "1em";
+		form.setCssProps({
+			display: "flex",
+			flexDirection: "column",
+			gap: "1em",
+		});
 
 		const inputContainer = form.createDiv();
-		inputContainer.createEl("label", { text: "Note Title:" });
+		inputContainer.createEl("label", { text: "Note title:" });
 		const input = inputContainer.createEl("input", {
 			type: "text",
 			placeholder: "Enter note title",
 		});
-		input.style.width = "100%";
-		input.style.marginTop = "0.5em";
+		input.setCssProps({
+			width: "100%",
+			marginTop: "0.5em",
+		});
 
 		const buttonContainer = form.createDiv();
-		buttonContainer.style.display = "flex";
-		buttonContainer.style.gap = "0.5em";
-		buttonContainer.style.justifyContent = "flex-end";
+		buttonContainer.setCssProps({
+			display: "flex",
+			gap: "0.5em",
+			justifyContent: "flex-end",
+		});
 
 		const submitButton = buttonContainer.createEl("button", {
 			text: "Create",

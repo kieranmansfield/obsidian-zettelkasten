@@ -107,7 +107,7 @@ export default class ZettelNote extends NoteCore {
     parentId: ZettelId,
     input: Omit<ZettelCreateInput, 'zettelId'> & { title: string }
   ): Promise<FileResult> {
-    const childId = parentId.nextChild()!
+    const childId = parentId.nextChild()
     const folder = await this.resolveFolder(input.folder, childId)
 
     const fileInput: FileCreateInput = {

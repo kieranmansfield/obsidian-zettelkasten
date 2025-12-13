@@ -30,11 +30,11 @@ export class TagSuggest extends AbstractInputSuggest<string> {
       })
 
       // Get frontmatter tags
-      const frontmatterTags = cache?.frontmatter?.tags
+      const frontmatterTags: unknown = cache?.frontmatter?.tags
       if (frontmatterTags) {
         const tagsArray = Array.isArray(frontmatterTags) ? frontmatterTags : [frontmatterTags]
 
-        tagsArray.forEach((tag) => {
+        tagsArray.forEach((tag: unknown) => {
           const tagName = String(tag).replace('#', '')
           allTags.add(tagName)
         })

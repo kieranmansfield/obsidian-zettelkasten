@@ -9,7 +9,6 @@ import type {
   FleetingSettings,
   IndexSettings,
   LiteratureSettings,
-  ProjectSettings,
   NoteSequenceSettings,
 } from 'src/base/settings'
 
@@ -39,7 +38,7 @@ export default class SettingsManager {
    * Merges with defaults and runs migrations
    */
   async load(): Promise<void> {
-    const data = await this.plugin.loadData()
+    const data = (await this.plugin.loadData()) as Partial<PluginSettings> | null
 
     // Deep merge loaded data with defaults
     this.settings = this.deepMerge(DEFAULT_SETTINGS, data || {})
@@ -216,14 +215,20 @@ export default class SettingsManager {
    * Refresh the Zettelkasten view
    */
   private refreshZettelkastenView(): void {
-    const { VIEW_TYPE_ZETTELKASTEN } = require('../ui/ZettelkastenView')
-    const leaves = this.plugin.app.workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
-    leaves.forEach((leaf) => {
-      const view = leaf.view as any
-      if (view && typeof view.refresh === 'function') {
-        view.refresh()
-      }
-    })
+    // Dynamic import to avoid circular dependencies
+    import('../ui/ZettelkastenView')
+      .then(({ VIEW_TYPE_ZETTELKASTEN, ZettelkastenView }) => {
+        const leaves = this.plugin.app.workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
+        leaves.forEach((leaf) => {
+          const view = leaf.view
+          if (view instanceof ZettelkastenView) {
+            view.refresh()
+          }
+        })
+      })
+      .catch((error) => {
+        console.error('Failed to refresh ZettelkastenView:', error)
+      })
   }
 
   /**
@@ -314,10 +319,7 @@ export default class SettingsManager {
         const targetValue = (output as Record<string, unknown>)[key]
 
         if (this.isObject(sourceValue) && this.isObject(targetValue)) {
-          ;(output as Record<string, unknown>)[key] = this.deepMerge(
-            targetValue as Record<string, unknown>,
-            sourceValue as Record<string, unknown>
-          )
+          ;(output as Record<string, unknown>)[key] = this.deepMerge(targetValue, sourceValue)
         } else {
           ;(output as Record<string, unknown>)[key] = sourceValue
         }
@@ -369,11 +371,13 @@ export default class SettingsManager {
    */
   async import(json: string): Promise<void> {
     try {
-      const imported = JSON.parse(json)
+      const imported = JSON.parse(json) as Partial<PluginSettings>
       this.settings = this.deepMerge(DEFAULT_SETTINGS, imported)
       await this.save()
     } catch (error) {
-      throw new Error(`Failed to import settings: ${error}`)
+      throw new Error(
+        `Failed to import settings: ${error instanceof Error ? error.message : String(error)}`
+      )
     }
   }
 }

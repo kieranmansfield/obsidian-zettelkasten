@@ -33,7 +33,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<ZettelItem> {
     // Build items list with title, filename, and aliases
     files.forEach((file) => {
       const cache = this.app.metadataCache.getFileCache(file)
-      const title = cache?.frontmatter?.title
+      const title = (cache?.frontmatter?.title as string | undefined) ?? undefined
 
       // Add main entry (using title if available, otherwise filename)
       this.items.push({
@@ -44,15 +44,17 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<ZettelItem> {
       })
 
       // Add aliases as additional entries
-      const aliases = cache?.frontmatter?.aliases
+      const aliases = cache?.frontmatter?.aliases as unknown
       if (aliases && Array.isArray(aliases)) {
-        aliases.forEach((alias: string) => {
-          this.items.push({
-            file,
-            displayText: alias,
-            isAlias: true,
-            isNew: false,
-          })
+        aliases.forEach((alias: unknown) => {
+          if (typeof alias === 'string') {
+            this.items.push({
+              file,
+              displayText: alias,
+              isAlias: true,
+              isNew: false,
+            })
+          }
         })
       }
     })
@@ -119,7 +121,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<ZettelItem> {
         if (fileToOpen) {
           // Open existing file
           const cache = this.app.metadataCache.getFileCache(fileToOpen)
-          const title = cache?.frontmatter?.title || fileToOpen.basename
+          const title = (cache?.frontmatter?.title as string | undefined) ?? fileToOpen.basename
           this.onSubmit(title, fileToOpen)
         } else if (inputValue) {
           // Create new zettel
@@ -132,7 +134,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<ZettelItem> {
   }
 
   onOpen() {
-    super.onOpen()
+    void super.onOpen()
 
     // Remove initial selection
     setTimeout(() => {
@@ -156,7 +158,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<ZettelItem> {
     if (!item.file) return
 
     const cache = this.app.metadataCache.getFileCache(item.file)
-    const title = cache?.frontmatter?.title || item.file.basename
+    const title = (cache?.frontmatter?.title as string | undefined) ?? item.file.basename
 
     // Main title
     const titleEl = el.createDiv({ cls: 'suggestion-title' })
@@ -190,7 +192,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<ZettelItem> {
 
   onChooseItem(item: ZettelItem, evt: MouseEvent | KeyboardEvent) {
     if (item.file) {
-      this.app.workspace.getLeaf().openFile(item.file)
+      void this.app.workspace.getLeaf().openFile(item.file)
     }
   }
 }

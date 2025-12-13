@@ -123,7 +123,7 @@ export interface SequenceBuildOptions {
 export interface SequenceReorderOptions {
   /**
    * Whether to compact IDs after reordering
-   * Compaction removes gaps: a, c, f ’ a, b, c
+   * Compaction removes gaps: a, c, f ï¿½ a, b, c
    * @default true
    */
   compactIds?: boolean

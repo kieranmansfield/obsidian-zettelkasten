@@ -33,10 +33,12 @@ export class BoxPaletteModal extends FuzzySuggestModal<BoxPaletteItem> {
     this.setPlaceholder('Select a box to view its notes')
   }
 
-  async onOpen() {
-    super.onOpen()
-    // Load boxes when modal opens
-    this.boxes = await this.boxManager.listBoxes()
+  onOpen(): void {
+    void (async () => {
+      await super.onOpen()
+      // Load boxes when modal opens
+      this.boxes = await this.boxManager.listBoxes()
+    })()
   }
 
   getItems(): BoxPaletteItem[] {
@@ -107,13 +109,15 @@ class NotesInBoxModal extends FuzzySuggestModal<TFile> {
     ])
   }
 
-  async onOpen() {
-    super.onOpen()
-    // Load files from the box
-    this.files = await this.getFilesInBox()
+  onOpen(): void {
+    void (async () => {
+      await super.onOpen()
+      // Load files from the box
+      this.files = this.getFilesInBox()
+    })()
   }
 
-  private async getFilesInBox(): Promise<TFile[]> {
+  private getFilesInBox(): TFile[] {
     const allFiles = this.app.vault.getMarkdownFiles()
 
     if (this.box.type === 'folder') {
@@ -152,9 +156,9 @@ class NotesInBoxModal extends FuzzySuggestModal<TFile> {
     el.createDiv({ cls: 'suggestion-note', text: file.item.path })
   }
 
-  onChooseItem(file: TFile) {
+  onChooseItem(file: TFile): void {
     // Open the file in the active leaf
-    this.app.workspace.getLeaf().openFile(file)
+    void this.app.workspace.getLeaf().openFile(file)
   }
 }
 
@@ -179,17 +183,17 @@ class CreateBoxModal extends Modal {
     const { contentEl } = this
 
     contentEl.empty()
-    contentEl.createEl('h2', { text: 'Create New Box' })
+    contentEl.createEl('h2', { text: 'Create new box' })
 
     const boxSettings = this.settingsManager.getBoxes()
     const boxType = boxSettings.mode === BoxMode.FOLDER ? 'folder' : 'tag'
 
     // Box name input
     new Setting(contentEl)
-      .setName('Box Name')
+      .setName('Box name')
       .setDesc('Human-readable name for the box')
       .addText((text) => {
-        text.setPlaceholder('My Box').onChange((value) => {
+        text.setPlaceholder('My box').onChange((value) => {
           this.name = value
         })
         text.inputEl.focus()
@@ -197,7 +201,7 @@ class CreateBoxModal extends Modal {
         text.inputEl.addEventListener('keydown', (evt: KeyboardEvent) => {
           if (evt.key === 'Enter' && !evt.shiftKey) {
             evt.preventDefault()
-            this.submit()
+            void this.submit()
           }
         })
       })
@@ -206,21 +210,17 @@ class CreateBoxModal extends Modal {
     new Setting(contentEl)
       .setName(boxType === 'folder' ? 'Folder Path' : 'Tag Name')
       .setDesc(
-        boxType === 'folder'
-          ? 'Folder path relative to root folder'
-          : 'Tag name (without #)'
+        boxType === 'folder' ? 'Folder path relative to root folder' : 'Tag name (without #)'
       )
       .addText((text) => {
-        text
-          .setPlaceholder(boxType === 'folder' ? 'my-box' : 'my-box-tag')
-          .onChange((value) => {
-            this.value = value
-          })
+        text.setPlaceholder(boxType === 'folder' ? 'my-box' : 'my-box-tag').onChange((value) => {
+          this.value = value
+        })
 
         text.inputEl.addEventListener('keydown', (evt: KeyboardEvent) => {
           if (evt.key === 'Enter' && !evt.shiftKey) {
             evt.preventDefault()
-            this.submit()
+            void this.submit()
           }
         })
       })
@@ -238,7 +238,7 @@ class CreateBoxModal extends Modal {
           .setButtonText('Create')
           .setCta()
           .onClick(() => {
-            this.submit()
+            void this.submit()
           })
       })
       .addButton((button) => {
@@ -270,7 +270,8 @@ class CreateBoxModal extends Modal {
       this.close()
     } catch (err) {
       console.error('Failed to create box:', err)
-      new Notice(`Failed to create box: ${err}`)
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      new Notice(`Failed to create box: ${errorMessage}`)
     }
   }
 

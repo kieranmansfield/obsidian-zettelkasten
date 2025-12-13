@@ -226,11 +226,11 @@ export class NoteSequencesView extends ItemView {
 		// Parent title/filename (clickable)
 		const titleEl = headerContent.createDiv({ cls: "sequence-card-title" });
 		const cache = this.app.metadataCache.getFileCache(parent.file);
-		const title = cache?.frontmatter?.title || parent.file.basename;
+		const title = (cache?.frontmatter?.title as string | undefined) || parent.file.basename;
 		titleEl.setText(title);
-		titleEl.addEventListener("click", async (e) => {
+		titleEl.addEventListener("click", (e) => {
 			e.stopPropagation();
-			await this.app.workspace.getLeaf(false).openFile(parent.file);
+			void this.app.workspace.getLeaf(false).openFile(parent.file);
 		});
 
 		// Action buttons container
@@ -244,9 +244,9 @@ export class NoteSequencesView extends ItemView {
 			attr: { "aria-label": "Open sequence in new tab" },
 		});
 		setIcon(openBtn, "external-link");
-		openBtn.addEventListener("click", async (e) => {
+		openBtn.addEventListener("click", (e) => {
 			e.stopPropagation();
-			await this.openSequenceInNewTab(parent);
+			void this.openSequenceInNewTab(parent);
 		});
 
 		// Reorder button
@@ -255,9 +255,9 @@ export class NoteSequencesView extends ItemView {
 			attr: { "aria-label": "Reorder sequence" },
 		});
 		setIcon(reorderBtn, "list-ordered");
-		reorderBtn.addEventListener("click", async (e) => {
+		reorderBtn.addEventListener("click", (e) => {
 			e.stopPropagation();
-			await this.openReorderModal(parent);
+			void this.openReorderModal(parent);
 		});
 
 		// Card body with children
@@ -278,19 +278,21 @@ export class NoteSequencesView extends ItemView {
 	private createChildItem(container: HTMLElement, node: SequenceNode): void {
 		const item = container.createDiv({
 			cls: "sequence-child-item",
-			attr: { style: `padding-left: ${12 + (node.level - 1) * 20}px` },
+		});
+		item.setCssProps({
+			paddingLeft: `${12 + (node.level - 1) * 20}px`,
 		});
 
 		// Child title/filename (no icon)
 		const titleEl = item.createDiv({ cls: "sequence-child-title" });
 		const cache = this.app.metadataCache.getFileCache(node.file);
-		const title = cache?.frontmatter?.title || node.file.basename;
+		const title = (cache?.frontmatter?.title as string | undefined) || node.file.basename;
 		titleEl.setText(title);
 
 		// Click handler to open the file
-		item.addEventListener("click", async (e) => {
+		item.addEventListener("click", (e) => {
 			e.stopPropagation();
-			await this.app.workspace.getLeaf(false).openFile(node.file);
+			void this.app.workspace.getLeaf(false).openFile(node.file);
 		});
 
 		// Recursively render children
@@ -305,7 +307,7 @@ export class NoteSequencesView extends ItemView {
 		await this.app.workspace.getLeaf(true).openFile(parent.file);
 	}
 
-	private async openReorderModal(parent: ParentNote): Promise<void> {
+	private openReorderModal(parent: ParentNote): void {
 		// Get all children as flat list for the modal
 		const childFiles = parent.children.map((child) => child.file);
 
@@ -313,13 +315,14 @@ export class NoteSequencesView extends ItemView {
 			this.app,
 			parent.file,
 			childFiles,
-			async (reorderedNotes, promoted, indentLevels) => {
-				await this.handleSequenceReorder(
+			(reorderedNotes, promoted, indentLevels, compactRequested) => {
+				void this.handleSequenceReorder(
 					parent.file,
 					parent.zettelId,
 					reorderedNotes,
 					promoted,
 					indentLevels,
+					compactRequested,
 				);
 			},
 		);
@@ -333,6 +336,7 @@ export class NoteSequencesView extends ItemView {
 		reorderedNotes: TFile[],
 		promoted: TFile[],
 		indentLevels: Map<TFile, number>,
+		compactRequested: boolean,
 	): Promise<void> {
 		const folder = parentFile.parent || this.plugin.app.vault.getRoot();
 
@@ -483,8 +487,8 @@ export class NoteSequencesView extends ItemView {
 			noteNewIds.set(note, newId);
 
 			// Add prefix if configured
-			const prefix = this.plugin.settings.useZettelPrefix
-				? this.plugin.settings.zettelPrefix
+			const prefix = (this.plugin.settings as { useZettelPrefix?: boolean; zettelPrefix?: string }).useZettelPrefix
+				? (this.plugin.settings as { zettelPrefix?: string }).zettelPrefix
 				: "";
 			const finalId = prefix + newId;
 

@@ -19,7 +19,7 @@ export const openIndexCommand: CommandFactory = (context) => {
       enabledByDefault: true,
     },
 
-    execute: async () => {
+    execute: () => {
       if (!context.settingsManager) {
         console.error('SettingsManager not available')
         return
