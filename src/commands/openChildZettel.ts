@@ -1,5 +1,5 @@
 import type { CommandFactory } from '../base/command'
-import { Notice, FuzzySuggestModal } from 'obsidian'
+import { Notice, FuzzySuggestModal, App } from 'obsidian'
 import type { TFile } from 'obsidian'
 
 /**
@@ -9,7 +9,7 @@ class ChildSelectorModal extends FuzzySuggestModal<TFile> {
   private children: TFile[]
   private onChoose: (file: TFile) => void
 
-  constructor(app: any, children: TFile[], onChoose: (file: TFile) => void) {
+  constructor(app: App, children: TFile[], onChoose: (file: TFile) => void) {
     super(app)
     this.children = children
     this.onChoose = onChoose
@@ -22,10 +22,10 @@ class ChildSelectorModal extends FuzzySuggestModal<TFile> {
 
   getItemText(file: TFile): string {
     const cache = this.app.metadataCache.getFileCache(file)
-    return cache?.frontmatter?.title || file.basename
+    return (cache?.frontmatter?.title as string | undefined) ?? file.basename
   }
 
-  onChooseItem(file: TFile) {
+  onChooseItem(file: TFile): void {
     this.onChoose(file)
   }
 }
@@ -56,7 +56,7 @@ export const openChildZettelCommand: CommandFactory = (context) => {
       }
 
       if (!context.noteSequenceService) {
-        new Notice('Note Sequence Service not available')
+        new Notice('Note sequence service not available')
         return
       }
 
@@ -81,10 +81,12 @@ export const openChildZettelCommand: CommandFactory = (context) => {
         new Notice(`Navigated to child: ${children[0].basename}`)
       } else {
         // Show picker modal for multiple children
-        const modal = new ChildSelectorModal(context.app, children, async (file) => {
-          const leaf = context.app.workspace.getLeaf(false)
-          await leaf.openFile(file)
-          new Notice(`Navigated to child: ${file.basename}`)
+        const modal = new ChildSelectorModal(context.app, children, (file) => {
+          void (async () => {
+            const leaf = context.app.workspace.getLeaf(false)
+            await leaf.openFile(file)
+            new Notice(`Navigated to child: ${file.basename}`)
+          })()
         })
         modal.open()
       }

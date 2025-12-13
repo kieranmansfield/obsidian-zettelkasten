@@ -615,7 +615,7 @@ h1.zettelkasten-settings-title {
   transition: max-height 220ms ease;
 }
 
-.zettelkasten-view .zk-menu-content.zk-collapsed {
+.zettelkasten-view .zk-menu-content.is-collapsed {
   max-height: 0;
 }
 

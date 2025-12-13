@@ -106,7 +106,6 @@ export default class CommandRegistry {
       id: registered.command.id,
       name: registered.command.name,
       icon: registered.command.icon,
-      hotkeys: registered.command.hotkeys,
       checkCallback: registered.command.checkCallback,
       editorCallback: registered.command.editorCallback,
       editorCheckCallback: registered.command.editorCheckCallback,

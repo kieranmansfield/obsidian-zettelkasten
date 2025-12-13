@@ -19,7 +19,7 @@ export const openSequenceCommandPaletteCommand: CommandFactory = (context) => {
       enabledByDefault: true,
     },
 
-    execute: async () => {
+    execute: () => {
       const modal = new SequenceCommandPaletteModal(context.app, context)
       modal.open()
     },

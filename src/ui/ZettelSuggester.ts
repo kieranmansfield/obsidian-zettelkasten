@@ -34,7 +34,8 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
     // Build items list with title, filename, and aliases
     files.forEach((file) => {
       const cache = this.app.metadataCache.getFileCache(file)
-      const title = cache?.frontmatter?.title
+      const frontmatterTitle: unknown = cache?.frontmatter?.title
+      const title = typeof frontmatterTitle === 'string' ? frontmatterTitle : null
 
       // Add main entry (using title if available, otherwise filename)
       this.items.push({
@@ -44,14 +45,16 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
       })
 
       // Add aliases as additional entries
-      const aliases = cache?.frontmatter?.aliases
+      const aliases: unknown = cache?.frontmatter?.aliases
       if (aliases && Array.isArray(aliases)) {
-        aliases.forEach((alias: string) => {
-          this.items.push({
-            file,
-            displayText: alias,
-            isAlias: true,
-          })
+        aliases.forEach((alias: unknown) => {
+          if (typeof alias === 'string') {
+            this.items.push({
+              file,
+              displayText: alias,
+              isAlias: true,
+            })
+          }
         })
       }
     })
@@ -68,19 +71,21 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
     })
   }
 
-  onOpen() {
-    super.onOpen()
+  onOpen(): void {
+    void super.onOpen()
     this.inputEl.value = this.initialQuery
     const event = new Event('input')
     this.inputEl.dispatchEvent(event)
 
     // Remove initial selection
-    setTimeout(() => {
-      const selectedEl = this.modalEl.querySelector('.suggestion-item.is-selected')
-      if (selectedEl && !this.hasInteracted) {
-        selectedEl.removeClass('is-selected')
-      }
-    }, 10)
+    void Promise.resolve().then(() => {
+      setTimeout(() => {
+        const selectedEl = this.modalEl.querySelector('.suggestion-item.is-selected')
+        if (selectedEl && !this.hasInteracted) {
+          selectedEl.removeClass('is-selected')
+        }
+      }, 10)
+    })
   }
 
   getItems(): ZettelItem[] {
@@ -91,10 +96,12 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
     return item.displayText
   }
 
-  renderSuggestion(value: FuzzyMatch<ZettelItem>, el: HTMLElement) {
+  renderSuggestion(value: FuzzyMatch<ZettelItem>, el: HTMLElement): void {
     const item = value.item
     const cache = this.app.metadataCache.getFileCache(item.file)
-    const title = cache?.frontmatter?.title || item.file.basename
+    const frontmatterTitle: unknown = cache?.frontmatter?.title
+    const title =
+      (typeof frontmatterTitle === 'string' ? frontmatterTitle : null) || item.file.basename
 
     // Main title
     const titleEl = el.createDiv({ cls: 'suggestion-title' })
@@ -126,7 +133,7 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
     }
   }
 
-  onChooseItem(item: ZettelItem, _evt: MouseEvent | KeyboardEvent) {
+  onChooseItem(item: ZettelItem, _evt: MouseEvent | KeyboardEvent): void {
     this.completion(item.file)
   }
 }

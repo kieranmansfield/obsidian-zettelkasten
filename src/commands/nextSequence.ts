@@ -27,7 +27,7 @@ export const nextSequenceCommand: CommandFactory = (context) => {
       }
 
       if (!context.noteSequenceService) {
-        new Notice('Note Sequence Service not available')
+        new Notice('Note sequence service not available')
         return
       }
 

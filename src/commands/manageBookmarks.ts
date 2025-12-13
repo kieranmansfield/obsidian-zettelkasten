@@ -22,7 +22,7 @@ export const addBookmarkCommand: CommandFactory = (context) => {
       enabledByDefault: true,
     },
 
-    execute: async () => {
+    execute: () => {
       if (!context.app || !context.settingsManager || !context.plugin) {
         console.error('Required services not available')
         return
@@ -31,10 +31,8 @@ export const addBookmarkCommand: CommandFactory = (context) => {
       const zkPlugin = context.plugin as ZettelkastenPlugin
       const settings = context.settingsManager
 
-      new BookmarkModal(
-        context.app,
-        zkPlugin,
-        async (bookmark: Bookmark) => {
+      new BookmarkModal(context.app, zkPlugin, (bookmark: Bookmark) => {
+        void (async () => {
           // Get current bookmarks
           const viewSettings = settings.getZettelkastenView()
           const bookmarks = [...viewSettings.bookmarks]
@@ -54,8 +52,8 @@ export const addBookmarkCommand: CommandFactory = (context) => {
               ;(leaf.view as { refresh: () => void }).refresh()
             }
           })
-        }
-      ).open()
+        })()
+      }).open()
     },
   }
 }
@@ -97,18 +95,32 @@ export const removeBookmarkCommand: CommandFactory = (context) => {
       const bookmarkNames = bookmarks.map((b: Bookmark) => b.title)
 
       // Use Obsidian's suggester
-      const selected = await new Promise<string | null>((resolve) => {
-        // @ts-ignore - using internal API
-        context.app.workspace.suggester(
-          bookmarkNames,
-          bookmarkNames,
-          (selected: string) => {
-            resolve(selected)
-          },
-          () => {
-            resolve(null)
-          }
-        )
+      const selected = await new Promise<string | null>((resolve, reject) => {
+        try {
+          // Using internal API - suppress the error for this line
+           
+          ;(
+            context.app.workspace as unknown as {
+              suggester: (
+                items: string[],
+                values: string[],
+                onSelect: (value: string) => void,
+                onCancel: () => void
+              ) => void
+            }
+          ).suggester(
+            bookmarkNames,
+            bookmarkNames,
+            (selected: string) => {
+              resolve(selected)
+            },
+            () => {
+              resolve(null)
+            }
+          )
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)))
+        }
       })
 
       if (!selected) {

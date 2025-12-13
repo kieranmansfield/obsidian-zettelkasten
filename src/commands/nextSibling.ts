@@ -1,6 +1,5 @@
 import type { CommandFactory } from '../base/command'
 import { Notice } from 'obsidian'
-import ZettelId from '../core/zettelId.class'
 
 /**
  * Command: Next Sibling
@@ -28,7 +27,7 @@ export const nextSiblingCommand: CommandFactory = (context) => {
       }
 
       if (!context.noteSequenceService) {
-        new Notice('Note Sequence Service not available')
+        new Notice('Note sequence service not available')
         return
       }
 

@@ -34,8 +34,14 @@ export class SequenceCommandPaletteModal extends FuzzySuggestModal<SequenceComma
     ])
   }
 
-  onOpen() {
-    super.onOpen()
+  override onOpen(): void {
+    const superResult = super.onOpen()
+    // Handle case where super.onOpen() returns a promise
+    if (superResult instanceof Promise) {
+      void superResult.catch((error) => {
+        console.error('Error in super.onOpen():', error)
+      })
+    }
     this.buildCommandItems()
   }
 
@@ -102,12 +108,16 @@ export class SequenceCommandPaletteModal extends FuzzySuggestModal<SequenceComma
     }
   }
 
-  async onChooseItem(item: SequenceCommandItem) {
-    try {
-      await item.execute()
-    } catch (error) {
-      console.error(`Error executing command ${item.id}:`, error)
-      new Notice(`Error executing command: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
+  onChooseItem(item: SequenceCommandItem): void {
+    void (async () => {
+      try {
+        await item.execute()
+      } catch (error) {
+        console.error(`Error executing command ${item.id}:`, error)
+        new Notice(
+          `Error executing command: ${error instanceof Error ? error.message : 'Unknown error'}`
+        )
+      }
+    })()
   }
 }

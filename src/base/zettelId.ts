@@ -1,6 +1,4 @@
-export type NumberSegment = `${number}`
-export type LetterSegment = `${string}`
-export type Segment = NumberSegment | LetterSegment
+export type Segment = string
 export type SegmentType = 'number' | 'letter'
 
 export type ZettelId = {

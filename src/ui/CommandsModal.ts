@@ -22,7 +22,7 @@ export class CommandsModal extends Modal {
     contentEl.addClass('commands-modal')
 
     // Header
-    contentEl.createEl('h2', { text: 'Manage Commands' })
+    contentEl.createEl('h2', { text: 'Manage commands' })
     contentEl.createEl('p', {
       text: 'Enable or disable individual commands. Changes require a plugin reload.',
       cls: 'setting-item-description',

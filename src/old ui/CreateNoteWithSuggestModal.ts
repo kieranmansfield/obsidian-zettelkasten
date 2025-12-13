@@ -31,7 +31,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<string> {
 		super.onOpen();
 
 		// Unregister default Enter handler and add our own
-		const scope = this.scope as { keys?: Array<{ key: string }> };
+		const scope = this.scope as unknown as { keys?: Array<{ key: string }> };
 		if (scope.keys) {
 			scope.keys = scope.keys.filter((k) => k.key !== "Enter");
 		}
@@ -95,8 +95,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<string> {
 					// Pass both the title and the existing file
 					const cache =
 						this.app.metadataCache.getFileCache(fileToOpen);
-					const title =
-						cache?.frontmatter?.title || fileToOpen.basename;
+					const title = (cache?.frontmatter?.title as string | undefined) || fileToOpen.basename;
 					this.onSubmit(title, fileToOpen);
 				} else if (inputValue) {
 					this.onSubmit(inputValue);
@@ -120,7 +119,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<string> {
 		if (!file) return;
 
 		const cache = this.app.metadataCache.getFileCache(file);
-		const title = cache?.frontmatter?.title || file.basename;
+		const title = (cache?.frontmatter?.title as string | undefined) || file.basename;
 
 		// Main title
 		const titleEl = el.createDiv({ cls: "suggestion-title" });
@@ -153,7 +152,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<string> {
 	onChooseItem(item: string, evt: MouseEvent | KeyboardEvent) {
 		const file = this.notesMap.get(item);
 		if (file) {
-			this.app.workspace.getLeaf().openFile(file);
+			void this.app.workspace.getLeaf().openFile(file);
 		}
 	}
 }

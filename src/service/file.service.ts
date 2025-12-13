@@ -1,11 +1,13 @@
-import { TFile, Vault } from 'obsidian'
+import { TFile, Vault, App } from 'obsidian'
 import type { FileCreateInput, FileRenameInput, FileResult } from '../base/file'
 
 export default class FileService {
   private vault: Vault
+  private app: App
 
-  constructor(vault: Vault) {
-    this.vault = vault
+  constructor(app: App) {
+    this.app = app
+    this.vault = app.vault
   }
 
   /**
@@ -101,7 +103,7 @@ export default class FileService {
    * Delete a file.
    */
   public async delete(file: TFile): Promise<void> {
-    await this.vault.delete(file)
+    await this.app.fileManager.trashFile(file)
   }
 
   /**

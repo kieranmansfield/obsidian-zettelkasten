@@ -101,7 +101,7 @@ export class BookmarkModal extends Modal {
 		// Path or query field depending on type
 		if (this.type === "file") {
 			new Setting(container).setName("File path").addText((text) => {
-				const onSelect = async (value: string) => {
+				const onSelect = (value: string) => {
 					text.setValue(value);
 					this.path = value;
 					// Auto-fill title from file name if title is empty
@@ -142,7 +142,7 @@ export class BookmarkModal extends Modal {
 			});
 		} else if (this.type === "folder") {
 			new Setting(container).setName("Folder path").addText((text) => {
-				const onSelect = async (value: string) => {
+				const onSelect = (value: string) => {
 					text.setValue(value);
 					this.path = value;
 					// Auto-fill title from folder name if title is empty
@@ -153,7 +153,7 @@ export class BookmarkModal extends Modal {
 					}
 				};
 				new FolderSuggest(this.app, text.inputEl, onSelect);
-				text.setPlaceholder("path/to/folder")
+				text.setPlaceholder("Path to folder")
 					.setValue(this.path || "")
 					.onChange((value) => {
 						this.path = value;

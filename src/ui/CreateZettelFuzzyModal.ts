@@ -42,12 +42,14 @@ export class CreateZettelFuzzyModal extends FuzzySuggestModal<ZettelItem> {
     ])
   }
 
-  async onOpen() {
-    await this.loadExistingFiles()
-    super.onOpen()
+  onOpen(): void {
+    void (async () => {
+      await this.loadExistingFiles()
+      await super.onOpen()
+    })()
   }
 
-  private async loadExistingFiles(): Promise<void> {
+  private loadExistingFiles(): Promise<void> {
     const allFiles = this.app.vault.getMarkdownFiles()
     const boxSettings = this.settingsManager.getBoxes()
     const zettelSettings = this.settingsManager.getZettel()
@@ -71,6 +73,8 @@ export class CreateZettelFuzzyModal extends FuzzySuggestModal<ZettelItem> {
         )
       })
     }
+
+    return Promise.resolve()
   }
 
   getItems(): ZettelItem[] {
@@ -92,7 +96,7 @@ export class CreateZettelFuzzyModal extends FuzzySuggestModal<ZettelItem> {
     // Add existing files
     for (const file of this.existingFiles) {
       const cache = this.app.metadataCache.getFileCache(file)
-      const title = cache?.frontmatter?.title || file.basename
+      const title = (cache?.frontmatter?.title as string | undefined) ?? file.basename
 
       items.push({
         type: 'existing',
@@ -126,23 +130,27 @@ export class CreateZettelFuzzyModal extends FuzzySuggestModal<ZettelItem> {
     }
   }
 
-  async onChooseItem(item: ZettelItem) {
+  onChooseItem(item: ZettelItem): void {
     console.log('CreateZettelFuzzyModal: onChooseItem called', item)
 
-    try {
-      if (item.type === 'create-new') {
-        console.log('Creating new zettel with title:', item.title)
-        await this.onCreate(item.title)
-        new Notice(`Created zettel: ${item.title}`)
-      } else if (item.file) {
-        console.log('Opening existing file:', item.file.basename)
-        const leaf = this.app.workspace.getLeaf(false)
-        await leaf.openFile(item.file)
-        new Notice(`Opened: ${item.file.basename}`)
+    void (async () => {
+      try {
+        if (item.type === 'create-new') {
+          console.log('Creating new zettel with title:', item.title)
+          await this.onCreate(item.title)
+          new Notice(`Created zettel: ${item.title}`)
+        } else if (item.file) {
+          console.log('Opening existing file:', item.file.basename)
+          const leaf = this.app.workspace.getLeaf(false)
+          await leaf.openFile(item.file)
+          new Notice(`Opened: ${item.file.basename}`)
+        }
+      } catch (error) {
+        console.error('Error in onChooseItem:', error)
+        if (error instanceof Error) {
+          new Notice(`Error: ${error.message}`)
+        }
       }
-    } catch (error) {
-      console.error('Error in onChooseItem:', error)
-      new Notice(`Error: ${error.message}`)
-    }
+    })()
   }
 }

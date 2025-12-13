@@ -21,13 +21,25 @@ export class OpenZettelModal extends FuzzySuggestModal<TFile> {
     ])
   }
 
-  async onOpen() {
-    super.onOpen()
+  override onOpen(): void {
+    const superResult = super.onOpen()
+    // Handle case where super.onOpen() returns a promise
+    if (superResult instanceof Promise) {
+      void superResult.catch((error) => {
+        console.error('Error in super.onOpen():', error)
+      })
+    }
     // Load zettel files when modal opens
-    this.zettelFiles = await this.getZettelFiles()
+    void this.getZettelFiles()
+      .then((files) => {
+        this.zettelFiles = files
+      })
+      .catch((error) => {
+        console.error('Error loading zettel files:', error)
+      })
   }
 
-  private async getZettelFiles(): Promise<TFile[]> {
+  private getZettelFiles(): Promise<TFile[]> {
     const allFiles = this.app.vault.getMarkdownFiles()
     const settings = this.settingsManager.getZettel()
     const boxSettings = this.settingsManager.getBoxes()
@@ -45,15 +57,17 @@ export class OpenZettelModal extends FuzzySuggestModal<TFile> {
 
     // If no specific folders, return all markdown files
     if (zettelFolders.length === 0) {
-      return allFiles
+      return Promise.resolve(allFiles)
     }
 
     // Filter files in zettel folders
-    return allFiles.filter((file) => {
+    const filtered = allFiles.filter((file) => {
       return zettelFolders.some(
         (folder) => file.path.startsWith(folder + '/') || file.path === folder
       )
     })
+
+    return Promise.resolve(filtered)
   }
 
   getItems(): TFile[] {
@@ -63,20 +77,20 @@ export class OpenZettelModal extends FuzzySuggestModal<TFile> {
   getItemText(file: TFile): string {
     // Get the title from frontmatter if available, otherwise use basename
     const cache = this.app.metadataCache.getFileCache(file)
-    return cache?.frontmatter?.title || file.basename
+    return (cache?.frontmatter?.title as string | undefined) || file.basename
   }
 
-  renderSuggestion(match: { item: TFile }, el: HTMLElement) {
+  renderSuggestion(match: { item: TFile }, el: HTMLElement): void {
     const file = match.item
     const cache = this.app.metadataCache.getFileCache(file)
-    const title = cache?.frontmatter?.title || file.basename
+    const title = (cache?.frontmatter?.title as string | undefined) || file.basename
 
     el.createDiv({ cls: 'suggestion-title', text: title })
     el.createDiv({ cls: 'suggestion-note', text: file.path })
   }
 
-  onChooseItem(file: TFile) {
+  onChooseItem(file: TFile): void {
     // Open the selected file in the active leaf
-    this.app.workspace.getLeaf().openFile(file)
+    void this.app.workspace.getLeaf().openFile(file)
   }
 }

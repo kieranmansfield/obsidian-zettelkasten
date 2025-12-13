@@ -19,26 +19,28 @@ export const openNoteSequencesBasesViewCommand: CommandFactory = (context) => {
       enabledByDefault: true,
     },
 
-    execute: async () => {
-      const { workspace } = context.app
+    execute: () => {
+      void (async () => {
+        const { workspace } = context.app
 
-      // Check if view is already open
-      const existing = workspace.getLeavesOfType(VIEW_TYPE_NOTE_SEQUENCES_BASES)
-      if (existing.length > 0) {
-        // Focus existing view
-        workspace.revealLeaf(existing[0])
-        return
-      }
+        // Check if view is already open
+        const existing = workspace.getLeavesOfType(VIEW_TYPE_NOTE_SEQUENCES_BASES)
+        if (existing.length > 0) {
+          // Focus existing view
+          void workspace.revealLeaf(existing[0])
+          return
+        }
 
-      // Open new view as a tab in main workspace
-      const leaf = workspace.getLeaf('tab')
-      if (leaf) {
-        await leaf.setViewState({
-          type: VIEW_TYPE_NOTE_SEQUENCES_BASES,
-          active: true,
-        })
-        workspace.revealLeaf(leaf)
-      }
+        // Open new view as a tab in main workspace
+        const leaf = workspace.getLeaf('tab')
+        if (leaf) {
+          await leaf.setViewState({
+            type: VIEW_TYPE_NOTE_SEQUENCES_BASES,
+            active: true,
+          })
+          void workspace.revealLeaf(leaf)
+        }
+      })()
     },
   }
 }

@@ -11,11 +11,7 @@ export class CreateZettelModal extends Modal {
   private folder: string = ''
   private onSubmit: (title: string, folder?: string) => void
 
-  constructor(
-    app: App,
-    defaultFolder: string,
-    onSubmit: (title: string, folder?: string) => void
-  ) {
+  constructor(app: App, defaultFolder: string, onSubmit: (title: string, folder?: string) => void) {
     super(app)
     this.folder = defaultFolder
     this.onSubmit = onSubmit
@@ -25,7 +21,7 @@ export class CreateZettelModal extends Modal {
     const { contentEl } = this
 
     contentEl.empty()
-    contentEl.createEl('h2', { text: 'Create Zettel Note' })
+    contentEl.createEl('h2', { text: 'Create zettel note' })
 
     // Title input
     new Setting(contentEl)

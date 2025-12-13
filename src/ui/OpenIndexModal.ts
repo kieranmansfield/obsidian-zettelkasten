@@ -21,26 +21,38 @@ export class OpenIndexModal extends FuzzySuggestModal<TFile> {
     ])
   }
 
-  async onOpen() {
-    super.onOpen()
+  override onOpen(): void {
+    const superResult = super.onOpen()
+    // Handle case where super.onOpen() returns a promise
+    if (superResult instanceof Promise) {
+      void superResult.catch((error) => {
+        console.error('Error in super.onOpen():', error)
+      })
+    }
     // Load index files when modal opens
-    this.indexFiles = await this.getIndexFiles()
+    void this.getIndexFiles()
+      .then((files) => {
+        this.indexFiles = files
+      })
+      .catch((error) => {
+        console.error('Error loading index files:', error)
+      })
   }
 
-  private async getIndexFiles(): Promise<TFile[]> {
+  private getIndexFiles(): Promise<TFile[]> {
     const allFiles = this.app.vault.getMarkdownFiles()
     const settings = this.settingsManager.getIndex()
 
     // Filter files that are in the index folder
     if (!settings.folder) {
-      return []
+      return Promise.resolve([])
     }
 
-    return allFiles.filter((file) => {
-      return (
-        file.path.startsWith(settings.folder + '/') || file.path === settings.folder
-      )
+    const filtered = allFiles.filter((file) => {
+      return file.path.startsWith(settings.folder + '/') || file.path === settings.folder
     })
+
+    return Promise.resolve(filtered)
   }
 
   getItems(): TFile[] {
@@ -50,20 +62,20 @@ export class OpenIndexModal extends FuzzySuggestModal<TFile> {
   getItemText(file: TFile): string {
     // Get the title from frontmatter if available, otherwise use basename
     const cache = this.app.metadataCache.getFileCache(file)
-    return cache?.frontmatter?.title || file.basename
+    return (cache?.frontmatter?.title as string | undefined) || file.basename
   }
 
-  renderSuggestion(match: { item: TFile }, el: HTMLElement) {
+  renderSuggestion(match: { item: TFile }, el: HTMLElement): void {
     const file = match.item
     const cache = this.app.metadataCache.getFileCache(file)
-    const title = cache?.frontmatter?.title || file.basename
+    const title = (cache?.frontmatter?.title as string | undefined) || file.basename
 
     el.createDiv({ cls: 'suggestion-title', text: title })
     el.createDiv({ cls: 'suggestion-note', text: file.path })
   }
 
-  onChooseItem(file: TFile) {
+  onChooseItem(file: TFile): void {
     // Open the selected file in the active leaf
-    this.app.workspace.getLeaf().openFile(file)
+    void this.app.workspace.getLeaf().openFile(file)
   }
 }
