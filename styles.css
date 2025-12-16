@@ -319,10 +319,15 @@ h1.zettelkasten-settings-title {
   padding: 16px;
 }
 
-/* Mobile: single column */
+/* Mobile: single column and auto-height cards */
 @media (max-width: 768px) {
   .sequence-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sequence-card {
+    height: auto;
+    min-height: 200px;
   }
 }
 
