@@ -629,28 +629,24 @@ export default class SettingsTab extends PluginSettingTab {
               void settings.updateProjects({ tag: value || 'project' })
             })
         })
-    }
-
-    new Setting(containerEl)
-      .setName('Folder')
-      .setDesc(
-        projectSettings.detectionMode === ZettelDetectionMode.TAG
-          ? 'Default folder for new project notes'
-          : 'Folder for project notes'
-      )
-      .addText((text) => {
-        new FolderSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateProjects({ folder: value })
-        })
-
-        text
-          .setPlaceholder('projects')
-          .setValue(projectSettings.folder)
-          .onChange((value) => {
-            void settings.updateProjects({ folder: value || 'projects' })
+    } else {
+      new Setting(containerEl)
+        .setName('Folder')
+        .setDesc('Folder for project notes')
+        .addText((text) => {
+          new FolderSuggest(this.app, text.inputEl, (value) => {
+            text.setValue(value)
+            void settings.updateProjects({ folder: value })
           })
-      })
+
+          text
+            .setPlaceholder('projects')
+            .setValue(projectSettings.folder)
+            .onChange((value) => {
+              void settings.updateProjects({ folder: value || 'projects' })
+            })
+        })
+    }
 
     new Setting(containerEl)
       .setName('Template file')
@@ -781,6 +777,99 @@ export default class SettingsTab extends PluginSettingTab {
           void settings.updateZettelkastenView({ projectsName: value })
         })
     })
+
+    // Section filters
+    new Setting(containerEl).setName('Section filters').setHeading()
+
+    containerEl.createEl('p', {
+      text: 'Optional tags to further filter notes in each section',
+      cls: 'setting-item-description',
+    })
+
+    new Setting(containerEl)
+      .setName('Inbox filter tag')
+      .setDesc('Additional tag to filter inbox notes (leave empty for no filter)')
+      .addText((text) => {
+        new TagSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ inboxFilterTag: value })
+        })
+
+        text
+          .setPlaceholder('Optional filter tag')
+          .setValue(viewSettings.inboxFilterTag || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ inboxFilterTag: value })
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('Zettels filter tag')
+      .setDesc('Additional tag to filter zettel notes (leave empty for no filter)')
+      .addText((text) => {
+        new TagSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ zettelsFilterTag: value })
+        })
+
+        text
+          .setPlaceholder('Optional filter tag')
+          .setValue(viewSettings.zettelsFilterTag || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ zettelsFilterTag: value })
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('Literature filter tag')
+      .setDesc('Additional tag to filter literature notes (leave empty for no filter)')
+      .addText((text) => {
+        new TagSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ literatureFilterTag: value })
+        })
+
+        text
+          .setPlaceholder('Optional filter tag')
+          .setValue(viewSettings.literatureFilterTag || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ literatureFilterTag: value })
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('Index filter tag')
+      .setDesc('Additional tag to filter index notes (leave empty for no filter)')
+      .addText((text) => {
+        new TagSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ indexFilterTag: value })
+        })
+
+        text
+          .setPlaceholder('Optional filter tag')
+          .setValue(viewSettings.indexFilterTag || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ indexFilterTag: value })
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('Projects filter tag')
+      .setDesc('Additional tag to filter project notes (leave empty for no filter)')
+      .addText((text) => {
+        new TagSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ projectsFilterTag: value })
+        })
+
+        text
+          .setPlaceholder('Optional filter tag')
+          .setValue(viewSettings.projectsFilterTag || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ projectsFilterTag: value })
+          })
+      })
   }
 
   // ============================================
