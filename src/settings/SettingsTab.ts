@@ -595,15 +595,57 @@ export default class SettingsTab extends PluginSettingTab {
     if (!projectSettings.enabled) return
 
     new Setting(containerEl)
+      .setName('Detection mode')
+      .setDesc('How to identify project notes')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption(ZettelDetectionMode.FOLDER, 'Folder-based')
+          .addOption(ZettelDetectionMode.TAG, 'Tag-based')
+          .setValue(projectSettings.detectionMode)
+          .onChange((value) => {
+            void (async () => {
+              await settings.updateProjects({
+                detectionMode: value as ZettelDetectionMode,
+              })
+              this.display()
+            })()
+          })
+      })
+
+    if (projectSettings.detectionMode === ZettelDetectionMode.TAG) {
+      new Setting(containerEl)
+        .setName('Tag')
+        .setDesc('Tag to identify project notes (e.g., "project")')
+        .addText((text) => {
+          new TagSuggest(this.app, text.inputEl, (value) => {
+            text.setValue(value)
+            void settings.updateProjects({ tag: value })
+          })
+
+          text
+            .setPlaceholder('project')
+            .setValue(projectSettings.tag)
+            .onChange((value) => {
+              void settings.updateProjects({ tag: value || 'project' })
+            })
+        })
+    }
+
+    new Setting(containerEl)
       .setName('Folder')
-      .setDesc('Folder for project notes')
+      .setDesc(
+        projectSettings.detectionMode === ZettelDetectionMode.TAG
+          ? 'Default folder for new project notes'
+          : 'Folder for project notes'
+      )
       .addText((text) => {
         new FolderSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
           void settings.updateProjects({ folder: value })
         })
 
         text
-          .setPlaceholder('Projects')
+          .setPlaceholder('projects')
           .setValue(projectSettings.folder)
           .onChange((value) => {
             void settings.updateProjects({ folder: value || 'projects' })
