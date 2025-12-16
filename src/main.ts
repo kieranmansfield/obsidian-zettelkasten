@@ -1,4 +1,4 @@
-import { Plugin, addIcon } from 'obsidian'
+import { Plugin, addIcon, Platform } from 'obsidian'
 import FileService from './service/file.service'
 import ZettelNote from './core/zettelNote.class'
 import FleetingNote from './core/fleetingNote.class'
@@ -69,6 +69,8 @@ export default class ZettelkastenPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       try {
         this.registerCommands()
+        // Ensure Zettelkasten view is in left sidebar on mobile
+        this.ensureZettelkastenViewLocationOnMobile()
         console.log('Zettelkasten plugin loaded successfully')
       } catch (err) {
         console.error('Error during plugin initialization:', err)
@@ -238,6 +240,47 @@ export default class ZettelkastenPlugin extends Plugin {
   public async disableCommand(commandId: string): Promise<void> {
     this.commandRegistry.disableCommand(commandId)
     await this.settingsManager.disableCommand(commandId)
+  }
+
+  /**
+   * Ensure Zettelkasten view is in the left sidebar on mobile
+   * This runs on layout ready to fix any workspace restoration issues
+   */
+  private ensureZettelkastenViewLocationOnMobile(): void {
+    // Only run on mobile devices
+    if (!Platform.isMobile) {
+      return
+    }
+
+    const { workspace } = this.app
+    const existing = workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
+
+    // If no view is open, nothing to do
+    if (existing.length === 0) {
+      return
+    }
+
+    const existingLeaf = existing[0]
+
+    // Check if the existing leaf's parent is the left split
+    const isInLeftSidebar = existingLeaf.getRoot() === workspace.leftSplit
+
+    // If it's not in the left sidebar, move it there
+    if (!isInLeftSidebar) {
+      // Close the view in the wrong location
+      existingLeaf.detach()
+
+      // Open in the correct location (left sidebar)
+      void (async () => {
+        const leaf = workspace.getLeftLeaf(false)
+        if (leaf) {
+          await leaf.setViewState({
+            type: VIEW_TYPE_ZETTELKASTEN,
+            active: true,
+          })
+        }
+      })()
+    }
   }
 
   onunload() {

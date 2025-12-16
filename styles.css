@@ -192,7 +192,6 @@ h1.zettelkasten-settings-title {
 
 .zettelkasten-sidebar .tree-item.nav-folder > .tree-item-self.nav-folder-title .tree-item-inner {
   font-weight: 600;
-  font-size: 14px;
   letter-spacing: 0.02em;
 }
 
@@ -213,6 +212,21 @@ h1.zettelkasten-settings-title {
   min-height: 44px; /* iOS recommended touch target */
   display: flex;
   align-items: center;
+}
+
+/* Move chevron to the right on mobile */
+.is-mobile .zettelkasten-sidebar .collapse-icon {
+  order: 3;
+  margin-right: 0;
+  margin-left: auto;
+}
+
+.is-mobile .zettelkasten-sidebar .zk-section-icon {
+  order: 1;
+}
+
+.is-mobile .zettelkasten-sidebar .tree-item-inner {
+  order: 2;
 }
 
 /* Remove hover effects on mobile, use active state instead */
