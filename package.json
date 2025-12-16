@@ -1,6 +1,6 @@
 {
   "name": "obsidian-zettelkasten",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "This is a sample plugin for Obsidian (https://obsidian.md)",
   "main": "main.js",
   "repository": {

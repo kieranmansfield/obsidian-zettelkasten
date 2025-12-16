@@ -202,51 +202,74 @@ h1.zettelkasten-settings-title {
 }
 
 /* Ensure proper spacing for mobile */
-.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title {
+.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title,
+.is-phone .zettelkasten-sidebar .tree-item-self.nav-folder-title {
   min-height: 44px !important; /* iOS recommended touch target - override desktop */
   display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
   gap: 0 !important;
+  justify-content: flex-start !important;
 }
 
-.is-mobile .zettelkasten-sidebar .tree-item-self.nav-file-title {
+.is-mobile .zettelkasten-sidebar .tree-item-self.nav-file-title,
+.is-phone .zettelkasten-sidebar .tree-item-self.nav-file-title {
   min-height: 44px; /* iOS recommended touch target */
   display: flex;
   align-items: center;
 }
 
-/* Move chevron to the right on mobile - using both CSS and DOM order */
-/* This works in conjunction with the Platform.isMobile check in TypeScript */
-.is-mobile .zettelkasten-sidebar .collapse-icon {
-  order: 999 !important;
-  margin-right: 0 !important;
-  margin-left: auto !important;
-  padding-left: 8px !important;
+/* Move chevron to the right on mobile */
+/* Use CSS to reposition regardless of DOM order */
+
+/* Mobile screens - force chevron to right with absolute positioning */
+@media (max-width: 768px), (hover: none), (pointer: coarse) {
+  .zettelkasten-sidebar .tree-item-self.nav-folder-title {
+    position: relative !important;
+    padding-right: 40px !important;
+  }
+
+  .zettelkasten-sidebar .tree-item-self.nav-folder-title .collapse-icon,
+  .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-icon.collapse-icon {
+    position: absolute !important;
+    right: 8px !important;
+    left: auto !important;
+    margin: 0 !important;
+  }
+
+  .zettelkasten-sidebar .tree-item-self.nav-folder-title .zk-section-icon {
+    position: relative !important;
+    left: auto !important;
+    margin-right: 8px !important;
+  }
+
+  .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-inner {
+    position: relative !important;
+    flex: 1 !important;
+    margin: 0 !important;
+  }
 }
 
-.is-mobile .zettelkasten-sidebar .tree-item-icon.collapse-icon {
-  order: 999 !important;
-  margin-right: 0 !important;
-  margin-left: auto !important;
-  padding-left: 8px !important;
+/* Class-based mobile detection (backup) */
+.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title,
+.is-phone .zettelkasten-sidebar .tree-item-self.nav-folder-title,
+body.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title,
+body.is-phone .zettelkasten-sidebar .tree-item-self.nav-folder-title {
+  position: relative !important;
+  padding-right: 40px !important;
 }
 
-.is-mobile .zettelkasten-sidebar .zk-section-icon {
-  order: 1 !important;
-  margin-right: 8px !important;
-  margin-left: 0 !important;
-}
-
-.is-mobile .zettelkasten-sidebar .tree-item-inner {
-  order: 2 !important;
-  flex: 1 !important;
-  margin: 0 !important;
-}
-
-.is-mobile .zettelkasten-sidebar .nav-folder-title-content {
-  order: 2 !important;
-  flex: 1 !important;
+.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .collapse-icon,
+.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-icon.collapse-icon,
+.is-phone .zettelkasten-sidebar .tree-item-self.nav-folder-title .collapse-icon,
+.is-phone .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-icon.collapse-icon,
+body.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .collapse-icon,
+body.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-icon.collapse-icon,
+body.is-phone .zettelkasten-sidebar .tree-item-self.nav-folder-title .collapse-icon,
+body.is-phone .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-icon.collapse-icon {
+  position: absolute !important;
+  right: 8px !important;
+  left: auto !important;
   margin: 0 !important;
 }
 
@@ -326,7 +349,13 @@ h1.zettelkasten-settings-title {
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
-  height: 320px;
+}
+
+/* Desktop only - fixed height */
+@media (min-width: 769px) and (hover: hover) {
+  .sequence-card {
+    height: 320px;
+  }
 }
 
 .sequence-card:hover {
@@ -334,16 +363,53 @@ h1.zettelkasten-settings-title {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* Mobile: single column and auto-height cards */
-@media (max-width: 768px) {
+/* Mobile and touch devices - auto height */
+@media (max-width: 768px), (hover: none), (pointer: coarse) {
   .sequence-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
 
   .sequence-card {
     height: auto !important;
-    min-height: 200px;
+    min-height: 0 !important;
+    max-height: none !important;
   }
+
+  .sequence-card-body {
+    min-height: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  .sequence-card-header {
+    flex-shrink: 0 !important;
+  }
+}
+
+/* Obsidian mobile app specific - class-based detection */
+.is-mobile .sequence-card,
+.is-phone .sequence-card,
+body.is-mobile .sequence-card,
+body.is-phone .sequence-card {
+  height: auto !important;
+  max-height: none !important;
+  min-height: 0 !important;
+}
+
+.is-mobile .sequence-card-body,
+.is-phone .sequence-card-body,
+body.is-mobile .sequence-card-body,
+body.is-phone .sequence-card-body {
+  min-height: 0 !important;
+  max-height: none !important;
+  height: auto !important;
+}
+
+.is-mobile .sequence-grid,
+.is-phone .sequence-grid,
+body.is-mobile .sequence-grid,
+body.is-phone .sequence-grid {
+  grid-template-columns: 1fr !important;
 }
 
 /* Card header */
