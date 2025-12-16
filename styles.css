@@ -216,37 +216,35 @@ h1.zettelkasten-settings-title {
   align-items: center;
 }
 
-/* Move chevron to the right on mobile - multiple selectors for specificity */
-.is-mobile
-  .zettelkasten-sidebar
-  .tree-item.nav-folder
-  > .tree-item-self.nav-folder-title
-  .tree-item-icon.collapse-icon,
-.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-icon.collapse-icon,
-.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .collapse-icon {
-  order: 3 !important;
+/* Move chevron to the right on mobile - using both CSS and DOM order */
+/* This works in conjunction with the Platform.isMobile check in TypeScript */
+.is-mobile .zettelkasten-sidebar .collapse-icon {
+  order: 999 !important;
   margin-right: 0 !important;
   margin-left: auto !important;
   padding-left: 8px !important;
 }
 
-.is-mobile
-  .zettelkasten-sidebar
-  .tree-item.nav-folder
-  > .tree-item-self.nav-folder-title
-  .zk-section-icon,
-.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .zk-section-icon {
+.is-mobile .zettelkasten-sidebar .tree-item-icon.collapse-icon {
+  order: 999 !important;
+  margin-right: 0 !important;
+  margin-left: auto !important;
+  padding-left: 8px !important;
+}
+
+.is-mobile .zettelkasten-sidebar .zk-section-icon {
   order: 1 !important;
   margin-right: 8px !important;
   margin-left: 0 !important;
 }
 
-.is-mobile
-  .zettelkasten-sidebar
-  .tree-item.nav-folder
-  > .tree-item-self.nav-folder-title
-  .tree-item-inner,
-.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-inner {
+.is-mobile .zettelkasten-sidebar .tree-item-inner {
+  order: 2 !important;
+  flex: 1 !important;
+  margin: 0 !important;
+}
+
+.is-mobile .zettelkasten-sidebar .nav-folder-title-content {
   order: 2 !important;
   flex: 1 !important;
   margin: 0 !important;
@@ -319,18 +317,6 @@ h1.zettelkasten-settings-title {
   padding: 16px;
 }
 
-/* Mobile: single column and auto-height cards */
-@media (max-width: 768px) {
-  .sequence-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .sequence-card {
-    height: auto;
-    min-height: 200px;
-  }
-}
-
 /* Sequence card styling */
 .sequence-card {
   background: var(--background-primary);
@@ -346,6 +332,18 @@ h1.zettelkasten-settings-title {
 .sequence-card:hover {
   border-color: var(--background-modifier-border-hover);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobile: single column and auto-height cards */
+@media (max-width: 768px) {
+  .sequence-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sequence-card {
+    height: auto !important;
+    min-height: 200px;
+  }
 }
 
 /* Card header */
