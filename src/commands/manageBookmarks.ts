@@ -45,11 +45,11 @@ export const addBookmarkCommand: CommandFactory = (context) => {
 
           new Notice(`Bookmark "${bookmark.title}" added`)
 
-          // Refresh the view if it's open
+          // Refresh the view immediately if it's open
           const leaves = context.app.workspace.getLeavesOfType('zettelkasten-view')
           leaves.forEach((leaf) => {
-            if (leaf.view && 'refresh' in leaf.view) {
-              ;(leaf.view as { refresh: () => void }).refresh()
+            if (leaf.view && 'refreshImmediate' in leaf.view) {
+              ;(leaf.view as { refreshImmediate: () => void }).refreshImmediate()
             }
           })
         })()
@@ -138,11 +138,11 @@ export const removeBookmarkCommand: CommandFactory = (context) => {
 
         new Notice(`Bookmark "${removedBookmark.title}" removed`)
 
-        // Refresh the view if it's open
+        // Refresh the view immediately if it's open
         const leaves = context.app.workspace.getLeavesOfType('zettelkasten-view')
         leaves.forEach((leaf) => {
-          if (leaf.view && 'refresh' in leaf.view) {
-            ;(leaf.view as { refresh: () => void }).refresh()
+          if (leaf.view && 'refreshImmediate' in leaf.view) {
+            ;(leaf.view as { refreshImmediate: () => void }).refreshImmediate()
           }
         })
       }

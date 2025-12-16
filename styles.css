@@ -144,149 +144,84 @@ h1.zettelkasten-settings-title {
   align-items: center;
 }
 
-/* Zettelkasten Panel View */
-.zettelkasten-view {
-  padding: 10px;
-}
+/* Zettelkasten Sidebar - Native File Explorer Style */
+/* Most styling is inherited from Obsidian's native classes */
+/* Only minimal overrides needed, scoped to zettelkasten-sidebar */
 
-.zk-menu-item {
-  margin-bottom: 8px;
-}
-
-.zk-menu-header {
+/* Ensure collapse icon has proper space and is centered */
+.zettelkasten-sidebar .collapse-icon {
   display: flex;
   align-items: center;
-  padding: 6px 8px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.1s;
-}
-
-.zk-menu-header:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-/* Active dashboard highlighting - using same style as active files */
-.zk-menu-header.is-active-dashboard {
-  background-color: var(--nav-item-background-active);
-  color: var(--nav-item-color-active);
-}
-
-.zk-menu-header.is-active-dashboard .zk-menu-name {
-  color: var(--nav-item-color-active);
-  font-weight: 500;
-}
-
-.zk-menu-header.is-active-dashboard .zk-menu-icon {
-  color: var(--nav-item-color-active);
-}
-
-.zk-collapse-icon {
-  display: flex;
-  align-items: center;
-  margin-right: 4px;
-  color: var(--text-muted);
-  width: 16px;
-  height: 16px;
-}
-
-.zk-collapse-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.zk-menu-icon {
-  display: flex;
-  align-items: center;
-  margin-right: 8px;
-  color: var(--text-muted);
-  width: 16px;
-  height: 16px;
-}
-
-.zk-menu-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.zk-menu-name {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-normal);
-}
-
-.zk-menu-content {
-  padding-left: 28px;
-  margin-top: 4px;
-  margin-bottom: 4px;
-}
-
-.zk-folder-note-link {
-  padding: 4px 8px;
-  cursor: pointer;
-  border-radius: 3px;
-  font-size: 13px;
-  color: var(--text-muted);
-  transition: background-color 0.1s;
-}
-
-.zk-folder-note-link:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.zk-no-folder-note,
-.zk-no-folder,
-.zk-no-files {
-  padding: 4px 8px;
-  font-size: 12px;
-  color: var(--text-faint);
-  font-style: italic;
-}
-
-.zk-file-link {
-  padding: 4px 8px;
-  cursor: pointer;
-  border-radius: 3px;
-  font-size: 13px;
-  color: var(--text-muted);
-  transition: background-color 0.1s;
-  margin-bottom: 2px;
-}
-
-.zk-file-link:hover {
-  background-color: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.zk-bookmark-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  cursor: pointer;
-  border-radius: 3px;
-  transition: background-color 0.1s;
-  margin-bottom: 2px;
-}
-
-.zk-bookmark-item:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-.zk-bookmark-icon {
-  display: flex;
-  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  color: var(--text-muted);
-  width: 16px;
-  height: 16px;
+  margin-right: 4px;
 }
 
-.zk-bookmark-icon svg {
-  width: 16px;
-  height: 16px;
+/* Hide chevron when no content, but maintain spacing */
+.zettelkasten-sidebar .zk-chevron-hidden {
+  visibility: hidden;
+}
+
+/* Custom section icons */
+.zettelkasten-sidebar .zk-section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-accent);
+  margin-right: 10px;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.zettelkasten-sidebar .zk-section-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Enhanced section headers - bolder and more spaced */
+.zettelkasten-sidebar .tree-item.nav-folder > .tree-item-self.nav-folder-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  min-height: 36px; /* Ensure consistent height for vertical centering */
+}
+
+.zettelkasten-sidebar .tree-item.nav-folder > .tree-item-self.nav-folder-title .tree-item-inner {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+}
+
+/* First section should not have top margin */
+.zettelkasten-sidebar > .tree-item.nav-folder:first-child > .tree-item-self.nav-folder-title {
+  margin-top: 0;
+  padding-top: 4px;
+}
+
+/* Ensure proper spacing for mobile */
+.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title {
+  min-height: 44px !important; /* iOS recommended touch target - override desktop */
+  display: flex;
+  align-items: center;
+}
+
+.is-mobile .zettelkasten-sidebar .tree-item-self.nav-file-title {
+  min-height: 44px; /* iOS recommended touch target */
+  display: flex;
+  align-items: center;
+}
+
+/* Remove hover effects on mobile, use active state instead */
+.is-mobile .zettelkasten-sidebar .tree-item-self:hover {
+  background-color: transparent;
+}
+
+.is-mobile .zettelkasten-sidebar .tree-item-self:active {
+  background-color: var(--background-modifier-hover);
 }
 
 /* Modal styles */
@@ -327,19 +262,6 @@ h1.zettelkasten-settings-title {
   }
 }
 
-/* Disabled menu item */
-.zk-menu-item-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.zk-menu-item-disabled .zk-menu-header {
-  cursor: not-allowed;
-}
-
-.zk-menu-item-disabled .zk-menu-header:hover {
-  background-color: transparent;
-}
 
 /* Note Sequences View */
 .note-sequences-view {
@@ -565,135 +487,3 @@ h1.zettelkasten-settings-title {
   margin-top: 8px;
 }
 
-/* Zettelkasten View Tabs */
-.zk-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 8px 8px 0 8px;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.zk-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 4px 4px 0 0;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.zk-tab:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-.zk-tab.is-active {
-  background-color: var(--background-primary-alt);
-  border-bottom: 2px solid var(--interactive-accent);
-}
-
-.zk-tab-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.zk-tab-label {
-  font-size: 0.9em;
-  font-weight: 500;
-}
-
-.zk-content {
-  padding: 8px;
-  overflow-y: auto;
-  max-height: calc(100vh - 100px);
-}
-
-/* Zettelkasten view: smooth collapse/expand for menu content */
-.zettelkasten-view .zk-menu-content {
-  overflow: hidden;
-  max-height: 1000px;
-  transition: max-height 220ms ease;
-}
-
-.zettelkasten-view .zk-menu-content.is-collapsed {
-  max-height: 0;
-}
-
-/* File list container in zettelkasten view */
-.zettelkasten-view .nav-files-container {
-  padding: 0;
-  margin: 0;
-}
-
-/* File items in zettelkasten view */
-.zettelkasten-view .tree-item.nav-file {
-  margin: 0;
-  padding: 0;
-}
-
-.zettelkasten-view .tree-item-self.nav-file-title {
-  padding: 4px 8px;
-  cursor: pointer;
-  border-radius: 3px;
-  transition: background-color 0.1s;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.zettelkasten-view .tree-item-self.nav-file-title:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-/* Active file highlighting */
-.zettelkasten-view .tree-item-self.nav-file-title.is-active {
-  background-color: var(--nav-item-background-active);
-  color: var(--nav-item-color-active);
-}
-
-.zettelkasten-view .tree-item-self.nav-file-title.is-active .tree-item-inner {
-  color: var(--nav-item-color-active);
-  font-weight: 500;
-}
-
-/* File title content */
-.zettelkasten-view .tree-item-inner.nav-file-title-content {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  color: var(--text-normal);
-}
-
-/* Mobile-specific styling for file lists */
-.is-mobile .zettelkasten-view .tree-item-self.nav-file-title {
-  padding: 8px 12px;
-  min-height: 44px; /* iOS recommended touch target */
-  display: flex;
-  align-items: center;
-}
-
-.is-mobile .zettelkasten-view .tree-item-inner.nav-file-title-content {
-  font-size: 14px;
-}
-
-/* Dragging support */
-.zettelkasten-view .tree-item-self.nav-file-title[draggable='true'] {
-  cursor: grab;
-}
-
-.zettelkasten-view .tree-item-self.nav-file-title:active {
-  cursor: grabbing;
-}
-
-/* Ensure proper spacing in collapsed/expanded state */
-.zettelkasten-view .zk-menu-content .nav-files-container {
-  margin-top: 4px;
-}
-
-/* Menu name container cursor */
-.zk-menu-name-container {
-  flex: 1;
-  cursor: pointer;
-}

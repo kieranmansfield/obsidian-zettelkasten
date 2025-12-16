@@ -31,8 +31,8 @@ export const openZettelkastenViewCommand: CommandFactory = (context) => {
           return
         }
 
-        // Open new view in right sidebar
-        const leaf = workspace.getRightLeaf(false)
+        // Open new view in left sidebar
+        const leaf = workspace.getLeftLeaf(false)
         if (leaf) {
           await leaf.setViewState({
             type: VIEW_TYPE_ZETTELKASTEN,

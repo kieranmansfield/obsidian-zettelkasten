@@ -39,8 +39,8 @@ export class ZettelkastenView extends ItemView {
   constructor(leaf: WorkspaceLeaf, plugin: ZettelkastenPlugin) {
     super(leaf)
     this.plugin = plugin
-    this.registerEvents()
     this.loadCollapsedSections()
+    this.registerEvents()
   }
 
   private collapsedStorageKey: string = 'obsidian-zettelkasten.collapsedSections'
@@ -78,27 +78,48 @@ export class ZettelkastenView extends ItemView {
     this.registerEvent(this.app.vault.on('create', () => this.scheduleRefresh()))
     this.registerEvent(this.app.vault.on('delete', () => this.scheduleRefresh()))
     this.registerEvent(this.app.vault.on('rename', () => this.scheduleRefresh()))
+    this.registerEvent(this.app.vault.on('modify', () => this.scheduleRefresh()))
+
     // Refresh when metadata changes (tags, frontmatter, etc.)
     this.registerEvent(this.app.metadataCache.on('changed', () => this.scheduleRefresh()))
+    this.registerEvent(this.app.metadataCache.on('resolved', () => this.scheduleRefresh()))
+
     // Refresh when active file changes to update highlighting
     this.registerEvent(this.app.workspace.on('active-leaf-change', () => this.scheduleRefresh()))
+
+    // Refresh when layout changes
+    this.registerEvent(this.app.workspace.on('layout-change', () => this.scheduleRefresh()))
   }
 
   private scheduleRefresh(): void {
-    // Debounce refreshes to avoid excessive updates
+    // Debounce refreshes to avoid excessive updates (reduced to 50ms for snappy updates)
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout)
     }
     this.refreshTimeout = setTimeout(() => {
       this.refresh()
       this.refreshTimeout = null
-    }, 300)
+    }, 50)
+  }
+
+  /**
+   * Immediately refresh the view without debouncing
+   * Use this for critical operations that need instant feedback
+   */
+  public refreshImmediate(): void {
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout)
+      this.refreshTimeout = null
+    }
+    this.refresh()
   }
 
   public refresh(): void {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()
-    container.addClass('zettelkasten-view')
+    // Add specific class for scoping CSS and native file explorer structure
+    container.addClass('zettelkasten-sidebar')
+    container.addClass('nav-files-container')
     this.renderContent(container)
   }
 
@@ -118,7 +139,9 @@ export class ZettelkastenView extends ItemView {
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()
-    container.addClass('zettelkasten-view')
+    // Add specific class for scoping CSS and native file explorer structure
+    container.addClass('zettelkasten-sidebar')
+    container.addClass('nav-files-container')
     this.renderContent(container)
   }
 
@@ -328,9 +351,6 @@ export class ZettelkastenView extends ItemView {
   }
 
   private createMenuItem(container: HTMLElement, item: MenuItem): void {
-    // Menu item container
-    const itemEl = container.createDiv({ cls: 'zk-menu-item' })
-
     // Get files if enabled
     let files: TFile[] = []
     if (item.showFiles) {
@@ -350,67 +370,105 @@ export class ZettelkastenView extends ItemView {
     const activeFile = this.app.workspace.getActiveFile()
     const isDashboardActive = dashboardFile && activeFile?.path === dashboardFile.path
 
-    // Header with icon, arrow, and title
-    const headerEl = itemEl.createDiv({ cls: 'zk-menu-header' })
+    // Check if collapsed
+    const isCollapsed = this.collapsedSections.has(item.name)
+
+    // Use native Obsidian classes to match file explorer
+    const itemEl = container.createDiv({
+      cls: `tree-item nav-folder${isCollapsed ? ' is-collapsed' : ''}`
+    })
+
+    // Header using native classes
+    const headerEl = itemEl.createDiv({
+      cls: 'tree-item-self nav-folder-title is-clickable mod-collapsible'
+    })
+    headerEl.setAttribute('draggable', 'true')
+    headerEl.setAttribute('data-path', item.folder)
+
+    // Apply native inline styles for padding
+    headerEl.style.marginInlineStart = '0px'
+    headerEl.style.paddingInlineStart = '24px'
+
     if (isDashboardActive) {
-      headerEl.addClass('is-active-dashboard')
+      headerEl.addClass('is-active')
     }
 
-    // Collapse chevron (only show if file lists are enabled)
-    const collapseIconEl = headerEl.createDiv({ cls: 'zk-collapse-icon' })
-    if (item.showFiles) {
-      const isCollapsed = this.collapsedSections.has(item.name)
-      setIcon(collapseIconEl, isCollapsed ? 'chevron-right' : 'chevron-down')
-    }
-
-    // Item icon
-    const iconEl = headerEl.createDiv({ cls: 'zk-menu-icon' })
-    setIcon(iconEl, item.icon)
-
-    // Item name
-    headerEl.createDiv({ cls: 'zk-menu-name', text: item.name })
-
-    // Content area for files
-    const contentEl = itemEl.createDiv({ cls: 'zk-menu-content' })
-    if (item.showFiles) {
-      const isCollapsed = this.collapsedSections.has(item.name)
-      if (isCollapsed) {
-        contentEl.addClass('is-collapsed')
-      }
+    // Collapse icon using native classes
+    const collapseIconEl = headerEl.createDiv({
+      cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
+    })
+    // Only show chevron if there are files to display
+    if (item.showFiles && files.length > 0) {
+      setIcon(collapseIconEl, 'right-triangle')
     } else {
-      // Hide content area when file lists are disabled
-      contentEl.addClass('is-collapsed')
+      // Keep the div for spacing but make it invisible
+      collapseIconEl.addClass('zk-chevron-hidden')
     }
+
+    // Custom section icon (added after collapse icon) - don't use tree-item-icon class
+    const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
+    setIcon(sectionIconEl, item.icon)
+
+    // Item name using native classes
+    const nameEl = headerEl.createDiv({
+      cls: 'tree-item-inner nav-folder-title-content',
+      text: item.name
+    })
+
+    // Content area for files (children)
+    const contentEl = itemEl.createDiv({ cls: 'tree-item-children nav-folder-children' })
+    if (isCollapsed) {
+      contentEl.style.display = 'none'
+    }
+
+    // Toggle collapse function
+    const toggleCollapse = () => {
+      // Don't allow collapse if no files are shown
+      if (!item.showFiles || files.length === 0) return
+
+      const isCurrentlyCollapsed = this.collapsedSections.has(item.name)
+
+      if (isCurrentlyCollapsed) {
+        this.collapsedSections.delete(item.name)
+        itemEl.removeClass('is-collapsed')
+        collapseIconEl.removeClass('is-collapsed')
+        contentEl.style.display = ''
+      } else {
+        this.collapsedSections.add(item.name)
+        itemEl.addClass('is-collapsed')
+        collapseIconEl.addClass('is-collapsed')
+        contentEl.style.display = 'none'
+      }
+      this.saveCollapsedSections()
+    }
+
+    // Add click handler to collapse icon
+    collapseIconEl.addEventListener('click', (e) => {
+      e.stopPropagation()
+      toggleCollapse()
+    })
 
     // Add click handler to header
     headerEl.addEventListener('click', (e) => {
       e.stopPropagation()
 
-      // If file lists are enabled and clicking on the collapse icon, toggle collapse
+      // If clicking collapse icon or section icon, toggle collapse
       if (
-        item.showFiles &&
-        (e.target === collapseIconEl || collapseIconEl.contains(e.target as Node))
+        e.target === collapseIconEl ||
+        collapseIconEl.contains(e.target as Node) ||
+        e.target === sectionIconEl ||
+        sectionIconEl.contains(e.target as Node)
       ) {
-        const isCurrentlyCollapsed = this.collapsedSections.has(item.name)
+        toggleCollapse()
+        return
+      }
 
-        if (isCurrentlyCollapsed) {
-          this.collapsedSections.delete(item.name)
-          contentEl.removeClass('is-collapsed')
-          setIcon(collapseIconEl, 'chevron-down')
-        } else {
-          this.collapsedSections.add(item.name)
-          contentEl.addClass('is-collapsed')
-          setIcon(collapseIconEl, 'chevron-right')
-        }
-        this.saveCollapsedSections()
-      } else if (
-        !item.showFiles ||
-        !(e.target === collapseIconEl || collapseIconEl.contains(e.target as Node))
-      ) {
-        // Open the dashboard file when not clicking collapse icon or when file lists are disabled
-        if (dashboardFile) {
-          void this.app.workspace.getLeaf(false).openFile(dashboardFile)
-        }
+      // If there's a dashboard file, open it
+      if (dashboardFile) {
+        void this.app.workspace.getLeaf(false).openFile(dashboardFile)
+      } else if (item.showFiles) {
+        // If no dashboard but files are shown, toggle collapse
+        toggleCollapse()
       }
     })
 
@@ -463,16 +521,17 @@ export class ZettelkastenView extends ItemView {
       return
     }
 
-    // Create a file list container using Obsidian's native classes
-    const fileListContainer = container.createDiv({ cls: 'nav-files-container' })
-
     const activeFile = this.app.workspace.getActiveFile()
 
     files.forEach((file) => {
-      const fileEl = fileListContainer.createDiv({ cls: 'tree-item nav-file' })
+      const fileEl = container.createDiv({ cls: 'tree-item nav-file' })
 
       // Inner container with native Obsidian classes
       const fileItemSelf = fileEl.createDiv({ cls: 'tree-item-self is-clickable nav-file-title' })
+
+      // Apply native inline styles for padding (nested one level)
+      fileItemSelf.style.marginInlineStart = '0px'
+      fileItemSelf.style.paddingInlineStart = '36px' // 24px base + 12px indent
 
       // Set the data attributes that Obsidian's file explorer uses
       fileItemSelf.setAttribute('data-path', file.path)
@@ -569,73 +628,118 @@ export class ZettelkastenView extends ItemView {
     const viewSettings = settings.getZettelkastenView()
     const bookmarksName = viewSettings.bookmarksName || 'Bookmarks'
 
-    const itemEl = container.createDiv({ cls: 'zk-menu-item' })
-    const headerEl = itemEl.createDiv({ cls: 'zk-menu-header' })
-
-    // Collapse icon
-    const collapseIconEl = headerEl.createDiv({ cls: 'zk-collapse-icon' })
+    // Check if collapsed
     const isCollapsed = this.collapsedSections.has(bookmarksName)
-    setIcon(collapseIconEl, isCollapsed ? 'chevron-right' : 'chevron-down')
 
-    // Item icon
-    const iconEl = headerEl.createDiv({ cls: 'zk-menu-icon' })
-    setIcon(iconEl, 'bookmark')
+    // Use native Obsidian classes
+    const itemEl = container.createDiv({
+      cls: `tree-item nav-folder${isCollapsed ? ' is-collapsed' : ''}`
+    })
 
-    // Item name
-    headerEl.createDiv({ cls: 'zk-menu-name', text: bookmarksName })
+    // Header using native classes
+    const headerEl = itemEl.createDiv({
+      cls: 'tree-item-self nav-folder-title is-clickable mod-collapsible'
+    })
+    headerEl.setAttribute('draggable', 'true')
 
-    // Content area (collapsible)
-    const contentEl = itemEl.createDiv({ cls: 'zk-menu-content' })
-    if (isCollapsed) {
-      contentEl.addClass('is-collapsed')
+    // Apply native inline styles for padding
+    headerEl.style.marginInlineStart = '0px'
+    headerEl.style.paddingInlineStart = '24px'
+
+    // Get bookmarks to check if there are any
+    const bookmarks = viewSettings.bookmarks
+
+    // Collapse icon using native classes
+    const collapseIconEl = headerEl.createDiv({
+      cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
+    })
+    // Only show chevron if there are bookmarks to display
+    if (bookmarks.length > 0) {
+      setIcon(collapseIconEl, 'right-triangle')
+    } else {
+      // Keep the div for spacing but make it invisible
+      collapseIconEl.addClass('zk-chevron-hidden')
     }
 
-    // Add click handler to header (toggle collapse)
-    headerEl.addEventListener('click', (e) => {
-      e.stopPropagation()
+    // Custom section icon for bookmarks - don't use tree-item-icon class
+    const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
+    setIcon(sectionIconEl, 'bookmark')
+
+    // Item name using native classes
+    headerEl.createDiv({
+      cls: 'tree-item-inner nav-folder-title-content',
+      text: bookmarksName
+    })
+
+    // Content area for bookmarks (children)
+    const contentEl = itemEl.createDiv({ cls: 'tree-item-children nav-folder-children' })
+    if (isCollapsed) {
+      contentEl.style.display = 'none'
+    }
+
+    // Toggle collapse function
+    const toggleCollapse = () => {
+      // Don't allow collapse if no bookmarks
+      if (bookmarks.length === 0) return
 
       const isCurrentlyCollapsed = this.collapsedSections.has(bookmarksName)
 
       if (isCurrentlyCollapsed) {
         this.collapsedSections.delete(bookmarksName)
-        contentEl.removeClass('is-collapsed')
-        setIcon(collapseIconEl, 'chevron-down')
+        itemEl.removeClass('is-collapsed')
+        collapseIconEl.removeClass('is-collapsed')
+        contentEl.style.display = ''
       } else {
         this.collapsedSections.add(bookmarksName)
-        contentEl.addClass('is-collapsed')
-        setIcon(collapseIconEl, 'chevron-right')
+        itemEl.addClass('is-collapsed')
+        collapseIconEl.addClass('is-collapsed')
+        contentEl.style.display = 'none'
       }
       this.saveCollapsedSections()
+    }
+
+    // Add click handler to collapse icon
+    collapseIconEl.addEventListener('click', (e) => {
+      e.stopPropagation()
+      toggleCollapse()
+    })
+
+    // Add click handler to header
+    headerEl.addEventListener('click', (e) => {
+      e.stopPropagation()
+      toggleCollapse()
     })
 
     // Display bookmarks
-    this.displayBookmarks(contentEl)
+    this.displayBookmarks(contentEl, bookmarks)
   }
 
   /**
    * Display bookmarks in the content area
    */
-  private displayBookmarks(container: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const viewSettings = settings.getZettelkastenView()
-    const bookmarks = viewSettings.bookmarks
-
+  private displayBookmarks(container: HTMLElement, bookmarks: Bookmark[]): void {
     if (bookmarks.length === 0) {
-      container.createDiv({
-        cls: 'zk-no-files',
+      const emptyEl = container.createDiv({
+        cls: 'tree-item-self',
         text: 'No bookmarks yet',
       })
+      emptyEl.style.marginInlineStart = '0px'
+      emptyEl.style.paddingInlineStart = '36px'
+      emptyEl.style.color = 'var(--text-faint)'
+      emptyEl.style.fontStyle = 'italic'
+      emptyEl.style.fontSize = '12px'
       return
     }
 
-    // Create a file list container using Obsidian's native classes
-    const bookmarkListContainer = container.createDiv({ cls: 'nav-files-container' })
-
     bookmarks.forEach((bookmark) => {
-      const bookmarkEl = bookmarkListContainer.createDiv({ cls: 'tree-item nav-file' })
+      const bookmarkEl = container.createDiv({ cls: 'tree-item nav-file' })
       const bookmarkItemSelf = bookmarkEl.createDiv({
         cls: 'tree-item-self is-clickable nav-file-title',
       })
+
+      // Apply native inline styles for padding (nested one level)
+      bookmarkItemSelf.style.marginInlineStart = '0px'
+      bookmarkItemSelf.style.paddingInlineStart = '36px' // 24px base + 12px indent
 
       // Icon based on type
       let iconName = 'file'
@@ -727,19 +831,32 @@ export class ZettelkastenView extends ItemView {
    * Create Note Sequences section - simple link to open view
    */
   private createNoteSequencesSection(container: HTMLElement): void {
-    const itemEl = container.createDiv({ cls: 'zk-menu-item' })
-    const headerEl = itemEl.createDiv({ cls: 'zk-menu-header' })
+    // Use native Obsidian classes to match other sections
+    const itemEl = container.createDiv({ cls: 'tree-item nav-folder' })
 
-    // Optional collapse icon (for alignment)
-    headerEl.createDiv({ cls: 'zk-collapse-icon' })
+    const headerEl = itemEl.createDiv({
+      cls: 'tree-item-self nav-folder-title is-clickable mod-collapsible'
+    })
+    headerEl.setAttribute('draggable', 'true')
 
-    const iconEl = headerEl.createDiv({ cls: 'zk-menu-icon' })
-    setIcon(iconEl, 'layers')
+    // Apply native inline styles for padding
+    headerEl.style.marginInlineStart = '0px'
+    headerEl.style.paddingInlineStart = '24px'
 
-    const nameContainer = headerEl.createDiv({ cls: 'zk-menu-name-container' })
-    nameContainer.createSpan({ cls: 'zk-menu-name', text: 'Note Sequences' })
+    // Empty collapse icon for alignment (no children to collapse, so hide it)
+    const collapseIconEl = headerEl.createDiv({ cls: 'tree-item-icon collapse-icon zk-chevron-hidden' })
 
-    // Click handler for dashboard
+    // Custom section icon - don't use tree-item-icon class
+    const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
+    setIcon(sectionIconEl, 'layers')
+
+    // Name
+    const nameEl = headerEl.createDiv({
+      cls: 'tree-item-inner nav-folder-title-content',
+      text: 'Note Sequences'
+    })
+
+    // Click handler to open Note Sequences view
     headerEl.addEventListener('click', (e) => {
       e.stopPropagation()
       void this.app.workspace.getLeaf('tab').setViewState({
@@ -747,7 +864,6 @@ export class ZettelkastenView extends ItemView {
         active: true,
       })
     })
-    headerEl.addClass('is-clickable')
   }
 
   // eslint-disable-next-line @typescript-eslint/require-await
