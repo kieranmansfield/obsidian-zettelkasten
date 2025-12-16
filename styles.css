@@ -217,7 +217,11 @@ h1.zettelkasten-settings-title {
 }
 
 /* Move chevron to the right on mobile - multiple selectors for specificity */
-.is-mobile .zettelkasten-sidebar .tree-item.nav-folder > .tree-item-self.nav-folder-title .tree-item-icon.collapse-icon,
+.is-mobile
+  .zettelkasten-sidebar
+  .tree-item.nav-folder
+  > .tree-item-self.nav-folder-title
+  .tree-item-icon.collapse-icon,
 .is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-icon.collapse-icon,
 .is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .collapse-icon {
   order: 3 !important;
@@ -226,14 +230,22 @@ h1.zettelkasten-settings-title {
   padding-left: 8px !important;
 }
 
-.is-mobile .zettelkasten-sidebar .tree-item.nav-folder > .tree-item-self.nav-folder-title .zk-section-icon,
+.is-mobile
+  .zettelkasten-sidebar
+  .tree-item.nav-folder
+  > .tree-item-self.nav-folder-title
+  .zk-section-icon,
 .is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .zk-section-icon {
   order: 1 !important;
   margin-right: 8px !important;
   margin-left: 0 !important;
 }
 
-.is-mobile .zettelkasten-sidebar .tree-item.nav-folder > .tree-item-self.nav-folder-title .tree-item-inner,
+.is-mobile
+  .zettelkasten-sidebar
+  .tree-item.nav-folder
+  > .tree-item-self.nav-folder-title
+  .tree-item-inner,
 .is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-inner {
   order: 2 !important;
   flex: 1 !important;
@@ -287,7 +299,6 @@ h1.zettelkasten-settings-title {
   }
 }
 
-
 /* Note Sequences View */
 .note-sequences-view {
   padding: 20px;
@@ -305,7 +316,7 @@ h1.zettelkasten-settings-title {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
-  padding: 2rem 2rem 2rem 2rem;
+  padding: 16px;
 }
 
 /* Mobile: single column */
@@ -512,3 +523,7 @@ h1.zettelkasten-settings-title {
   margin-top: 8px;
 }
 
+.vertical-tab-nav-item[data-setting-id='obsidian-zettelkasten'] .vertical-tab-nav-item-icon {
+  --setting-nav-icon-background: rebeccapurple;
+  --setting-nav-icon-color: whitesmoke;
+}

@@ -19,6 +19,7 @@ import { getFileTitle } from '../base/fileHelpers'
 export class NoteSequenceCardsView extends BasesView {
   type = 'note-sequence-cards'
   private sequenceService: NoteSequenceService
+  private contentEl: HTMLElement | null = null
 
   constructor(
     controller: QueryController,
@@ -43,9 +44,14 @@ export class NoteSequenceCardsView extends BasesView {
    * Render the view
    */
   private render(): void {
-    const container = this.containerEl
-    container.empty()
-    container.addClass('note-sequences-bases-view')
+    // Create or clear content element, preserving the filter UI
+    if (!this.contentEl) {
+      this.contentEl = this.containerEl.createDiv({ cls: 'note-sequences-bases-view' })
+    } else {
+      this.contentEl.empty()
+    }
+
+    const container = this.contentEl
 
     // Get all files from the query result
     const files = this.data.data.map((entry) => entry.file).filter((f) => f !== null)
@@ -78,14 +84,25 @@ export class NoteSequenceCardsView extends BasesView {
     const gridContainer = container.createDiv({ cls: 'sequence-grid' })
 
     // Display each root zettel with its children as a card
+    // Only show sequences with children (more than 1 note total)
     rootZettels.forEach((rootFile) => {
       const sequence = this.sequenceService.getSequenceForFile(rootFile)
-      if (sequence) {
+      if (sequence && sequence.allNodes.length > 1) {
         this.createSequenceCard(gridContainer, sequence)
-      } else {
-        this.createRootOnlyCard(gridContainer, rootFile)
       }
     })
+
+    // If no sequences with children, show empty state
+    if (gridContainer.children.length === 0) {
+      const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
+      emptyState.createEl('p', {
+        text: 'No sequences with children found.',
+      })
+      emptyState.createEl('p', {
+        text: 'Create child notes to see sequences displayed here.',
+        cls: 'setting-item-description',
+      })
+    }
   }
 
   /**
@@ -156,20 +173,24 @@ export class NoteSequenceCardsView extends BasesView {
       void this.app.workspace.getLeaf(true).openFile(sequence.root.file)
     })
 
-    // Card body with children
+    // Card body with children only (exclude root which is level 0)
     const body = card.createDiv({ cls: 'sequence-card-body' })
 
-    if (sequence.allNodes.length === 0) {
+    // Filter to only show children (level > 0), excluding the root
+    const children = sequence.allNodes.filter((node) => node.level > 0)
+
+    if (children.length === 0) {
       body.createDiv({
         cls: 'sequence-card-empty',
         text: 'No children',
       })
     } else {
-      // Render all nodes (already flattened in allNodes)
-      sequence.allNodes.forEach((node) => {
+      // Render child nodes (flattened hierarchy)
+      children.forEach((node) => {
         const item = body.createDiv({
           cls: 'sequence-child-item',
-          attr: { style: `padding-left: ${12 + node.level * 20}px` },
+          // Adjust padding: level 1 gets base padding, each deeper level adds more
+          attr: { style: `padding-left: ${12 + (node.level - 1) * 20}px` },
         })
 
         // Child title

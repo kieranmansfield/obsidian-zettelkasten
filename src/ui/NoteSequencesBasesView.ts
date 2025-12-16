@@ -96,15 +96,25 @@ export class NoteSequencesBasesView extends ItemView {
     const gridContainer = container.createDiv({ cls: 'sequence-grid' })
 
     // Display each base (root zettel) with its complete sequence as a card
+    // Only show sequences with children (more than 1 note total)
     rootZettels.forEach((rootFile) => {
       const sequence = this.sequenceService.getSequenceForFile(rootFile)
-      if (sequence) {
+      if (sequence && sequence.allNodes.length > 1) {
         this.createBaseCard(gridContainer, sequence)
-      } else {
-        // Root with no children - still show it
-        this.createRootOnlyCard(gridContainer, rootFile)
       }
     })
+
+    // If no sequences with children, show empty state
+    if (gridContainer.children.length === 0) {
+      const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
+      emptyState.createEl('p', {
+        text: 'No sequences with children found.',
+      })
+      emptyState.createEl('p', {
+        text: 'Create child notes to see sequences displayed here.',
+        cls: 'setting-item-description',
+      })
+    }
   }
 
   private createRootOnlyCard(container: HTMLElement, file: TFile): void {
@@ -175,20 +185,24 @@ export class NoteSequencesBasesView extends ItemView {
       void this.app.workspace.getLeaf(true).openFile(sequence.root.file)
     })
 
-    // Card body with complete sequence (all children)
+    // Card body with children only (exclude root which is level 0)
     const body = card.createDiv({ cls: 'sequence-card-body' })
 
-    if (sequence.allNodes.length === 0) {
+    // Filter to only show children (level > 0), excluding the root
+    const children = sequence.allNodes.filter((node) => node.level > 0)
+
+    if (children.length === 0) {
       body.createDiv({
         cls: 'sequence-card-empty',
         text: 'No children',
       })
     } else {
-      // Render all nodes in the sequence (flattened hierarchy)
-      sequence.allNodes.forEach((node) => {
+      // Render child nodes (flattened hierarchy)
+      children.forEach((node) => {
         const item = body.createDiv({
           cls: 'sequence-child-item',
-          attr: { style: `padding-left: ${12 + node.level * 20}px` },
+          // Adjust padding: level 1 gets base padding, each deeper level adds more
+          attr: { style: `padding-left: ${12 + (node.level - 1) * 20}px` },
         })
 
         // Child title/filename
