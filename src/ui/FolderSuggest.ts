@@ -7,9 +7,11 @@ import { AbstractInputSuggest, App, TAbstractFile, TFolder } from 'obsidian'
  */
 export class FolderSuggest extends AbstractInputSuggest<TFolder> {
   private onSelectCallback: (value: string) => void
+  private input: HTMLInputElement
 
   constructor(app: App, inputEl: HTMLInputElement, onSelect: (value: string) => void) {
     super(app, inputEl)
+    this.input = inputEl
     this.onSelectCallback = onSelect
   }
 
@@ -32,6 +34,8 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
   }
 
   selectSuggestion(folder: TFolder): void {
+    this.input.value = folder.path
+    this.input.trigger('input')
     this.onSelectCallback(folder.path)
     this.close()
   }

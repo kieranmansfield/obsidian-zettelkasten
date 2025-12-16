@@ -7,9 +7,11 @@ import { AbstractInputSuggest, App, TFile } from 'obsidian'
  */
 export class FileSuggest extends AbstractInputSuggest<TFile> {
   private onSelectCallback: (value: string) => void
+  private input: HTMLInputElement
 
   constructor(app: App, inputEl: HTMLInputElement, onSelect: (value: string) => void) {
     super(app, inputEl)
+    this.input = inputEl
     this.onSelectCallback = onSelect
   }
 
@@ -29,6 +31,8 @@ export class FileSuggest extends AbstractInputSuggest<TFile> {
   }
 
   selectSuggestion(file: TFile): void {
+    this.input.value = file.path
+    this.input.trigger('input')
     this.onSelectCallback(file.path)
     this.close()
   }

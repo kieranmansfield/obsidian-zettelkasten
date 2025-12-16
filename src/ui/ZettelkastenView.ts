@@ -7,6 +7,7 @@ import {
   Menu,
   MenuItem as ObsidianMenuItem,
   getAllTags,
+  Platform,
 } from 'obsidian'
 import type ZettelkastenPlugin from '../main'
 import { VIEW_TYPE_NOTE_SEQUENCES } from './NoteSequencesView'
@@ -393,27 +394,60 @@ export class ZettelkastenView extends ItemView {
       headerEl.addClass('is-active')
     }
 
-    // Collapse icon using native classes
-    const collapseIconEl = headerEl.createDiv({
-      cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
-    })
-    // Only show chevron if there are files to display
-    if (item.showFiles && files.length > 0) {
-      setIcon(collapseIconEl, 'right-triangle')
+    // Create elements in different order for mobile vs desktop
+    let collapseIconEl: HTMLElement
+    let sectionIconEl: HTMLElement
+    let nameEl: HTMLElement
+
+    if (Platform.isMobile) {
+      // Mobile: section icon, name, collapse icon (left to right)
+
+      // Custom section icon
+      sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
+      setIcon(sectionIconEl, item.icon)
+
+      // Item name
+      nameEl = headerEl.createDiv({
+        cls: 'tree-item-inner nav-folder-title-content',
+        text: item.name
+      })
+
+      // Collapse icon
+      collapseIconEl = headerEl.createDiv({
+        cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
+      })
+      // Only show chevron if there are files to display
+      if (item.showFiles && files.length > 0) {
+        setIcon(collapseIconEl, 'right-triangle')
+      } else {
+        // Keep the div for spacing but make it invisible
+        collapseIconEl.addClass('zk-chevron-hidden')
+      }
     } else {
-      // Keep the div for spacing but make it invisible
-      collapseIconEl.addClass('zk-chevron-hidden')
+      // Desktop: collapse icon, section icon, name (left to right)
+
+      // Collapse icon
+      collapseIconEl = headerEl.createDiv({
+        cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
+      })
+      // Only show chevron if there are files to display
+      if (item.showFiles && files.length > 0) {
+        setIcon(collapseIconEl, 'right-triangle')
+      } else {
+        // Keep the div for spacing but make it invisible
+        collapseIconEl.addClass('zk-chevron-hidden')
+      }
+
+      // Custom section icon
+      sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
+      setIcon(sectionIconEl, item.icon)
+
+      // Item name
+      nameEl = headerEl.createDiv({
+        cls: 'tree-item-inner nav-folder-title-content',
+        text: item.name
+      })
     }
-
-    // Custom section icon (added after collapse icon) - don't use tree-item-icon class
-    const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
-    setIcon(sectionIconEl, item.icon)
-
-    // Item name using native classes
-    const nameEl = headerEl.createDiv({
-      cls: 'tree-item-inner nav-folder-title-content',
-      text: item.name
-    })
 
     // Content area for files (children)
     const contentEl = itemEl.createDiv({ cls: 'tree-item-children nav-folder-children' })
@@ -649,27 +683,59 @@ export class ZettelkastenView extends ItemView {
     // Get bookmarks to check if there are any
     const bookmarks = viewSettings.bookmarks
 
-    // Collapse icon using native classes
-    const collapseIconEl = headerEl.createDiv({
-      cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
-    })
-    // Only show chevron if there are bookmarks to display
-    if (bookmarks.length > 0) {
-      setIcon(collapseIconEl, 'right-triangle')
+    // Create elements in different order for mobile vs desktop
+    let collapseIconEl: HTMLElement
+    let sectionIconEl: HTMLElement
+
+    if (Platform.isMobile) {
+      // Mobile: section icon, name, collapse icon (left to right)
+
+      // Custom section icon for bookmarks
+      sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
+      setIcon(sectionIconEl, 'bookmark')
+
+      // Item name
+      headerEl.createDiv({
+        cls: 'tree-item-inner nav-folder-title-content',
+        text: bookmarksName
+      })
+
+      // Collapse icon
+      collapseIconEl = headerEl.createDiv({
+        cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
+      })
+      // Only show chevron if there are bookmarks to display
+      if (bookmarks.length > 0) {
+        setIcon(collapseIconEl, 'right-triangle')
+      } else {
+        // Keep the div for spacing but make it invisible
+        collapseIconEl.addClass('zk-chevron-hidden')
+      }
     } else {
-      // Keep the div for spacing but make it invisible
-      collapseIconEl.addClass('zk-chevron-hidden')
+      // Desktop: collapse icon, section icon, name (left to right)
+
+      // Collapse icon
+      collapseIconEl = headerEl.createDiv({
+        cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
+      })
+      // Only show chevron if there are bookmarks to display
+      if (bookmarks.length > 0) {
+        setIcon(collapseIconEl, 'right-triangle')
+      } else {
+        // Keep the div for spacing but make it invisible
+        collapseIconEl.addClass('zk-chevron-hidden')
+      }
+
+      // Custom section icon for bookmarks
+      sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
+      setIcon(sectionIconEl, 'bookmark')
+
+      // Item name
+      headerEl.createDiv({
+        cls: 'tree-item-inner nav-folder-title-content',
+        text: bookmarksName
+      })
     }
-
-    // Custom section icon for bookmarks - don't use tree-item-icon class
-    const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
-    setIcon(sectionIconEl, 'bookmark')
-
-    // Item name using native classes
-    headerEl.createDiv({
-      cls: 'tree-item-inner nav-folder-title-content',
-      text: bookmarksName
-    })
 
     // Content area for bookmarks (children)
     const contentEl = itemEl.createDiv({ cls: 'tree-item-children nav-folder-children' })
@@ -843,18 +909,38 @@ export class ZettelkastenView extends ItemView {
     headerEl.style.marginInlineStart = '0px'
     headerEl.style.paddingInlineStart = '24px'
 
-    // Empty collapse icon for alignment (no children to collapse, so hide it)
-    const collapseIconEl = headerEl.createDiv({ cls: 'tree-item-icon collapse-icon zk-chevron-hidden' })
+    // Create elements in different order for mobile vs desktop
+    if (Platform.isMobile) {
+      // Mobile: section icon, name, collapse icon (left to right)
 
-    // Custom section icon - don't use tree-item-icon class
-    const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
-    setIcon(sectionIconEl, 'layers')
+      // Custom section icon
+      const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
+      setIcon(sectionIconEl, 'layers')
 
-    // Name
-    const nameEl = headerEl.createDiv({
-      cls: 'tree-item-inner nav-folder-title-content',
-      text: 'Note Sequences'
-    })
+      // Name
+      headerEl.createDiv({
+        cls: 'tree-item-inner nav-folder-title-content',
+        text: 'Note Sequences'
+      })
+
+      // Empty collapse icon for alignment (no children to collapse, so hide it)
+      headerEl.createDiv({ cls: 'tree-item-icon collapse-icon zk-chevron-hidden' })
+    } else {
+      // Desktop: collapse icon, section icon, name (left to right)
+
+      // Empty collapse icon for alignment (no children to collapse, so hide it)
+      headerEl.createDiv({ cls: 'tree-item-icon collapse-icon zk-chevron-hidden' })
+
+      // Custom section icon
+      const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
+      setIcon(sectionIconEl, 'layers')
+
+      // Name
+      headerEl.createDiv({
+        cls: 'tree-item-inner nav-folder-title-content',
+        text: 'Note Sequences'
+      })
+    }
 
     // Click handler to open Note Sequences view
     headerEl.addEventListener('click', (e) => {

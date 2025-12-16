@@ -778,6 +778,99 @@ export default class SettingsTab extends PluginSettingTab {
         })
     })
 
+    // Dashboard notes
+    new Setting(containerEl).setName('Dashboard notes').setHeading()
+
+    containerEl.createEl('p', {
+      text: 'Optional dashboard notes to open when clicking section headers',
+      cls: 'setting-item-description',
+    })
+
+    new Setting(containerEl)
+      .setName('Inbox dashboard note')
+      .setDesc('Note to open when clicking the inbox section header')
+      .addText((text) => {
+        new FileSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ dashboardFleetingNote: value })
+        })
+
+        text
+          .setPlaceholder('path/to/inbox-dashboard.md')
+          .setValue(viewSettings.dashboardFleetingNote || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ dashboardFleetingNote: value })
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('Zettels dashboard note')
+      .setDesc('Note to open when clicking the zettels section header')
+      .addText((text) => {
+        new FileSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ dashboardZettelNote: value })
+        })
+
+        text
+          .setPlaceholder('path/to/zettels-dashboard.md')
+          .setValue(viewSettings.dashboardZettelNote || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ dashboardZettelNote: value })
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('Literature dashboard note')
+      .setDesc('Note to open when clicking the literature section header')
+      .addText((text) => {
+        new FileSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ dashboardLiteratureNote: value })
+        })
+
+        text
+          .setPlaceholder('path/to/literature-dashboard.md')
+          .setValue(viewSettings.dashboardLiteratureNote || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ dashboardLiteratureNote: value })
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('Index dashboard note')
+      .setDesc('Note to open when clicking the index section header')
+      .addText((text) => {
+        new FileSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ dashboardIndexNote: value })
+        })
+
+        text
+          .setPlaceholder('path/to/index-dashboard.md')
+          .setValue(viewSettings.dashboardIndexNote || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ dashboardIndexNote: value })
+          })
+      })
+
+    new Setting(containerEl)
+      .setName('Projects dashboard note')
+      .setDesc('Note to open when clicking the projects section header')
+      .addText((text) => {
+        new FileSuggest(this.app, text.inputEl, (value) => {
+          text.setValue(value)
+          void settings.updateZettelkastenView({ dashboardProjectsNote: value })
+        })
+
+        text
+          .setPlaceholder('path/to/projects-dashboard.md')
+          .setValue(viewSettings.dashboardProjectsNote || '')
+          .onChange((value) => {
+            void settings.updateZettelkastenView({ dashboardProjectsNote: value })
+          })
+      })
+
     // Section filters
     new Setting(containerEl).setName('Section filters').setHeading()
 

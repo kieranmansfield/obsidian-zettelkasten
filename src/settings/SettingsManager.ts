@@ -156,6 +156,8 @@ export default class SettingsManager {
   async updateBoxes(boxes: Partial<typeof this.settings.boxes>): Promise<void> {
     this.settings.boxes = { ...this.settings.boxes, ...boxes }
     await this.save()
+    // Refresh the Zettelkasten view if it's open
+    this.refreshZettelkastenView()
   }
 
   /**
@@ -164,6 +166,8 @@ export default class SettingsManager {
   async updateZettel(zettel: Partial<typeof this.settings.zettel>): Promise<void> {
     this.settings.zettel = { ...this.settings.zettel, ...zettel }
     await this.save()
+    // Refresh the Zettelkasten view if it's open
+    this.refreshZettelkastenView()
   }
 
   /**
@@ -172,6 +176,8 @@ export default class SettingsManager {
   async updateFleeting(fleeting: Partial<typeof this.settings.fleeting>): Promise<void> {
     this.settings.fleeting = { ...this.settings.fleeting, ...fleeting }
     await this.save()
+    // Refresh the Zettelkasten view if it's open
+    this.refreshZettelkastenView()
   }
 
   /**
@@ -180,6 +186,8 @@ export default class SettingsManager {
   async updateIndex(index: Partial<typeof this.settings.index>): Promise<void> {
     this.settings.index = { ...this.settings.index, ...index }
     await this.save()
+    // Refresh the Zettelkasten view if it's open
+    this.refreshZettelkastenView()
   }
 
   /**
@@ -188,6 +196,8 @@ export default class SettingsManager {
   async updateLiterature(literature: Partial<typeof this.settings.literature>): Promise<void> {
     this.settings.literature = { ...this.settings.literature, ...literature }
     await this.save()
+    // Refresh the Zettelkasten view if it's open
+    this.refreshZettelkastenView()
   }
 
   /**
@@ -196,6 +206,8 @@ export default class SettingsManager {
   async updateProjects(projects: Partial<typeof this.settings.projects>): Promise<void> {
     this.settings.projects = { ...this.settings.projects, ...projects }
     await this.save()
+    // Refresh the Zettelkasten view if it's open
+    this.refreshZettelkastenView()
   }
 
   /**

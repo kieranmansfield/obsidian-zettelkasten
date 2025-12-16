@@ -7,9 +7,11 @@ import { AbstractInputSuggest, App } from 'obsidian'
  */
 export class TagSuggest extends AbstractInputSuggest<string> {
   private onSelectCallback: (value: string) => void
+  private input: HTMLInputElement
 
   constructor(app: App, inputEl: HTMLInputElement, onSelect: (value: string) => void) {
     super(app, inputEl)
+    this.input = inputEl
     this.onSelectCallback = onSelect
   }
 
@@ -54,6 +56,8 @@ export class TagSuggest extends AbstractInputSuggest<string> {
   }
 
   selectSuggestion(tag: string): void {
+    this.input.value = tag
+    this.input.trigger('input')
     this.onSelectCallback(tag)
     this.close()
   }
