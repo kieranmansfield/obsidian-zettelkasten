@@ -1,7 +1,7 @@
 {
   "id": "obsidian-zettelkasten",
   "name": "Zettelkasten",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "minAppVersion": "1.11.0",
   "description": "Bring Zettelkasten note-taking methods to Obsidian.",
   "author": "Kieran Mansfield",
