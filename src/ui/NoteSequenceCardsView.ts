@@ -20,6 +20,7 @@ export class NoteSequenceCardsView extends BasesView {
   type = 'note-sequence-cards'
   private sequenceService: NoteSequenceService
   private contentEl: HTMLElement | null = null
+  containerEl: HTMLElement
 
   constructor(
     controller: QueryController,
@@ -30,8 +31,6 @@ export class NoteSequenceCardsView extends BasesView {
     this.sequenceService = sequenceService
     this.containerEl = containerEl
   }
-
-  containerEl: HTMLElement
 
   /**
    * Called when query data is updated

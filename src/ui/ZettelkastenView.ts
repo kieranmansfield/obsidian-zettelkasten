@@ -93,14 +93,14 @@ export class ZettelkastenView extends ItemView {
   }
 
   private scheduleRefresh(): void {
-    // Debounce refreshes to avoid excessive updates (reduced to 50ms for snappy updates)
+    // Debounce refreshes to avoid excessive updates
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout)
     }
     this.refreshTimeout = setTimeout(() => {
       this.refresh()
       this.refreshTimeout = null
-    }, 50)
+    }, 150)
   }
 
   /**
@@ -476,33 +476,40 @@ export class ZettelkastenView extends ItemView {
       this.saveCollapsedSections()
     }
 
-    // Add click handler to collapse icon
+    // Add click handlers to specific elements for reliable single-click behavior
+
+    // Collapse icon - always toggles
     collapseIconEl.addEventListener('click', (e) => {
       e.stopPropagation()
       toggleCollapse()
     })
 
-    // Add click handler to header
-    headerEl.addEventListener('click', (e) => {
+    // Section icon - always toggles
+    sectionIconEl.addEventListener('click', (e) => {
       e.stopPropagation()
+      toggleCollapse()
+    })
 
-      // If clicking collapse icon or section icon, toggle collapse
-      if (
-        e.target === collapseIconEl ||
-        collapseIconEl.contains(e.target as Node) ||
-        e.target === sectionIconEl ||
-        sectionIconEl.contains(e.target as Node)
-      ) {
-        toggleCollapse()
-        return
-      }
-
-      // If there's a dashboard file, open it
+    // Title/name - opens dashboard or toggles
+    nameEl.addEventListener('click', (e) => {
+      e.stopPropagation()
       if (dashboardFile) {
         void this.app.workspace.getLeaf(false).openFile(dashboardFile)
       } else if (item.showFiles) {
-        // If no dashboard but files are shown, toggle collapse
         toggleCollapse()
+      }
+    })
+
+    // Header catch-all for clicks on padding/gaps
+    headerEl.addEventListener('click', (e) => {
+      // Only handle if not clicking on a child element
+      if (e.target === headerEl) {
+        e.stopPropagation()
+        if (dashboardFile) {
+          void this.app.workspace.getLeaf(false).openFile(dashboardFile)
+        } else if (item.showFiles) {
+          toggleCollapse()
+        }
       }
     })
 

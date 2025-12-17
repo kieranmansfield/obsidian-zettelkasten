@@ -282,6 +282,17 @@ body.is-phone .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-
   background-color: var(--background-modifier-hover);
 }
 
+/* Disable double-tap delay on all clickable elements */
+.zettelkasten-sidebar .tree-item-self,
+.zettelkasten-sidebar .collapse-icon,
+.zettelkasten-sidebar .zk-section-icon,
+.zettelkasten-sidebar .tree-item-inner {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* Modal styles */
 .bookmark-fields {
   margin-top: 1em;
