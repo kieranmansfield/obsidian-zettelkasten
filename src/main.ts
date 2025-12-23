@@ -187,6 +187,7 @@ export default class ZettelkastenPlugin extends Plugin {
       .add(commands.openNoteSequencesViewCommand)
       // .add(commands.openNoteSequencesBasesViewCommand)
       .add(commands.openSequenceNavigatorViewCommand)
+      .add(commands.openSequenceNavigatorModalCommand)
       .add(commands.openSequenceCommandPaletteCommand)
       .add(commands.openZettelkastenViewCommand)
       .add(commands.indentZettelCommand)

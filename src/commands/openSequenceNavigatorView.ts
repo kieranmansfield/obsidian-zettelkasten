@@ -2,19 +2,19 @@ import type { CommandFactory } from '../base/command'
 import { VIEW_TYPE_SEQUENCE_NAVIGATOR } from '../ui/SequenceNavigatorView'
 
 /**
- * Command: Open Sequence Navigator View
+ * Command: Open Sequence Navigator Sidebar
  *
  * Opens the Sequence Navigator sidebar view showing current note's sequence
  */
 export const openSequenceNavigatorViewCommand: CommandFactory = (context) => {
   return {
     id: 'open-sequence-navigator-view',
-    name: 'Open Sequence Navigator View',
+    name: 'Open Sequence Navigator Sidebar',
     icon: 'layers',
 
     metadata: {
       category: 'note-sequences',
-      description: "Open sidebar view showing current note's sequence tree",
+      description: "Open sidebar showing current note's sequence tree",
       canBeDisabled: true,
       enabledByDefault: true,
     },

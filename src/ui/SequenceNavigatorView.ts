@@ -47,7 +47,7 @@ export class SequenceNavigatorView extends ItemView {
   }
 
   getDisplayText(): string {
-    return 'Note sequence'
+    return 'Sequence navigator'
   }
 
   getIcon(): string {

@@ -1000,7 +1000,7 @@ export default class SettingsTab extends PluginSettingTab {
       })
 
     new Setting(containerEl)
-      .setName('Show sequence navigator')
+      .setName('Show sequence navigator sidebar')
       .setDesc("Display tree view of the current note's sequence in the sidebar")
       .addToggle((toggle) => {
         toggle.setValue(sequenceSettings.showSequenceNavigator).onChange((value) => {
