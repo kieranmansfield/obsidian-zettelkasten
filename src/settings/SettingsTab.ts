@@ -46,7 +46,7 @@ export default class SettingsTab extends PluginSettingTab {
     }
 
     // Zettelkasten Sidebar View
-    this.addZettelkastenViewSection(containerEl)
+    this.addZettelkastenSidebarSection(containerEl)
 
     // Note Sequences
     this.addNoteSequenceSection(containerEl)
@@ -677,9 +677,9 @@ export default class SettingsTab extends PluginSettingTab {
   // ============================================
   // Zettelkasten Sidebar View Section
   // ============================================
-  private addZettelkastenViewSection(containerEl: HTMLElement): void {
+  private addZettelkastenSidebarSection(containerEl: HTMLElement): void {
     const settings = this.plugin.getSettingsManager()
-    const viewSettings = settings.getZettelkastenView()
+    const viewSettings = settings.getZettelkastenSidebar()
 
     containerEl.createEl('p', {
       text: 'Browse your notes by type in a collapsible sidebar view.',
@@ -689,7 +689,7 @@ export default class SettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName('Enable sidebar view').addToggle((toggle) => {
       toggle.setValue(viewSettings.enabled).onChange((value) => {
         void (async () => {
-          await settings.updateZettelkastenView({ enabled: value })
+          await settings.updateZettelkastenSidebar({ enabled: value })
           this.display()
         })()
       })
@@ -702,31 +702,31 @@ export default class SettingsTab extends PluginSettingTab {
 
     new Setting(containerEl).setName('Show inbox').addToggle((toggle) => {
       toggle.setValue(viewSettings.showInbox).onChange((value) => {
-        void settings.updateZettelkastenView({ showInbox: value })
+        void settings.updateZettelkastenSidebar({ showInbox: value })
       })
     })
 
     new Setting(containerEl).setName('Show zettels').addToggle((toggle) => {
       toggle.setValue(viewSettings.showZettels).onChange((value) => {
-        void settings.updateZettelkastenView({ showZettels: value })
+        void settings.updateZettelkastenSidebar({ showZettels: value })
       })
     })
 
     new Setting(containerEl).setName('Show literature').addToggle((toggle) => {
       toggle.setValue(viewSettings.showLiterature ?? true).onChange((value) => {
-        void settings.updateZettelkastenView({ showLiterature: value })
+        void settings.updateZettelkastenSidebar({ showLiterature: value })
       })
     })
 
     new Setting(containerEl).setName('Show index').addToggle((toggle) => {
       toggle.setValue(viewSettings.showIndex).onChange((value) => {
-        void settings.updateZettelkastenView({ showIndex: value })
+        void settings.updateZettelkastenSidebar({ showIndex: value })
       })
     })
 
     new Setting(containerEl).setName('Show projects').addToggle((toggle) => {
       toggle.setValue(viewSettings.showProjects ?? false).onChange((value) => {
-        void settings.updateZettelkastenView({ showProjects: value })
+        void settings.updateZettelkastenSidebar({ showProjects: value })
       })
     })
 
@@ -738,7 +738,7 @@ export default class SettingsTab extends PluginSettingTab {
         .setPlaceholder('Inbox')
         .setValue(viewSettings.inboxName || 'Inbox')
         .onChange((value) => {
-          void settings.updateZettelkastenView({ inboxName: value })
+          void settings.updateZettelkastenSidebar({ inboxName: value })
         })
     })
 
@@ -747,7 +747,7 @@ export default class SettingsTab extends PluginSettingTab {
         .setPlaceholder('Zettels')
         .setValue(viewSettings.zettelsName || 'Zettels')
         .onChange((value) => {
-          void settings.updateZettelkastenView({ zettelsName: value })
+          void settings.updateZettelkastenSidebar({ zettelsName: value })
         })
     })
 
@@ -756,7 +756,7 @@ export default class SettingsTab extends PluginSettingTab {
         .setPlaceholder('Literature')
         .setValue(viewSettings.literatureName || 'Literature')
         .onChange((value) => {
-          void settings.updateZettelkastenView({ literatureName: value })
+          void settings.updateZettelkastenSidebar({ literatureName: value })
         })
     })
 
@@ -765,7 +765,7 @@ export default class SettingsTab extends PluginSettingTab {
         .setPlaceholder('Index')
         .setValue(viewSettings.indexName || 'Index')
         .onChange((value) => {
-          void settings.updateZettelkastenView({ indexName: value })
+          void settings.updateZettelkastenSidebar({ indexName: value })
         })
     })
 
@@ -774,7 +774,7 @@ export default class SettingsTab extends PluginSettingTab {
         .setPlaceholder('Projects')
         .setValue(viewSettings.projectsName || 'Projects')
         .onChange((value) => {
-          void settings.updateZettelkastenView({ projectsName: value })
+          void settings.updateZettelkastenSidebar({ projectsName: value })
         })
     })
 
@@ -792,14 +792,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new FileSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ dashboardFleetingNote: value })
+          void settings.updateZettelkastenSidebar({ dashboardFleetingNote: value })
         })
 
         text
           .setPlaceholder('path/to/inbox-dashboard.md')
           .setValue(viewSettings.dashboardFleetingNote || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ dashboardFleetingNote: value })
+            void settings.updateZettelkastenSidebar({ dashboardFleetingNote: value })
           })
       })
 
@@ -809,14 +809,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new FileSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ dashboardZettelNote: value })
+          void settings.updateZettelkastenSidebar({ dashboardZettelNote: value })
         })
 
         text
           .setPlaceholder('path/to/zettels-dashboard.md')
           .setValue(viewSettings.dashboardZettelNote || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ dashboardZettelNote: value })
+            void settings.updateZettelkastenSidebar({ dashboardZettelNote: value })
           })
       })
 
@@ -826,14 +826,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new FileSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ dashboardLiteratureNote: value })
+          void settings.updateZettelkastenSidebar({ dashboardLiteratureNote: value })
         })
 
         text
           .setPlaceholder('path/to/literature-dashboard.md')
           .setValue(viewSettings.dashboardLiteratureNote || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ dashboardLiteratureNote: value })
+            void settings.updateZettelkastenSidebar({ dashboardLiteratureNote: value })
           })
       })
 
@@ -843,14 +843,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new FileSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ dashboardIndexNote: value })
+          void settings.updateZettelkastenSidebar({ dashboardIndexNote: value })
         })
 
         text
           .setPlaceholder('path/to/index-dashboard.md')
           .setValue(viewSettings.dashboardIndexNote || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ dashboardIndexNote: value })
+            void settings.updateZettelkastenSidebar({ dashboardIndexNote: value })
           })
       })
 
@@ -860,14 +860,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new FileSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ dashboardProjectsNote: value })
+          void settings.updateZettelkastenSidebar({ dashboardProjectsNote: value })
         })
 
         text
           .setPlaceholder('path/to/projects-dashboard.md')
           .setValue(viewSettings.dashboardProjectsNote || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ dashboardProjectsNote: value })
+            void settings.updateZettelkastenSidebar({ dashboardProjectsNote: value })
           })
       })
 
@@ -885,14 +885,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ inboxFilterTag: value })
+          void settings.updateZettelkastenSidebar({ inboxFilterTag: value })
         })
 
         text
           .setPlaceholder('Optional filter tag')
           .setValue(viewSettings.inboxFilterTag || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ inboxFilterTag: value })
+            void settings.updateZettelkastenSidebar({ inboxFilterTag: value })
           })
       })
 
@@ -902,14 +902,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ zettelsFilterTag: value })
+          void settings.updateZettelkastenSidebar({ zettelsFilterTag: value })
         })
 
         text
           .setPlaceholder('Optional filter tag')
           .setValue(viewSettings.zettelsFilterTag || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ zettelsFilterTag: value })
+            void settings.updateZettelkastenSidebar({ zettelsFilterTag: value })
           })
       })
 
@@ -919,14 +919,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ literatureFilterTag: value })
+          void settings.updateZettelkastenSidebar({ literatureFilterTag: value })
         })
 
         text
           .setPlaceholder('Optional filter tag')
           .setValue(viewSettings.literatureFilterTag || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ literatureFilterTag: value })
+            void settings.updateZettelkastenSidebar({ literatureFilterTag: value })
           })
       })
 
@@ -936,14 +936,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ indexFilterTag: value })
+          void settings.updateZettelkastenSidebar({ indexFilterTag: value })
         })
 
         text
           .setPlaceholder('Optional filter tag')
           .setValue(viewSettings.indexFilterTag || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ indexFilterTag: value })
+            void settings.updateZettelkastenSidebar({ indexFilterTag: value })
           })
       })
 
@@ -953,14 +953,14 @@ export default class SettingsTab extends PluginSettingTab {
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
-          void settings.updateZettelkastenView({ projectsFilterTag: value })
+          void settings.updateZettelkastenSidebar({ projectsFilterTag: value })
         })
 
         text
           .setPlaceholder('Optional filter tag')
           .setValue(viewSettings.projectsFilterTag || '')
           .onChange((value) => {
-            void settings.updateZettelkastenView({ projectsFilterTag: value })
+            void settings.updateZettelkastenSidebar({ projectsFilterTag: value })
           })
       })
   }

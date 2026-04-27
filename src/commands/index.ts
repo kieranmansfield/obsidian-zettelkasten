@@ -16,7 +16,7 @@ export { openNoteSequencesViewCommand } from './openNoteSequencesView'
 export { openSequenceNavigatorViewCommand } from './openSequenceNavigatorView'
 export { openSequenceNavigatorModalCommand } from './openSequenceNavigatorModal'
 export { openSequenceCommandPaletteCommand } from './openSequenceCommandPalette'
-export { openZettelkastenViewCommand } from './openZettelkastenView'
+export { openZettelkastenSidebarCommand } from './openZettelkastenSidebar'
 // export { openNoteSequencesBasesViewCommand } from './openNoteSequencesBasesView'
 
 // Note Sequence manipulation commands

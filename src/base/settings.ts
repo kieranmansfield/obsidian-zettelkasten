@@ -424,7 +424,7 @@ export interface ProjectSettings {
 /**
  * Settings for the Zettelkasten sidebar view
  */
-export interface ZettelkastenViewSettings {
+export interface ZettelkastenSidebarSettings {
   /**
    * Enable/disable Zettelkasten sidebar view
    * @default true
@@ -691,7 +691,7 @@ export interface PluginSettings {
   /**
    * Zettelkasten sidebar view settings
    */
-  zettelkastenView: ZettelkastenViewSettings
+  zettelkastenSidebar: ZettelkastenSidebarSettings
 
   /**
    * Note sequence settings

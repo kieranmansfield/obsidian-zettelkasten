@@ -27,12 +27,12 @@ interface MenuItem {
 }
 
 /**
- * ZettelkastenView
+ * ZettelkastenSidebar
  *
  * Sidebar view displaying folders for different note types
  * (Fleeting/Inbox, Zettels, Literature/References, Index, Note Sequences)
  */
-export class ZettelkastenView extends ItemView {
+export class ZettelkastenSidebar extends ItemView {
   private plugin: ZettelkastenPlugin
   private collapsedSections: Set<string> = new Set()
   private refreshTimeout: NodeJS.Timeout | null = null
@@ -153,7 +153,7 @@ export class ZettelkastenView extends ItemView {
     const zettelSettings = settings.getZettel()
     const literatureSettings = settings.getLiterature()
     const indexSettings = settings.getIndex()
-    const viewSettings = settings.getZettelkastenView()
+    const viewSettings = settings.getZettelkastenSidebar()
 
     const menuItems: MenuItem[] = []
 
@@ -666,7 +666,7 @@ export class ZettelkastenView extends ItemView {
    */
   private createBookmarksSection(container: HTMLElement): void {
     const settings = this.plugin.getSettingsManager()
-    const viewSettings = settings.getZettelkastenView()
+    const viewSettings = settings.getZettelkastenSidebar()
     const bookmarksName = viewSettings.bookmarksName || 'Bookmarks'
 
     // Check if collapsed

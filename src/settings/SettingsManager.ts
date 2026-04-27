@@ -38,10 +38,16 @@ export default class SettingsManager {
    * Merges with defaults and runs migrations
    */
   async load(): Promise<void> {
-    const data = (await this.plugin.loadData()) as Partial<PluginSettings> | null
+    const raw = ((await this.plugin.loadData()) ?? {}) as Record<string, unknown>
+
+    // Migrate zettelkastenView → zettelkastenSidebar
+    if ('zettelkastenView' in raw && !('zettelkastenSidebar' in raw)) {
+      raw['zettelkastenSidebar'] = raw['zettelkastenView']
+      delete raw['zettelkastenView']
+    }
 
     // Deep merge loaded data with defaults
-    this.settings = this.deepMerge(DEFAULT_SETTINGS, data || {})
+    this.settings = this.deepMerge(DEFAULT_SETTINGS, raw as Partial<PluginSettings>)
 
     // Run migrations if needed
     await this.migrate()
@@ -121,10 +127,10 @@ export default class SettingsManager {
   }
 
   /**
-   * Get Zettelkasten view settings
+   * Get Zettelkasten sidebar settings
    */
-  getZettelkastenView() {
-    return { ...this.settings.zettelkastenView }
+  getZettelkastenSidebar() {
+    return { ...this.settings.zettelkastenSidebar }
   }
 
   /**
@@ -157,7 +163,7 @@ export default class SettingsManager {
     this.settings.boxes = { ...this.settings.boxes, ...boxes }
     await this.save()
     // Refresh the Zettelkasten view if it's open
-    this.refreshZettelkastenView()
+    this.refreshZettelkastenSidebar()
   }
 
   /**
@@ -167,7 +173,7 @@ export default class SettingsManager {
     this.settings.zettel = { ...this.settings.zettel, ...zettel }
     await this.save()
     // Refresh the Zettelkasten view if it's open
-    this.refreshZettelkastenView()
+    this.refreshZettelkastenSidebar()
   }
 
   /**
@@ -177,7 +183,7 @@ export default class SettingsManager {
     this.settings.fleeting = { ...this.settings.fleeting, ...fleeting }
     await this.save()
     // Refresh the Zettelkasten view if it's open
-    this.refreshZettelkastenView()
+    this.refreshZettelkastenSidebar()
   }
 
   /**
@@ -187,7 +193,7 @@ export default class SettingsManager {
     this.settings.index = { ...this.settings.index, ...index }
     await this.save()
     // Refresh the Zettelkasten view if it's open
-    this.refreshZettelkastenView()
+    this.refreshZettelkastenSidebar()
   }
 
   /**
@@ -197,7 +203,7 @@ export default class SettingsManager {
     this.settings.literature = { ...this.settings.literature, ...literature }
     await this.save()
     // Refresh the Zettelkasten view if it's open
-    this.refreshZettelkastenView()
+    this.refreshZettelkastenSidebar()
   }
 
   /**
@@ -207,39 +213,39 @@ export default class SettingsManager {
     this.settings.projects = { ...this.settings.projects, ...projects }
     await this.save()
     // Refresh the Zettelkasten view if it's open
-    this.refreshZettelkastenView()
+    this.refreshZettelkastenSidebar()
   }
 
   /**
-   * Update Zettelkasten view settings
+   * Update Zettelkasten sidebar settings
    */
-  async updateZettelkastenView(
-    zettelkastenView: Partial<typeof this.settings.zettelkastenView>
+  async updateZettelkastenSidebar(
+    zettelkastenSidebar: Partial<typeof this.settings.zettelkastenSidebar>
   ): Promise<void> {
-    this.settings.zettelkastenView = { ...this.settings.zettelkastenView, ...zettelkastenView }
+    this.settings.zettelkastenSidebar = { ...this.settings.zettelkastenSidebar, ...zettelkastenSidebar }
     await this.save()
 
-    // Refresh the Zettelkasten view if it's open
-    this.refreshZettelkastenView()
+    // Refresh the Zettelkasten sidebar if it's open
+    this.refreshZettelkastenSidebar()
   }
 
   /**
-   * Refresh the Zettelkasten view
+   * Refresh the Zettelkasten sidebar
    */
-  private refreshZettelkastenView(): void {
+  private refreshZettelkastenSidebar(): void {
     // Dynamic import to avoid circular dependencies
-    import('../ui/ZettelkastenView')
-      .then(({ VIEW_TYPE_ZETTELKASTEN, ZettelkastenView }) => {
+    import('../ui/ZettelkastenSidebar')
+      .then(({ VIEW_TYPE_ZETTELKASTEN, ZettelkastenSidebar }) => {
         const leaves = this.plugin.app.workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
         leaves.forEach((leaf) => {
           const view = leaf.view
-          if (view instanceof ZettelkastenView) {
+          if (view instanceof ZettelkastenSidebar) {
             view.refresh()
           }
         })
       })
       .catch((error) => {
-        console.error('Failed to refresh ZettelkastenView:', error)
+        console.error('Failed to refresh ZettelkastenSidebar:', error)
       })
   }
 

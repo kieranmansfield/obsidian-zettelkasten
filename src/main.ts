@@ -14,7 +14,7 @@ import type { CommandContext } from './base/command'
 import * as commands from './commands'
 import { NoteSequencesView, VIEW_TYPE_NOTE_SEQUENCES } from './ui/NoteSequencesView'
 import { SequenceNavigatorView, VIEW_TYPE_SEQUENCE_NAVIGATOR } from './ui/SequenceNavigatorView'
-import { ZettelkastenView, VIEW_TYPE_ZETTELKASTEN } from './ui/ZettelkastenView'
+import { ZettelkastenSidebar, VIEW_TYPE_ZETTELKASTEN } from './ui/ZettelkastenSidebar'
 import { NoteSequencesBasesView, VIEW_TYPE_NOTE_SEQUENCES_BASES } from './ui/NoteSequencesBasesView'
 import { createNoteSequenceCardsViewRegistration } from './ui/NoteSequenceCardsView'
 
@@ -70,7 +70,7 @@ export default class ZettelkastenPlugin extends Plugin {
       try {
         this.registerCommands()
         // Ensure Zettelkasten view is in left sidebar on mobile
-        this.ensureZettelkastenViewLocationOnMobile()
+        this.ensureZettelkastenSidebarLocationOnMobile()
         console.log('Zettelkasten plugin loaded successfully')
       } catch (err) {
         console.error('Error during plugin initialization:', err)
@@ -120,7 +120,7 @@ export default class ZettelkastenPlugin extends Plugin {
     const rootFolder = boxSettings.rootFolder
 
     // Always register view types (even if disabled) to prevent ghost icons
-    this.registerView(VIEW_TYPE_ZETTELKASTEN, (leaf) => new ZettelkastenView(leaf, this))
+    this.registerView(VIEW_TYPE_ZETTELKASTEN, (leaf) => new ZettelkastenSidebar(leaf, this))
 
     this.registerView(
       VIEW_TYPE_NOTE_SEQUENCES,
@@ -189,7 +189,7 @@ export default class ZettelkastenPlugin extends Plugin {
       .add(commands.openSequenceNavigatorViewCommand)
       .add(commands.openSequenceNavigatorModalCommand)
       .add(commands.openSequenceCommandPaletteCommand)
-      .add(commands.openZettelkastenViewCommand)
+      .add(commands.openZettelkastenSidebarCommand)
       .add(commands.indentZettelCommand)
       .add(commands.outdentZettelCommand)
       .add(commands.assignParentCommand)
@@ -244,10 +244,10 @@ export default class ZettelkastenPlugin extends Plugin {
   }
 
   /**
-   * Ensure Zettelkasten view is in the left sidebar on mobile
+   * Ensure Zettelkasten sidebar is in the left sidebar on mobile
    * This runs on layout ready to fix any workspace restoration issues
    */
-  private ensureZettelkastenViewLocationOnMobile(): void {
+  private ensureZettelkastenSidebarLocationOnMobile(): void {
     // Only run on mobile devices
     if (!Platform.isMobile) {
       return

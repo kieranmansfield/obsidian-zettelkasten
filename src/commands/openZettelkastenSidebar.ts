@@ -1,16 +1,16 @@
 import { Platform } from 'obsidian'
 import type { CommandFactory } from '../base/command'
-import { VIEW_TYPE_ZETTELKASTEN } from '../ui/ZettelkastenView'
+import { VIEW_TYPE_ZETTELKASTEN } from '../ui/ZettelkastenSidebar'
 
 /**
- * Command: Open Zettelkasten View
+ * Command: Open Zettelkasten Sidebar
  *
  * Opens the Zettelkasten sidebar view showing note types (Inbox, Zettels, References, Index)
  */
-export const openZettelkastenViewCommand: CommandFactory = (context) => {
+export const openZettelkastenSidebarCommand: CommandFactory = (context) => {
   return {
     id: 'open-zettelkasten-view',
-    name: 'Open Zettelkasten View',
+    name: 'Open Zettelkasten Sidebar',
     icon: 'square-library',
 
     metadata: {

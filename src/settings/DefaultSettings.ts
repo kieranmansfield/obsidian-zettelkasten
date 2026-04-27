@@ -9,7 +9,7 @@ import {
   ProjectSettings,
   BoxConfig,
   ZettelDetectionMode,
-  ZettelkastenViewSettings,
+  ZettelkastenSidebarSettings,
   NoteSequenceSettings,
 } from '../base/settings'
 
@@ -86,7 +86,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
 /**
  * Default Zettelkasten view settings
  */
-export const DEFAULT_ZETTELKASTEN_VIEW_SETTINGS: ZettelkastenViewSettings = {
+export const DEFAULT_ZETTELKASTEN_SIDEBAR_SETTINGS: ZettelkastenSidebarSettings = {
   enabled: true,
   inboxName: 'Inbox',
   zettelsName: 'Zettels',
@@ -171,6 +171,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   index: { ...DEFAULT_INDEX_SETTINGS },
   literature: { ...DEFAULT_LITERATURE_SETTINGS },
   projects: { ...DEFAULT_PROJECT_SETTINGS },
-  zettelkastenView: { ...DEFAULT_ZETTELKASTEN_VIEW_SETTINGS },
+  zettelkastenSidebar: { ...DEFAULT_ZETTELKASTEN_SIDEBAR_SETTINGS },
   noteSequences: { ...DEFAULT_NOTE_SEQUENCE_SETTINGS },
 }

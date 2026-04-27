@@ -19,7 +19,7 @@ interface MenuItem {
 	filterTags?: string[];
 }
 
-export class ZettelkastenView extends ItemView {
+export class ZettelkastenSidebar extends ItemView {
 	private collapsedSections: Set<string> = new Set();
 	plugin: ZettelkastenPlugin;
 	private refreshTimeout: NodeJS.Timeout | null = null;

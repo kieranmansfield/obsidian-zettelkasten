@@ -34,14 +34,14 @@ export const addBookmarkCommand: CommandFactory = (context) => {
       new BookmarkModal(context.app, zkPlugin, (bookmark: Bookmark) => {
         void (async () => {
           // Get current bookmarks
-          const viewSettings = settings.getZettelkastenView()
+          const viewSettings = settings.getZettelkastenSidebar()
           const bookmarks = [...viewSettings.bookmarks]
 
           // Add new bookmark
           bookmarks.push(bookmark)
 
           // Save updated bookmarks
-          await settings.updateZettelkastenView({ bookmarks })
+          await settings.updateZettelkastenSidebar({ bookmarks })
 
           new Notice(`Bookmark "${bookmark.title}" added`)
 
@@ -83,7 +83,7 @@ export const removeBookmarkCommand: CommandFactory = (context) => {
       }
 
       const settings = context.settingsManager
-      const viewSettings = settings.getZettelkastenView()
+      const viewSettings = settings.getZettelkastenSidebar()
       const bookmarks = viewSettings.bookmarks
 
       if (bookmarks.length === 0) {
@@ -134,7 +134,7 @@ export const removeBookmarkCommand: CommandFactory = (context) => {
         const updatedBookmarks = bookmarks.filter((_: Bookmark, i: number) => i !== index)
 
         // Save updated bookmarks
-        await settings.updateZettelkastenView({ bookmarks: updatedBookmarks })
+        await settings.updateZettelkastenSidebar({ bookmarks: updatedBookmarks })
 
         new Notice(`Bookmark "${removedBookmark.title}" removed`)
 
