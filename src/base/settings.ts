@@ -32,6 +32,16 @@ export enum ZettelDetectionMode {
    * Detect zettels based on tags
    */
   TAG = 'tag',
+
+  /**
+   * Detect zettels based on links to a target note
+   */
+  LINK = 'link',
+
+  /**
+   * Detect zettels based on a frontmatter property ("key: value", or "key:" for exists)
+   */
+  PROPERTY = 'property',
 }
 
 /**
@@ -69,6 +79,16 @@ export enum BoxMode {
    * Boxes organized by tags
    */
   TAG = 'tag',
+
+  /**
+   * Boxes organized by links to a target note
+   */
+  LINK = 'link',
+
+  /**
+   * Boxes organized by a frontmatter property
+   */
+  PROPERTY = 'property',
 }
 
 /**

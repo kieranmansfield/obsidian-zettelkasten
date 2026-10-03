@@ -3,7 +3,26 @@ import type { Box } from '../base/box'
 import type BoxManager from '../core/boxManager.class'
 import { BoxMode } from '../base/settings'
 import type SettingsManager from '../settings/SettingsManager'
-import { getFileTitle } from '../base/fileHelpers'
+import { getFileTitle, matchesMarker } from '../base/fileHelpers'
+
+const BOX_VALUE_LABELS: Record<Box['type'], { name: string; desc: string; placeholder: string }> = {
+  folder: {
+    name: 'Folder Path',
+    desc: 'Folder path relative to root folder',
+    placeholder: 'my-box',
+  },
+  tag: { name: 'Tag Name', desc: 'Tag name (without #)', placeholder: 'my-box-tag' },
+  link: {
+    name: 'Link Target',
+    desc: 'Note that member notes link to',
+    placeholder: 'My Box Note',
+  },
+  property: {
+    name: 'Property',
+    desc: '"key: value", or "key:" for any value',
+    placeholder: 'status: active',
+  },
+}
 
 /**
  * Box item for the palette (includes boxes and create action)
@@ -129,17 +148,9 @@ class NotesInBoxModal extends FuzzySuggestModal<TFile> {
       return allFiles.filter((file) => {
         return file.path.startsWith(boxPath + '/') || file.path === boxPath
       })
-    } else if (this.box.type === 'tag') {
-      // Filter files that have this tag
-      const tagName = this.box.value.startsWith('#') ? this.box.value : `#${this.box.value}`
-      return allFiles.filter((file) => {
-        const cache = this.app.metadataCache.getFileCache(file)
-        if (!cache || !cache.tags) return false
-        return cache.tags.some((tag) => tag.tag === tagName)
-      })
     }
 
-    return []
+    return allFiles.filter((file) => matchesMarker(this.app, file, this.box.value, this.box.type))
   }
 
   getItems(): TFile[] {
@@ -186,7 +197,9 @@ class CreateBoxModal extends Modal {
     contentEl.createEl('h2', { text: 'Create new box' })
 
     const boxSettings = this.settingsManager.getBoxes()
-    const boxType = boxSettings.mode === BoxMode.FOLDER ? 'folder' : 'tag'
+    const boxType: Box['type'] = (
+      boxSettings.mode === BoxMode.FOLDER ? 'folder' : boxSettings.mode
+    ) as Box['type']
 
     // Box name input
     new Setting(contentEl)
@@ -208,12 +221,10 @@ class CreateBoxModal extends Modal {
 
     // Box value input
     new Setting(contentEl)
-      .setName(boxType === 'folder' ? 'Folder Path' : 'Tag Name')
-      .setDesc(
-        boxType === 'folder' ? 'Folder path relative to root folder' : 'Tag name (without #)'
-      )
+      .setName(BOX_VALUE_LABELS[boxType].name)
+      .setDesc(BOX_VALUE_LABELS[boxType].desc)
       .addText((text) => {
-        text.setPlaceholder(boxType === 'folder' ? 'my-box' : 'my-box-tag').onChange((value) => {
+        text.setPlaceholder(BOX_VALUE_LABELS[boxType].placeholder).onChange((value) => {
           this.value = value
         })
 
@@ -256,7 +267,9 @@ class CreateBoxModal extends Modal {
 
     try {
       const boxSettings = this.settingsManager.getBoxes()
-      const boxType = boxSettings.mode === BoxMode.FOLDER ? 'folder' : 'tag'
+      const boxType: Box['type'] = (
+        boxSettings.mode === BoxMode.FOLDER ? 'folder' : boxSettings.mode
+      ) as Box['type']
 
       const newBox: Box = {
         type: boxType,

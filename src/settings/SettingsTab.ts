@@ -124,11 +124,13 @@ export default class SettingsTab extends PluginSettingTab {
       // Box system enabled
       new Setting(containerEl)
         .setName('Box mode')
-        .setDesc('Organize boxes by folders or by tags')
+        .setDesc('Organize boxes by folders, tags, links or properties')
         .addDropdown((dropdown) => {
           dropdown
             .addOption(BoxMode.FOLDER, 'Folders')
             .addOption(BoxMode.TAG, 'Tags')
+            .addOption(BoxMode.LINK, 'Links')
+            .addOption(BoxMode.PROPERTY, 'Properties')
             .setValue(boxSettings.mode)
             .onChange((value) => {
               void (async () => {
@@ -230,6 +232,71 @@ export default class SettingsTab extends PluginSettingTab {
 
   // ============================================
   // Zettel Notes Section
+  /**
+   * Detection dropdown plus tag / link / property field for a note type.
+   * onChange gets (mode) on dropdown change, (mode, value) on field change.
+   */
+  private addDetectionSetting(
+    containerEl: HTMLElement,
+    mode: ZettelDetectionMode,
+    value: string,
+    defaultValue: string,
+    onChange: (mode: ZettelDetectionMode, value?: string) => Promise<void>
+  ): void {
+    new Setting(containerEl)
+      .setName('Detection mode')
+      .setDesc('Identify notes by folder location, tag, link or property')
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption(ZettelDetectionMode.FOLDER, 'Folder-based')
+          .addOption(ZettelDetectionMode.TAG, 'Tag-based')
+          .addOption(ZettelDetectionMode.LINK, 'Link-based')
+          .addOption(ZettelDetectionMode.PROPERTY, 'Property-based')
+          .setValue(mode)
+          .onChange((v) => {
+            void (async () => {
+              await onChange(v as ZettelDetectionMode)
+              this.display()
+            })()
+          })
+      })
+
+    if (mode === ZettelDetectionMode.FOLDER) return
+
+    const labels = {
+      [ZettelDetectionMode.TAG]: ['Tag', 'Tag that marks these notes', defaultValue],
+      [ZettelDetectionMode.LINK]: ['Link', 'Note that these notes link to', 'My Index Note'],
+      [ZettelDetectionMode.PROPERTY]: [
+        'Property',
+        '"key: value", or "key:" for any value. List properties match any item',
+        `type: ${defaultValue}`,
+      ],
+    }[mode]
+
+    new Setting(containerEl)
+      .setName(labels[0])
+      .setDesc(`${labels[1]}. New notes get this added automatically`)
+      .addText((text) => {
+        if (mode === ZettelDetectionMode.TAG)
+          new TagSuggest(this.app, text.inputEl, (v) => {
+            text.setValue(v)
+            void onChange(mode, v)
+          })
+        else if (mode === ZettelDetectionMode.LINK)
+          new FileSuggest(this.app, text.inputEl, (v) => {
+            text.setValue(v)
+            void onChange(mode, v)
+          })
+
+        text
+          .setPlaceholder(labels[2])
+          .setValue(value)
+          .onChange((v) => {
+            void onChange(mode, v || defaultValue)
+          })
+      })
+  }
+
   // ============================================
   private addZettelSection(containerEl: HTMLElement): void {
     const settings = this.plugin.getSettingsManager()
@@ -253,39 +320,17 @@ export default class SettingsTab extends PluginSettingTab {
 
     if (!zettelSettings.enabled) return
 
-    new Setting(containerEl)
-      .setName('Detection mode')
-      .setDesc('Identify zettel notes by folder location or tag')
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption(ZettelDetectionMode.FOLDER, 'Folder-based')
-          .addOption(ZettelDetectionMode.TAG, 'Tag-based')
-          .setValue(zettelSettings.zettelDetectionMode)
-          .onChange((value) => {
-            void (async () => {
-              await settings.updateZettel({ zettelDetectionMode: value as ZettelDetectionMode })
-              this.display()
-            })()
-          })
-      })
-
-    if (zettelSettings.zettelDetectionMode === ZettelDetectionMode.TAG) {
-      new Setting(containerEl)
-        .setName('Zettel tag')
-        .setDesc('Tag to identify zettel notes')
-        .addText((text) => {
-          new TagSuggest(this.app, text.inputEl, (value) => {
-            void settings.updateZettel({ zettelTag: value })
-          })
-
-          text
-            .setPlaceholder('Zettel')
-            .setValue(zettelSettings.zettelTag)
-            .onChange((value) => {
-              void settings.updateZettel({ zettelTag: value || 'zettel' })
-            })
+    this.addDetectionSetting(
+      containerEl,
+      zettelSettings.zettelDetectionMode,
+      zettelSettings.zettelTag,
+      'zettel',
+      (zettelDetectionMode, zettelTag) =>
+        settings.updateZettel({
+          zettelDetectionMode,
+          ...(zettelTag !== undefined && { zettelTag }),
         })
-    }
+    )
 
     new Setting(containerEl)
       .setName('Default folder')
@@ -393,6 +438,15 @@ export default class SettingsTab extends PluginSettingTab {
 
     if (!fleetingSettings.enabled) return
 
+    this.addDetectionSetting(
+      containerEl,
+      fleetingSettings.detectionMode,
+      fleetingSettings.tag,
+      'fleeting',
+      (detectionMode, tag) =>
+        settings.updateFleeting({ detectionMode, ...(tag !== undefined && { tag }) })
+    )
+
     new Setting(containerEl)
       .setName('Folder')
       .setDesc('Folder for fleeting notes')
@@ -459,6 +513,15 @@ export default class SettingsTab extends PluginSettingTab {
     })
 
     if (!indexSettings.enabled) return
+
+    this.addDetectionSetting(
+      containerEl,
+      indexSettings.detectionMode,
+      indexSettings.tag,
+      'index',
+      (detectionMode, tag) =>
+        settings.updateIndex({ detectionMode, ...(tag !== undefined && { tag }) })
+    )
 
     new Setting(containerEl)
       .setName('Folder')
@@ -527,6 +590,15 @@ export default class SettingsTab extends PluginSettingTab {
 
     if (!literatureSettings.enabled) return
 
+    this.addDetectionSetting(
+      containerEl,
+      literatureSettings.detectionMode,
+      literatureSettings.tag,
+      'literature',
+      (detectionMode, tag) =>
+        settings.updateLiterature({ detectionMode, ...(tag !== undefined && { tag }) })
+    )
+
     new Setting(containerEl)
       .setName('Folder')
       .setDesc('Folder for literature notes')
@@ -594,42 +666,16 @@ export default class SettingsTab extends PluginSettingTab {
 
     if (!projectSettings.enabled) return
 
-    new Setting(containerEl)
-      .setName('Detection mode')
-      .setDesc('How to identify project notes')
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption(ZettelDetectionMode.FOLDER, 'Folder-based')
-          .addOption(ZettelDetectionMode.TAG, 'Tag-based')
-          .setValue(projectSettings.detectionMode)
-          .onChange((value) => {
-            void (async () => {
-              await settings.updateProjects({
-                detectionMode: value as ZettelDetectionMode,
-              })
-              this.display()
-            })()
-          })
-      })
+    this.addDetectionSetting(
+      containerEl,
+      projectSettings.detectionMode,
+      projectSettings.tag,
+      'project',
+      (detectionMode, tag) =>
+        settings.updateProjects({ detectionMode, ...(tag !== undefined && { tag }) })
+    )
 
-    if (projectSettings.detectionMode === ZettelDetectionMode.TAG) {
-      new Setting(containerEl)
-        .setName('Tag')
-        .setDesc('Tag to identify project notes (e.g., "project")')
-        .addText((text) => {
-          new TagSuggest(this.app, text.inputEl, (value) => {
-            text.setValue(value)
-            void settings.updateProjects({ tag: value })
-          })
-
-          text
-            .setPlaceholder('project')
-            .setValue(projectSettings.tag)
-            .onChange((value) => {
-              void settings.updateProjects({ tag: value || 'project' })
-            })
-        })
-    } else {
+    if (projectSettings.detectionMode === ZettelDetectionMode.FOLDER) {
       new Setting(containerEl)
         .setName('Folder')
         .setDesc('Folder for project notes')
@@ -875,13 +921,15 @@ export default class SettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName('Section filters').setHeading()
 
     containerEl.createEl('p', {
-      text: 'Optional tags to further filter notes in each section',
+      text: 'Optional tag (project), link ([[Note]]) or property (status: active, or status:) to further filter notes in each section',
       cls: 'setting-item-description',
     })
 
     new Setting(containerEl)
       .setName('Inbox filter tag')
-      .setDesc('Additional tag to filter inbox notes (leave empty for no filter)')
+      .setDesc(
+        'Additional tag, [[link]] or key: value property to filter inbox notes (leave empty for no filter)'
+      )
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
@@ -898,7 +946,9 @@ export default class SettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Zettels filter tag')
-      .setDesc('Additional tag to filter zettel notes (leave empty for no filter)')
+      .setDesc(
+        'Additional tag, [[link]] or key: value property to filter zettel notes (leave empty for no filter)'
+      )
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
@@ -915,7 +965,9 @@ export default class SettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Literature filter tag')
-      .setDesc('Additional tag to filter literature notes (leave empty for no filter)')
+      .setDesc(
+        'Additional tag, [[link]] or key: value property to filter literature notes (leave empty for no filter)'
+      )
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
@@ -932,7 +984,9 @@ export default class SettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Index filter tag')
-      .setDesc('Additional tag to filter index notes (leave empty for no filter)')
+      .setDesc(
+        'Additional tag, [[link]] or key: value property to filter index notes (leave empty for no filter)'
+      )
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)
@@ -949,7 +1003,9 @@ export default class SettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Projects filter tag')
-      .setDesc('Additional tag to filter project notes (leave empty for no filter)')
+      .setDesc(
+        'Additional tag, [[link]] or key: value property to filter project notes (leave empty for no filter)'
+      )
       .addText((text) => {
         new TagSuggest(this.app, text.inputEl, (value) => {
           text.setValue(value)

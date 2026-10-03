@@ -6,11 +6,11 @@ import {
   setIcon,
   Menu,
   MenuItem as ObsidianMenuItem,
-  getAllTags,
   Platform,
 } from 'obsidian'
 import type ZettelkastenPlugin from '../main'
 import { VIEW_TYPE_NOTE_SEQUENCES } from './NoteSequencesView'
+import { matchesFilter, matchesMarker } from 'src/base/fileHelpers'
 import type { Bookmark } from 'src/base/settings'
 import { ZettelDetectionMode } from 'src/base/settings'
 
@@ -159,7 +159,7 @@ export class ZettelkastenSidebar extends ItemView {
 
     // Fleeting Notes (Inbox)
     if (viewSettings.showInbox && fleetingSettings.enabled) {
-      const useTagDetection = fleetingSettings.detectionMode === ZettelDetectionMode.TAG
+      const useTagDetection = fleetingSettings.detectionMode !== ZettelDetectionMode.FOLDER
       menuItems.push({
         name: viewSettings.inboxName || 'Inbox',
         icon: 'inbox',
@@ -170,7 +170,7 @@ export class ZettelkastenSidebar extends ItemView {
         filterFunc: (file: TFile) => {
           // Check detection mode
           if (useTagDetection) {
-            if (!this.hasTag(file, fleetingSettings.tag)) {
+            if (!matchesMarker(this.app, file, fleetingSettings.tag, fleetingSettings.detectionMode)) {
               return false
             }
           }
@@ -178,7 +178,7 @@ export class ZettelkastenSidebar extends ItemView {
 
           // Apply additional filter tag if specified
           if (viewSettings.inboxFilterTag) {
-            return this.hasTag(file, viewSettings.inboxFilterTag)
+            return matchesFilter(this.app, file, viewSettings.inboxFilterTag)
           }
 
           return true
@@ -188,7 +188,7 @@ export class ZettelkastenSidebar extends ItemView {
 
     // Zettel Notes
     if (viewSettings.showZettels && zettelSettings.enabled) {
-      const useTagDetection = zettelSettings.zettelDetectionMode === ZettelDetectionMode.TAG
+      const useTagDetection = zettelSettings.zettelDetectionMode !== ZettelDetectionMode.FOLDER
       menuItems.push({
         name: viewSettings.zettelsName || 'Zettels',
         icon: 'gallery-vertical-end',
@@ -199,7 +199,7 @@ export class ZettelkastenSidebar extends ItemView {
         filterFunc: (file: TFile) => {
           // Check detection mode
           if (useTagDetection) {
-            if (!this.hasTag(file, zettelSettings.zettelTag)) {
+            if (!matchesMarker(this.app, file, zettelSettings.zettelTag, zettelSettings.zettelDetectionMode)) {
               return false
             }
           } else {
@@ -212,7 +212,7 @@ export class ZettelkastenSidebar extends ItemView {
 
           // Apply additional filter tag if specified
           if (viewSettings.zettelsFilterTag) {
-            return this.hasTag(file, viewSettings.zettelsFilterTag)
+            return matchesFilter(this.app, file, viewSettings.zettelsFilterTag)
           }
 
           return true
@@ -229,7 +229,7 @@ export class ZettelkastenSidebar extends ItemView {
       viewSettings.literatureFilterTag || viewSettings.referencesFilterTag || ''
 
     if (showLiterature && literatureSettings.enabled) {
-      const useTagDetection = literatureSettings.detectionMode === ZettelDetectionMode.TAG
+      const useTagDetection = literatureSettings.detectionMode !== ZettelDetectionMode.FOLDER
       menuItems.push({
         name: viewSettings.literatureName || 'Literature',
         icon: 'book-open',
@@ -240,7 +240,7 @@ export class ZettelkastenSidebar extends ItemView {
         filterFunc: (file: TFile) => {
           // Check detection mode
           if (useTagDetection) {
-            if (!this.hasTag(file, literatureSettings.tag)) {
+            if (!matchesMarker(this.app, file, literatureSettings.tag, literatureSettings.detectionMode)) {
               return false
             }
           }
@@ -248,7 +248,7 @@ export class ZettelkastenSidebar extends ItemView {
 
           // Apply additional filter tag if specified
           if (literatureFilterTag) {
-            return this.hasTag(file, literatureFilterTag)
+            return matchesFilter(this.app, file, literatureFilterTag)
           }
 
           return true
@@ -258,7 +258,7 @@ export class ZettelkastenSidebar extends ItemView {
 
     // Index Notes
     if (viewSettings.showIndex && indexSettings.enabled) {
-      const useTagDetection = indexSettings.detectionMode === ZettelDetectionMode.TAG
+      const useTagDetection = indexSettings.detectionMode !== ZettelDetectionMode.FOLDER
       menuItems.push({
         name: viewSettings.indexName || 'Index',
         icon: 'list',
@@ -269,7 +269,7 @@ export class ZettelkastenSidebar extends ItemView {
         filterFunc: (file: TFile) => {
           // Check detection mode
           if (useTagDetection) {
-            if (!this.hasTag(file, indexSettings.tag)) {
+            if (!matchesMarker(this.app, file, indexSettings.tag, indexSettings.detectionMode)) {
               return false
             }
           }
@@ -277,7 +277,7 @@ export class ZettelkastenSidebar extends ItemView {
 
           // Apply additional filter tag if specified
           if (viewSettings.indexFilterTag) {
-            return this.hasTag(file, viewSettings.indexFilterTag)
+            return matchesFilter(this.app, file, viewSettings.indexFilterTag)
           }
 
           return true
@@ -288,7 +288,7 @@ export class ZettelkastenSidebar extends ItemView {
     // Projects
     const projectSettings = settings.getProjects()
     if (viewSettings.showProjects && projectSettings.enabled) {
-      const useTagDetection = projectSettings.detectionMode === ZettelDetectionMode.TAG
+      const useTagDetection = projectSettings.detectionMode !== ZettelDetectionMode.FOLDER
       menuItems.push({
         name: viewSettings.projectsName || 'Projects',
         icon: 'folder-kanban',
@@ -299,7 +299,7 @@ export class ZettelkastenSidebar extends ItemView {
         filterFunc: (file: TFile) => {
           // Check detection mode
           if (useTagDetection) {
-            if (!this.hasTag(file, projectSettings.tag)) {
+            if (!matchesMarker(this.app, file, projectSettings.tag, projectSettings.detectionMode)) {
               return false
             }
           }
@@ -307,7 +307,7 @@ export class ZettelkastenSidebar extends ItemView {
 
           // Apply additional filter tag if specified
           if (viewSettings.projectsFilterTag) {
-            return this.hasTag(file, viewSettings.projectsFilterTag)
+            return matchesFilter(this.app, file, viewSettings.projectsFilterTag)
           }
 
           return true
@@ -327,28 +327,6 @@ export class ZettelkastenSidebar extends ItemView {
     if (sequenceSettings.enabled && sequenceSettings.showSequencesView) {
       this.createNoteSequencesSection(container)
     }
-  }
-
-  /**
-   * Check if a file has a specific tag
-   * Checks both inline tags and frontmatter tags
-   */
-  private hasTag(file: TFile, tag: string): boolean {
-    const cache = this.app.metadataCache.getFileCache(file)
-    if (!cache) {
-      return false
-    }
-
-    // Get all tags (both inline and frontmatter)
-    const fileTags = getAllTags(cache)
-    if (!fileTags || fileTags.length === 0) {
-      return false
-    }
-
-    // Normalize tag (add # if missing)
-    const normalizedTag = tag.startsWith('#') ? tag : `#${tag}`
-
-    return fileTags.includes(normalizedTag)
   }
 
   private createMenuItem(container: HTMLElement, item: MenuItem): void {

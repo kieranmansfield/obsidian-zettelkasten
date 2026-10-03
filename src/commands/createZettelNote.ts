@@ -1,6 +1,7 @@
 import type { CommandFactory } from '../base/command'
 import { CreateNoteWithSuggestModal } from '../ui/CreateNoteWithSuggestModal'
 import { Notice, TFile, App } from 'obsidian'
+import { finishNote } from '../base/fileHelpers'
 
 /**
  * Command: Create Zettel
@@ -49,13 +50,13 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
 
             new Notice(`Created zettel: ${result.filename}`)
 
-            // Open the newly created file in the editor
-            if (settings.openOnCreate) {
-              const file = context.app.vault.getAbstractFileByPath(result.path)
-              if (file instanceof TFile) {
-                await context.app.workspace.getLeaf().openFile(file)
-              }
-            }
+            await finishNote(
+              context.app,
+              result.path,
+              settings.zettelDetectionMode,
+              settings.zettelTag,
+              settings.openOnCreate
+            )
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error'
             new Notice(`Error creating zettel: ${errorMessage}`)

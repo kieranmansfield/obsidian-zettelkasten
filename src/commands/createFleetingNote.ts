@@ -1,5 +1,5 @@
 import type { CommandFactory } from '../base/command'
-import { TFile } from 'obsidian'
+import { finishNote } from '../base/fileHelpers'
 
 /**
  * Command: Create Fleeting Note
@@ -42,13 +42,13 @@ export const createFleetingNoteCommand: CommandFactory = (context) => {
 
         console.log('Created fleeting note:', result)
 
-        // Open the newly created file in the editor if settings.openOnCreate is true
-        if (settings.openOnCreate) {
-          const file = context.app.vault.getAbstractFileByPath(result.path)
-          if (file instanceof TFile) {
-            await context.app.workspace.getLeaf().openFile(file)
-          }
-        }
+        await finishNote(
+          context.app,
+          result.path,
+          settings.detectionMode,
+          settings.tag,
+          settings.openOnCreate
+        )
       } catch (err) {
         console.error('Failed to create fleeting note:', err)
       }
