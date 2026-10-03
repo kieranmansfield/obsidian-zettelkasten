@@ -219,6 +219,17 @@ h1.zettelkasten-settings-title {
   align-items: center;
 }
 
+/* Mobile font sizes: items and section headers share one base size, headers slightly larger */
+.is-mobile .zettelkasten-sidebar .tree-item-self.nav-file-title .tree-item-inner,
+.is-phone .zettelkasten-sidebar .tree-item-self.nav-file-title .tree-item-inner {
+  font-size: var(--nav-item-size, var(--font-ui-small));
+}
+
+.is-mobile .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-inner,
+.is-phone .zettelkasten-sidebar .tree-item-self.nav-folder-title .tree-item-inner {
+  font-size: calc(var(--nav-item-size, var(--font-ui-small)) * 1.1);
+}
+
 /* Move chevron to the right on mobile */
 /* Use CSS to reposition regardless of DOM order */
 
