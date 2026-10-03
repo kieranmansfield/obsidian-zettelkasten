@@ -1,5 +1,6 @@
 import type { Plugin } from 'obsidian'
 import { DEFAULT_SETTINGS } from './DefaultSettings'
+import { getIn, setIn } from 'src/base/objectPath'
 import type {
   PluginSettings,
   GeneralSettings,
@@ -51,7 +52,6 @@ export default class SettingsManager {
 
     // Run migrations if needed
     await this.migrate()
-
   }
 
   /**
@@ -66,6 +66,20 @@ export default class SettingsManager {
    */
   getAll(): PluginSettings {
     return { ...this.settings }
+  }
+
+  /** Read a setting by dotted path, e.g. "zettel.enabled" */
+  // fallow-ignore-next-line unused-class-member
+  getPath(path: string): unknown {
+    return getIn(this.settings, path)
+  }
+
+  /** Write a setting by dotted path and persist it */
+  // fallow-ignore-next-line unused-class-member
+  async setPath(path: string, value: unknown): Promise<void> {
+    this.settings = setIn(this.settings, path, value)
+    await this.save()
+    this.refreshZettelkastenSidebar()
   }
 
   /**
@@ -220,7 +234,10 @@ export default class SettingsManager {
   async updateZettelkastenSidebar(
     zettelkastenSidebar: Partial<typeof this.settings.zettelkastenSidebar>
   ): Promise<void> {
-    this.settings.zettelkastenSidebar = { ...this.settings.zettelkastenSidebar, ...zettelkastenSidebar }
+    this.settings.zettelkastenSidebar = {
+      ...this.settings.zettelkastenSidebar,
+      ...zettelkastenSidebar,
+    }
     await this.save()
 
     // Refresh the Zettelkasten sidebar if it's open

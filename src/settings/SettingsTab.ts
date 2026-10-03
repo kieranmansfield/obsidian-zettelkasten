@@ -1,18 +1,89 @@
-import { App, PluginSettingTab, Setting, Notice } from 'obsidian'
+import {
+  App,
+  Notice,
+  PluginSettingTab,
+  type SettingDefinition,
+  type SettingDefinitionItem,
+  type SettingDefinitionPage,
+  type SettingGroupItem,
+} from 'obsidian'
 import type ZettelkastenPlugin from '../main'
 import { FilenameFormat, BoxMode, ZettelDetectionMode } from '../base/settings'
-import { FolderSuggest } from '../ui/FolderSuggest'
-import { FileSuggest } from '../ui/FileSuggest'
+import type { BoxConfig } from '../base/settings'
+import { getIn } from '../base/objectPath'
 import { TagSuggest } from '../ui/TagSuggest'
 import { BoxConfigModal } from '../ui/BoxConfigModal'
 import { ImportExportModal } from '../ui/ImportExportModal'
 import { CommandsModal } from '../ui/CommandsModal'
-import { createDefaultBoxConfig } from '../settings/DefaultSettings'
+import { DEFAULT_SETTINGS, createDefaultBoxConfig } from '../settings/DefaultSettings'
+
+interface NoteTypePage {
+  name: string
+  desc: string
+  key: 'zettel' | 'fleeting' | 'literature' | 'index' | 'projects'
+  /** Setting names differ for zettels (zettelDetectionMode / zettelTag) */
+  modeKey: string
+  tagKey: string
+  /** Settings shown under "Creation" */
+  creation: SettingGroupItem[]
+}
+
+const toggle = (name: string, key: string, desc?: string): SettingDefinition => ({
+  name,
+  desc,
+  control: { type: 'toggle', key },
+})
+
+const text = (
+  name: string,
+  key: string,
+  desc?: string,
+  placeholder?: string
+): SettingDefinition => ({
+  name,
+  desc,
+  control: { type: 'text', key, placeholder },
+})
+
+const folder = (
+  name: string,
+  key: string,
+  desc?: string,
+  placeholder?: string
+): SettingDefinition => ({
+  name,
+  desc,
+  control: { type: 'folder', key, placeholder },
+})
+
+const file = (
+  name: string,
+  key: string,
+  desc?: string,
+  placeholder?: string
+): SettingDefinition => ({
+  name,
+  desc,
+  control: { type: 'file', key, placeholder },
+})
+
+const dropdown = (
+  name: string,
+  key: string,
+  options: Record<string, string>,
+  desc?: string
+): SettingDefinition => ({
+  name,
+  desc,
+  control: { type: 'dropdown', key, options },
+})
 
 /**
  * SettingsTab
  *
- * Provides a clean, organized UI for all plugin settings using native Obsidian components.
+ * Declarative settings (Obsidian 1.13+): the tab returns definitions, Obsidian renders them
+ * and routes reads/writes through getControlValue / setControlValue using dotted keys
+ * such as "zettel.enabled" into PluginSettings.
  */
 export default class SettingsTab extends PluginSettingTab {
   plugin: ZettelkastenPlugin
@@ -23,1159 +94,556 @@ export default class SettingsTab extends PluginSettingTab {
     this.plugin = plugin
   }
 
-  display(): void {
-    const { containerEl } = this
-    containerEl.empty()
+  // ============================================
+  // Storage
+  // ============================================
+  // fallow-ignore-next-line unused-class-member
+  getControlValue(key: string): unknown {
+    return this.plugin.getSettingsManager().getPath(key)
+  }
 
-    const settings = this.plugin.getSettingsManager()
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    // Emptied text fields fall back to the default (e.g. folder names, separator)
+    const fallback = getIn(DEFAULT_SETTINGS, key)
+    const next = value === '' && typeof fallback === 'string' && fallback ? fallback : value
+    await this.plugin.getSettingsManager().setPath(key, next)
+    this.refreshDomState()
+  }
 
-    // Commands Management
-    this.addCommandsSection(containerEl)
+  private get<T>(key: string): T {
+    return this.plugin.getSettingsManager().getPath(key) as T
+  }
 
-    // Box System
-    this.addBoxSection(containerEl)
+  private on = (key: string) => () => this.get<boolean>(key)
+  private is = (key: string, value: unknown) => () => this.get<unknown>(key) === value
+  private status = (key: string) => () => (this.get<boolean>(key) ? 'On' : 'Off')
 
-    // Note Type Settings (only when boxes are disabled)
-    const boxSettings = settings.getBoxes()
-    if (!boxSettings.enabled) {
-      this.addZettelSection(containerEl)
-      this.addFleetingSection(containerEl)
-      this.addIndexSection(containerEl)
-      this.addLiteratureSection(containerEl)
-      this.addProjectSection(containerEl)
-    }
-
-    // Zettelkasten Sidebar View
-    this.addZettelkastenSidebarSection(containerEl)
-
-    // Note Sequences
-    this.addNoteSequenceSection(containerEl)
-
-    // Ignored Folders
-    this.addIgnoredFoldersSection(containerEl)
-
-    // Advanced
-    this.addAdvancedSection(containerEl)
+  // ============================================
+  // Definitions
+  // ============================================
+  // fallow-ignore-next-line unused-class-member
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return [
+      {
+        name: 'Manage commands',
+        desc: 'Enable or disable individual plugin commands',
+        action: () => new CommandsModal(this.app, this.plugin).open(),
+      },
+      {
+        type: 'group',
+        heading: 'Organisation',
+        items: [this.boxesPage(), this.noteTypesPage()],
+      },
+      {
+        type: 'group',
+        heading: 'Interface',
+        items: [this.sidebarPage(), this.sequencesPage()],
+      },
+      {
+        type: 'group',
+        heading: 'Maintenance',
+        items: [this.advancedPage()],
+      },
+    ]
   }
 
   // ============================================
-  // Commands Section
+  // Boxes
   // ============================================
-  /** Re-render the tab after a structural change */
-  private rerender(): void {
-    // eslint-disable-next-line @typescript-eslint/no-deprecated -- getSettingDefinitions needs Obsidian 1.13+, minAppVersion is 1.11
-    this.display()
-  }
+  private boxesPage(): SettingDefinitionPage {
+    const manager = this.plugin.getSettingsManager()
+    const enabled = this.on('boxes.enabled')
 
-  private addCommandsSection(containerEl: HTMLElement): void {
-    new Setting(containerEl).setName('Commands').setHeading()
-
-    new Setting(containerEl)
-      .setName('Manage commands')
-      .setDesc('Enable or disable individual plugin commands')
-      .addButton((button) => {
-        button
-          .setButtonText('Manage commands')
-          .setCta()
-          .onClick(() => {
-            new CommandsModal(this.app, this.plugin).open()
-          })
-      })
-  }
-
-  // ============================================
-  // Box System Section
-  // ============================================
-  private addBoxSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const boxSettings = settings.getBoxes()
-
-    new Setting(containerEl).setName('Box system').setHeading()
-
-    containerEl.createEl('p', {
-      text: 'Organize zettels into boxes (folders or tags). When disabled, all zettels go to a single folder.',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl)
-      .setName('Enable box system')
-      .setDesc('Use boxes to organize notes into separate collections')
-      .addToggle((toggle) => {
-        toggle.setValue(boxSettings.enabled).onChange((value) => {
-          void (async () => {
-            await settings.updateBoxes({ enabled: value })
-            this.rerender()
-          })()
-        })
-      })
-
-    if (!boxSettings.enabled) {
-      // Single folder mode
-      new Setting(containerEl)
-        .setName('Zettels folder')
-        .setDesc('Folder where all zettels will be stored')
-        .addText((text) => {
-          new FolderSuggest(this.app, text.inputEl, (value) => {
-            void settings.updateBoxes({ rootFolder: value })
-          })
-
-          text
-            .setPlaceholder('Zettels')
-            .setValue(boxSettings.rootFolder)
-            .onChange((value) => {
-              void settings.updateBoxes({ rootFolder: value || 'zettels' })
-            })
-        })
-    } else {
-      // Box system enabled
-      new Setting(containerEl)
-        .setName('Box mode')
-        .setDesc('Organize boxes by folders, tags, links or properties')
-        .addDropdown((dropdown) => {
-          dropdown
-            .addOption(BoxMode.FOLDER, 'Folders')
-            .addOption(BoxMode.TAG, 'Tags')
-            .addOption(BoxMode.LINK, 'Links')
-            .addOption(BoxMode.PROPERTY, 'Properties')
-            .setValue(boxSettings.mode)
-            .onChange((value) => {
-              void (async () => {
-                await settings.updateBoxes({ mode: value as BoxMode })
-                this.rerender()
-              })()
-            })
-        })
-
-      if (boxSettings.mode === BoxMode.FOLDER) {
-        new Setting(containerEl)
-          .setName('Root folder')
-          .setDesc('Root folder containing all boxes')
-          .addText((text) => {
-            new FolderSuggest(this.app, text.inputEl, (value) => {
-              void settings.updateBoxes({ rootFolder: value })
-            })
-
-            text
-              .setPlaceholder('Zettels')
-              .setValue(boxSettings.rootFolder)
-              .onChange((value) => {
-                void settings.updateBoxes({ rootFolder: value || 'zettels' })
-              })
-          })
-      }
-
-      new Setting(containerEl)
-        .setName('Auto-create boxes')
-        .setDesc('Automatically create boxes when referenced')
-        .addToggle((toggle) => {
-          toggle.setValue(boxSettings.autoCreateBoxes).onChange((value) => {
-            void settings.updateBoxes({ autoCreateBoxes: value })
-          })
-        })
-
-      // Boxes management
-      new Setting(containerEl).setName('Boxes').setHeading()
-
-      new Setting(containerEl)
-        .setName('Add box')
-        .setDesc('Configure boxes and their settings')
-        .addButton((button) => {
-          button
-            .setButtonText('Add box')
-            .setCta()
-            .onClick(() => {
-              const newBox = createDefaultBoxConfig()
-              newBox.id = `box-${Date.now()}`
-              newBox.name = 'New box'
-              newBox.isDefault = false
-
-              const modal = new BoxConfigModal(this.app, newBox, (config) => {
-                void (async () => {
-                  const newBoxes = [...boxSettings.boxes, config]
-                  await settings.updateBoxes({ boxes: newBoxes })
-                  this.rerender()
-                })()
-              })
-              modal.open()
-            })
-        })
-
-      // List existing boxes
-      boxSettings.boxes.forEach((box, index) => {
-        new Setting(containerEl)
-          .setName(box.name)
-          .setDesc(box.isDefault ? 'Default box' : `${boxSettings.mode}: ${box.value || '(root)'}`)
-          .addButton((button) => {
-            button.setButtonText('Edit').onClick(() => {
-              const modal = new BoxConfigModal(this.app, box, (config) => {
-                void (async () => {
-                  const newBoxes = [...boxSettings.boxes]
-                  newBoxes[index] = config
-                  await settings.updateBoxes({ boxes: newBoxes })
-                  this.rerender()
-                })()
-              })
-              modal.open()
-            })
-          })
-          .addButton((button) => {
-            if (!box.isDefault) {
-              button
-                .setIcon('trash')
-                .setTooltip('Delete box')
-                .onClick(() => {
-                  void (async () => {
-                    const newBoxes = boxSettings.boxes.filter((_, i) => i !== index)
-                    await settings.updateBoxes({ boxes: newBoxes })
-                    this.rerender()
-                  })()
-                })
-            }
-          })
-      })
-    }
-  }
-
-  // ============================================
-  // Zettel Notes Section
-  /**
-   * Detection dropdown plus tag / link / property field for a note type.
-   * onChange gets (mode) on dropdown change, (mode, value) on field change.
-   */
-  private addDetectionSetting(
-    containerEl: HTMLElement,
-    mode: ZettelDetectionMode,
-    value: string,
-    defaultValue: string,
-    onChange: (mode: ZettelDetectionMode, value?: string) => Promise<void>
-  ): void {
-    new Setting(containerEl)
-      .setName('Detection mode')
-      .setDesc('Identify notes by folder location, tag, link or property')
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption(ZettelDetectionMode.FOLDER, 'Folder-based')
-          .addOption(ZettelDetectionMode.TAG, 'Tag-based')
-          .addOption(ZettelDetectionMode.LINK, 'Link-based')
-          .addOption(ZettelDetectionMode.PROPERTY, 'Property-based')
-          .setValue(mode)
-          .onChange((v) => {
-            void (async () => {
-              await onChange(v as ZettelDetectionMode)
-              this.rerender()
-            })()
-          })
-      })
-
-    if (mode === ZettelDetectionMode.FOLDER) return
-
-    const labels = {
-      [ZettelDetectionMode.TAG]: ['Tag', 'Tag that marks these notes', defaultValue],
-      [ZettelDetectionMode.LINK]: ['Link', 'Note that these notes link to', 'My Index Note'],
-      [ZettelDetectionMode.PROPERTY]: [
-        'Property',
-        '"key: value", or "key:" for any value. List properties match any item',
-        `type: ${defaultValue}`,
+    return {
+      type: 'page',
+      name: 'Boxes',
+      desc: 'Organise zettels into boxes (folders, tags, links or properties)',
+      displayValue: () => (enabled() ? this.get<string>('boxes.mode') : 'Off'),
+      items: [
+        {
+          type: 'group',
+          items: [
+            toggle(
+              'Enable box system',
+              'boxes.enabled',
+              'Use boxes to organise notes into separate collections. When off, all zettels go to a single folder.'
+            ),
+            {
+              ...folder(
+                'Zettels folder',
+                'boxes.rootFolder',
+                'Folder where all zettels are stored',
+                'Zettels'
+              ),
+              visible: () => !enabled(),
+            },
+          ],
+        },
+        {
+          type: 'group',
+          visible: enabled,
+          items: [
+            dropdown(
+              'Box mode',
+              'boxes.mode',
+              {
+                [BoxMode.FOLDER]: 'Folders',
+                [BoxMode.TAG]: 'Tags',
+                [BoxMode.LINK]: 'Links',
+                [BoxMode.PROPERTY]: 'Properties',
+              },
+              'How boxes identify their notes'
+            ),
+            {
+              ...folder(
+                'Root folder',
+                'boxes.rootFolder',
+                'Root folder containing all boxes',
+                'Zettels'
+              ),
+              visible: this.is('boxes.mode', BoxMode.FOLDER),
+            },
+            toggle(
+              'Auto-create boxes',
+              'boxes.autoCreateBoxes',
+              'Automatically create boxes when referenced'
+            ),
+          ],
+        },
+        {
+          type: 'list',
+          heading: 'Boxes',
+          visible: enabled,
+          emptyState: 'No boxes yet',
+          items: manager.getBoxes().boxes.map((box, index) => ({
+            name: box.name,
+            desc: box.isDefault
+              ? 'Default box'
+              : `${manager.getBoxes().mode}: ${box.value || '(root)'}`,
+            action: () => this.editBox(index),
+          })),
+          addItem: { name: 'Add box', action: () => this.addBox() },
+          onDelete: (index) => void this.deleteBox(index),
+        },
       ],
-    }[mode]
+    }
+  }
 
-    new Setting(containerEl)
-      .setName(labels[0])
-      .setDesc(`${labels[1]}. New notes get this added automatically`)
-      .addText((text) => {
-        if (mode === ZettelDetectionMode.TAG)
-          new TagSuggest(this.app, text.inputEl, (v) => {
-            text.setValue(v)
-            void onChange(mode, v)
-          })
-        else if (mode === ZettelDetectionMode.LINK)
-          new FileSuggest(this.app, text.inputEl, (v) => {
-            text.setValue(v)
-            void onChange(mode, v)
-          })
+  private async saveBoxes(boxes: BoxConfig[]): Promise<void> {
+    await this.plugin.getSettingsManager().updateBoxes({ boxes })
+    this.update()
+  }
 
-        text
-          .setPlaceholder(labels[2])
-          .setValue(value)
-          .onChange((v) => {
-            void onChange(mode, v || defaultValue)
-          })
-      })
+  private addBox(): void {
+    const box = createDefaultBoxConfig()
+    box.id = `box-${Date.now()}`
+    box.name = 'New box'
+    box.isDefault = false
+    new BoxConfigModal(this.app, box, (config) => {
+      void this.saveBoxes([...this.plugin.getSettingsManager().getBoxes().boxes, config])
+    }).open()
+  }
+
+  private editBox(index: number): void {
+    const boxes = [...this.plugin.getSettingsManager().getBoxes().boxes]
+    const box = boxes[index]
+    if (!box) return
+    new BoxConfigModal(this.app, box, (config) => {
+      boxes[index] = config
+      void this.saveBoxes(boxes)
+    }).open()
+  }
+
+  private async deleteBox(index: number): Promise<void> {
+    const boxes = this.plugin.getSettingsManager().getBoxes().boxes
+    if (boxes[index]?.isDefault) {
+      new Notice('The default box cannot be deleted')
+      return
+    }
+    await this.saveBoxes(boxes.filter((_, i) => i !== index))
   }
 
   // ============================================
-  private addZettelSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const zettelSettings = settings.getZettel()
+  // Note types
+  // ============================================
+  private noteTypesPage(): SettingDefinitionPage {
+    const common = (label: string, key: string): SettingGroupItem[] => [
+      file(
+        'Template file',
+        `${key}.templatePath`,
+        'Path to template file (leave empty for default)',
+        `templates/${label}.md`
+      ),
+      toggle(
+        'Open on create',
+        `${key}.openOnCreate`,
+        `Open newly created ${label} notes in the editor`
+      ),
+    ]
 
-    new Setting(containerEl).setName('Zettel notes').setHeading()
+    return {
+      type: 'page',
+      name: 'Note types',
+      desc: 'Detection, folders and templates for each kind of note',
+      visible: () => !this.get<boolean>('boxes.enabled'),
+      items: [
+        this.noteTypePage({
+          name: 'Zettel notes',
+          desc: 'Atomic notes with unique ids for building a knowledge network',
+          key: 'zettel',
+          modeKey: 'zettelDetectionMode',
+          tagKey: 'zettelTag',
+          creation: [
+            folder(
+              'Default folder',
+              'zettel.defaultFolder',
+              'Folder for zettel notes (relative to box root)'
+            ),
+            dropdown(
+              'Filename format',
+              'zettel.filenameFormat',
+              {
+                [FilenameFormat.ID_ONLY]: 'ID only',
+                [FilenameFormat.ID_TITLE]: 'ID + title',
+              },
+              'How zettel filenames are formatted'
+            ),
+            {
+              ...text('Separator', 'zettel.separator', 'Character(s) between ID and title', '⁝'),
+              visible: this.is('zettel.filenameFormat', FilenameFormat.ID_TITLE),
+            },
+            ...common('zettel', 'zettel'),
+            toggle(
+              'Auto-link to parent',
+              'zettel.autoLinkToParent',
+              'Automatically add link to parent when creating child zettel'
+            ),
+          ],
+        }),
+        this.noteTypePage({
+          name: 'Fleeting notes',
+          desc: 'Temporary notes for quick capture and processing',
+          key: 'fleeting',
+          modeKey: 'detectionMode',
+          tagKey: 'tag',
+          creation: [
+            folder('Folder', 'fleeting.folder', 'Folder for fleeting notes', 'Fleeting'),
+            ...common('fleeting', 'fleeting'),
+          ],
+        }),
+        this.noteTypePage({
+          name: 'Literature notes',
+          desc: 'Notes for external sources, books, articles and research',
+          key: 'literature',
+          modeKey: 'detectionMode',
+          tagKey: 'tag',
+          creation: [
+            folder('Folder', 'literature.folder', 'Folder for literature notes', 'Literature'),
+            ...common('literature', 'literature'),
+          ],
+        }),
+        this.noteTypePage({
+          name: 'Index notes',
+          desc: 'Index or map-of-content notes for organising and linking zettels',
+          key: 'index',
+          modeKey: 'detectionMode',
+          tagKey: 'tag',
+          creation: [
+            folder('Folder', 'index.folder', 'Folder for index notes', 'Index'),
+            ...common('index', 'index'),
+          ],
+        }),
+        this.noteTypePage({
+          name: 'Project notes',
+          desc: 'Notes that group work towards a goal',
+          key: 'projects',
+          modeKey: 'detectionMode',
+          tagKey: 'tag',
+          creation: [
+            folder('Folder', 'projects.folder', 'Folder for project notes', 'Projects'),
+            ...common('project', 'projects'),
+          ],
+        }),
+      ],
+    }
+  }
 
-    containerEl.createEl('p', {
-      text: 'Atomic notes with unique ids for building a knowledge network.',
-      cls: 'setting-item-description',
-    })
+  private noteTypePage(o: NoteTypePage): SettingDefinitionPage {
+    const enabled = this.on(`${o.key}.enabled`)
+    const modeKey = `${o.key}.${o.modeKey}`
+    const tagKey = `${o.key}.${o.tagKey}`
+    const marker = 'New notes get this added automatically'
 
-    new Setting(containerEl).setName('Enable zettel notes').addToggle((toggle) => {
-      toggle.setValue(zettelSettings.enabled).onChange((value) => {
-        void (async () => {
-          await settings.updateZettel({ enabled: value })
-          this.rerender()
-        })()
-      })
-    })
+    return {
+      type: 'page',
+      name: o.name,
+      desc: o.desc,
+      displayValue: this.status(`${o.key}.enabled`),
+      items: [
+        { type: 'group', items: [toggle(`Enable ${o.name.toLowerCase()}`, `${o.key}.enabled`)] },
+        {
+          type: 'group',
+          heading: 'Detection',
+          visible: enabled,
+          items: [
+            dropdown(
+              'Detection mode',
+              modeKey,
+              {
+                [ZettelDetectionMode.FOLDER]: 'Folder-based',
+                [ZettelDetectionMode.TAG]: 'Tag-based',
+                [ZettelDetectionMode.LINK]: 'Link-based',
+                [ZettelDetectionMode.PROPERTY]: 'Property-based',
+              },
+              'Identify notes by folder location, tag, link or property'
+            ),
+            {
+              name: 'Tag',
+              desc: `Tag that marks these notes. ${marker}`,
+              visible: this.is(modeKey, ZettelDetectionMode.TAG),
+              render: (setting) => {
+                setting.addText((input) => {
+                  new TagSuggest(this.app, input.inputEl, (value) => {
+                    input.setValue(value)
+                    void this.setControlValue(tagKey, value)
+                  })
+                  input
+                    .setValue(this.get<string>(tagKey))
+                    .onChange((value) => void this.setControlValue(tagKey, value))
+                })
+              },
+            },
+            {
+              ...file('Link', tagKey, `Note that these notes link to. ${marker}`, 'My index note'),
+              visible: this.is(modeKey, ZettelDetectionMode.LINK),
+            },
+            {
+              ...text(
+                'Property',
+                tagKey,
+                `"key: value", or "key:" for any value. List properties match any item. ${marker}`,
+                `type: ${o.key}`
+              ),
+              visible: this.is(modeKey, ZettelDetectionMode.PROPERTY),
+            },
+          ],
+        },
+        { type: 'group', heading: 'Creation', visible: enabled, items: o.creation },
+      ],
+    }
+  }
 
-    if (!zettelSettings.enabled) return
+  // ============================================
+  // Sidebar
+  // ============================================
+  private sidebarPage(): SettingDefinitionPage {
+    const s = 'zettelkastenSidebar'
+    const enabled = this.on(`${s}.enabled`)
+    const sections = [
+      {
+        label: 'Inbox',
+        show: 'showInbox',
+        name: 'inboxName',
+        dash: 'dashboardFleetingNote',
+        filter: 'inboxFilterTag',
+      },
+      {
+        label: 'Zettels',
+        show: 'showZettels',
+        name: 'zettelsName',
+        dash: 'dashboardZettelNote',
+        filter: 'zettelsFilterTag',
+      },
+      {
+        label: 'Literature',
+        show: 'showLiterature',
+        name: 'literatureName',
+        dash: 'dashboardLiteratureNote',
+        filter: 'literatureFilterTag',
+      },
+      {
+        label: 'Index',
+        show: 'showIndex',
+        name: 'indexName',
+        dash: 'dashboardIndexNote',
+        filter: 'indexFilterTag',
+      },
+      {
+        label: 'Projects',
+        show: 'showProjects',
+        name: 'projectsName',
+        dash: 'dashboardProjectsNote',
+        filter: 'projectsFilterTag',
+      },
+    ]
 
-    this.addDetectionSetting(
-      containerEl,
-      zettelSettings.zettelDetectionMode,
-      zettelSettings.zettelTag,
-      'zettel',
-      (zettelDetectionMode, zettelTag) =>
-        settings.updateZettel({
-          zettelDetectionMode,
-          ...(zettelTag !== undefined && { zettelTag }),
-        })
-    )
+    return {
+      type: 'page',
+      name: 'Sidebar',
+      desc: 'The Zettelkasten sidebar: sections, names, dashboards and filters',
+      displayValue: this.status(`${s}.enabled`),
+      items: [
+        { type: 'group', items: [toggle('Enable sidebar view', `${s}.enabled`)] },
+        {
+          type: 'group',
+          visible: enabled,
+          items: [
+            {
+              type: 'page',
+              name: 'Sections',
+              desc: 'Which sections appear and what they are called',
+              items: [
+                {
+                  type: 'group',
+                  heading: 'Visibility',
+                  items: sections.map((x) =>
+                    toggle(`Show ${x.label.toLowerCase()}`, `${s}.${x.show}`)
+                  ),
+                },
+                {
+                  type: 'group',
+                  heading: 'Names',
+                  items: [
+                    ...sections.map((x) =>
+                      text(`${x.label} section name`, `${s}.${x.name}`, undefined, x.label)
+                    ),
+                    text('Bookmarks section name', `${s}.bookmarksName`, undefined, 'Bookmarks'),
+                  ],
+                },
+              ],
+            },
+            {
+              type: 'page',
+              name: 'Dashboard notes',
+              desc: 'Notes to open when clicking a section header',
+              items: [
+                {
+                  type: 'group',
+                  items: sections.map((x) =>
+                    file(
+                      `${x.label} dashboard note`,
+                      `${s}.${x.dash}`,
+                      `Note to open when clicking the ${x.label.toLowerCase()} section header`,
+                      `path/to/${x.label.toLowerCase()}-dashboard.md`
+                    )
+                  ),
+                },
+              ],
+            },
+            {
+              type: 'page',
+              name: 'Section filters',
+              desc: 'Narrow each section with a tag, link or property',
+              items: [
+                {
+                  type: 'group',
+                  items: sections.map((x) =>
+                    text(
+                      `${x.label} filter`,
+                      `${s}.${x.filter}`,
+                      'Additional tag, [[link]] or "key: value" property (leave empty for no filter)',
+                      'project, [[note]] or status: active'
+                    )
+                  ),
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    }
+  }
 
-    new Setting(containerEl)
-      .setName('Default folder')
-      .setDesc('Folder for zettel notes (relative to box root)')
-      .addText((text) => {
-        new FolderSuggest(this.app, text.inputEl, (value) => {
-          void settings.updateZettel({ defaultFolder: value })
-        })
+  // ============================================
+  // Note sequences
+  // ============================================
+  private sequencesPage(): SettingDefinitionPage {
+    const enabled = this.on('noteSequences.enabled')
+    return {
+      type: 'page',
+      name: 'Note sequences',
+      desc: 'Visualise and navigate hierarchical note sequences',
+      displayValue: this.status('noteSequences.enabled'),
+      items: [
+        { type: 'group', items: [toggle('Enable note sequences', 'noteSequences.enabled')] },
+        {
+          type: 'group',
+          visible: enabled,
+          items: [
+            toggle(
+              'Show sequences view',
+              'noteSequences.showSequencesView',
+              'Display card view showing all note sequences'
+            ),
+            toggle(
+              'Show sequence navigator sidebar',
+              'noteSequences.showSequenceNavigator',
+              "Display tree view of the current note's sequence in the sidebar"
+            ),
+            toggle(
+              'Auto-open navigator',
+              'noteSequences.autoOpenNavigator',
+              'Automatically open sequence navigator when opening a zettel note'
+            ),
+          ],
+        },
+      ],
+    }
+  }
 
-        text
-          .setPlaceholder('')
-          .setValue(zettelSettings.defaultFolder)
-          .onChange((value) => {
-            void settings.updateZettel({ defaultFolder: value })
-          })
-      })
+  // ============================================
+  // Advanced
+  // ============================================
+  private advancedPage(): SettingDefinitionPage {
+    const manager = this.plugin.getSettingsManager()
+    const ignored = () => manager.getGeneral().ignoredFolders
 
-    new Setting(containerEl)
-      .setName('Filename format')
-      .setDesc('How zettel filenames should be formatted')
-      .addDropdown((dropdown) => {
-        dropdown
-          .addOption(FilenameFormat.ID_ONLY, 'ID only')
-          .addOption(FilenameFormat.ID_TITLE, 'ID + title')
-          .setValue(zettelSettings.filenameFormat)
-          .onChange((value) => {
-            void (async () => {
-              await settings.updateZettel({ filenameFormat: value as FilenameFormat })
-              this.rerender()
-            })()
-          })
-      })
-
-    if (zettelSettings.filenameFormat === FilenameFormat.ID_TITLE) {
-      new Setting(containerEl)
-        .setName('Separator')
-        .setDesc('Character(s) between ID and title')
-        .addText((text) => {
-          text
-            .setPlaceholder('⁝')
-            .setValue(zettelSettings.separator)
-            .onChange((value) => {
-              void settings.updateZettel({ separator: value || '⁝' })
-            })
-        })
+    const saveIgnored = async (folders: string[]) => {
+      await manager.updateGeneral({ ignoredFolders: folders })
+      this.update()
     }
 
-    new Setting(containerEl)
-      .setName('Template file')
-      .setDesc('Path to template file (leave empty for default)')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          void settings.updateZettel({ templatePath: value })
-        })
-
-        text
-          .setPlaceholder('templates/zettel.md')
-          .setValue(zettelSettings.templatePath)
-          .onChange((value) => {
-            void settings.updateZettel({ templatePath: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Auto-link to parent')
-      .setDesc('Automatically add link to parent when creating child zettel')
-      .addToggle((toggle) => {
-        toggle.setValue(zettelSettings.autoLinkToParent).onChange((value) => {
-          void settings.updateZettel({ autoLinkToParent: value })
-        })
-      })
-
-    new Setting(containerEl)
-      .setName('Open on create')
-      .setDesc('Open newly created zettels in the editor')
-      .addToggle((toggle) => {
-        toggle.setValue(zettelSettings.openOnCreate).onChange((value) => {
-          void settings.updateZettel({ openOnCreate: value })
-        })
-      })
-  }
-
-  // ============================================
-  // Fleeting Notes Section
-  // ============================================
-  private addFleetingSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const fleetingSettings = settings.getFleeting()
-
-    new Setting(containerEl).setName('Fleeting notes').setHeading()
-
-    containerEl.createEl('p', {
-      text: 'Temporary notes for quick capture and processing.',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl).setName('Enable fleeting notes').addToggle((toggle) => {
-      toggle.setValue(fleetingSettings.enabled).onChange((value) => {
-        void (async () => {
-          await settings.updateFleeting({ enabled: value })
-          this.rerender()
-        })()
-      })
-    })
-
-    if (!fleetingSettings.enabled) return
-
-    this.addDetectionSetting(
-      containerEl,
-      fleetingSettings.detectionMode,
-      fleetingSettings.tag,
-      'fleeting',
-      (detectionMode, tag) =>
-        settings.updateFleeting({ detectionMode, ...(tag !== undefined && { tag }) })
-    )
-
-    new Setting(containerEl)
-      .setName('Folder')
-      .setDesc('Folder for fleeting notes')
-      .addText((text) => {
-        new FolderSuggest(this.app, text.inputEl, (value) => {
-          void settings.updateFleeting({ folder: value })
-        })
-
-        text
-          .setPlaceholder('Fleeting')
-          .setValue(fleetingSettings.folder)
-          .onChange((value) => {
-            void settings.updateFleeting({ folder: value || 'fleeting' })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Template file')
-      .setDesc('Path to template file (leave empty for default)')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          void settings.updateFleeting({ templatePath: value })
-        })
-
-        text
-          .setPlaceholder('templates/fleeting.md')
-          .setValue(fleetingSettings.templatePath)
-          .onChange((value) => {
-            void settings.updateFleeting({ templatePath: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Open on create')
-      .setDesc('Open newly created fleeting notes in the editor')
-      .addToggle((toggle) => {
-        toggle.setValue(fleetingSettings.openOnCreate).onChange((value) => {
-          void settings.updateFleeting({ openOnCreate: value })
-        })
-      })
-  }
-
-  // ============================================
-  // Index Notes Section
-  // ============================================
-  private addIndexSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const indexSettings = settings.getIndex()
-
-    new Setting(containerEl).setName('Index notes').setHeading()
-
-    containerEl.createEl('p', {
-      text: 'Index/moc (map of content) notes for organizing and linking zettels.',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl).setName('Enable index notes').addToggle((toggle) => {
-      toggle.setValue(indexSettings.enabled).onChange((value) => {
-        void (async () => {
-          await settings.updateIndex({ enabled: value })
-          this.rerender()
-        })()
-      })
-    })
-
-    if (!indexSettings.enabled) return
-
-    this.addDetectionSetting(
-      containerEl,
-      indexSettings.detectionMode,
-      indexSettings.tag,
-      'index',
-      (detectionMode, tag) =>
-        settings.updateIndex({ detectionMode, ...(tag !== undefined && { tag }) })
-    )
-
-    new Setting(containerEl)
-      .setName('Folder')
-      .setDesc('Folder for index notes')
-      .addText((text) => {
-        new FolderSuggest(this.app, text.inputEl, (value) => {
-          void settings.updateIndex({ folder: value })
-        })
-
-        text
-          .setPlaceholder('Index')
-          .setValue(indexSettings.folder)
-          .onChange((value) => {
-            void settings.updateIndex({ folder: value || 'index' })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Template file')
-      .setDesc('Path to template file (leave empty for default)')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          void settings.updateIndex({ templatePath: value })
-        })
-
-        text
-          .setPlaceholder('templates/index.md')
-          .setValue(indexSettings.templatePath)
-          .onChange((value) => {
-            void settings.updateIndex({ templatePath: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Open on create')
-      .setDesc('Open newly created index notes in the editor')
-      .addToggle((toggle) => {
-        toggle.setValue(indexSettings.openOnCreate).onChange((value) => {
-          void settings.updateIndex({ openOnCreate: value })
-        })
-      })
-  }
-
-  // ============================================
-  // Literature Notes Section
-  // ============================================
-  private addLiteratureSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const literatureSettings = settings.getLiterature()
-
-    new Setting(containerEl).setName('Literature notes').setHeading()
-
-    containerEl.createEl('p', {
-      text: 'Notes for referencing external sources, books, articles, and research.',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl).setName('Enable literature notes').addToggle((toggle) => {
-      toggle.setValue(literatureSettings.enabled).onChange((value) => {
-        void (async () => {
-          await settings.updateLiterature({ enabled: value })
-          this.rerender()
-        })()
-      })
-    })
-
-    if (!literatureSettings.enabled) return
-
-    this.addDetectionSetting(
-      containerEl,
-      literatureSettings.detectionMode,
-      literatureSettings.tag,
-      'literature',
-      (detectionMode, tag) =>
-        settings.updateLiterature({ detectionMode, ...(tag !== undefined && { tag }) })
-    )
-
-    new Setting(containerEl)
-      .setName('Folder')
-      .setDesc('Folder for literature notes')
-      .addText((text) => {
-        new FolderSuggest(this.app, text.inputEl, (value) => {
-          void settings.updateLiterature({ folder: value })
-        })
-
-        text
-          .setPlaceholder('Literature')
-          .setValue(literatureSettings.folder)
-          .onChange((value) => {
-            void settings.updateLiterature({ folder: value || 'literature' })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Template file')
-      .setDesc('Path to template file (leave empty for default)')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          void settings.updateLiterature({ templatePath: value })
-        })
-
-        text
-          .setPlaceholder('templates/literature.md')
-          .setValue(literatureSettings.templatePath)
-          .onChange((value) => {
-            void settings.updateLiterature({ templatePath: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Open on create')
-      .setDesc('Open newly created literature notes in the editor')
-      .addToggle((toggle) => {
-        toggle.setValue(literatureSettings.openOnCreate).onChange((value) => {
-          void settings.updateLiterature({ openOnCreate: value })
-        })
-      })
-  }
-
-  // ============================================
-  // Project Notes Section
-  // ============================================
-  private addProjectSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const projectSettings = settings.getProjects()
-
-    new Setting(containerEl).setName('Project notes').setHeading()
-
-    containerEl.createEl('p', {
-      text: 'Notes for organizing and tracking projects, tasks, and long-term work.',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl).setName('Enable project notes').addToggle((toggle) => {
-      toggle.setValue(projectSettings.enabled).onChange((value) => {
-        void (async () => {
-          await settings.updateProjects({ enabled: value })
-          this.rerender()
-        })()
-      })
-    })
-
-    if (!projectSettings.enabled) return
-
-    this.addDetectionSetting(
-      containerEl,
-      projectSettings.detectionMode,
-      projectSettings.tag,
-      'project',
-      (detectionMode, tag) =>
-        settings.updateProjects({ detectionMode, ...(tag !== undefined && { tag }) })
-    )
-
-    if (projectSettings.detectionMode === ZettelDetectionMode.FOLDER) {
-      new Setting(containerEl)
-        .setName('Folder')
-        .setDesc('Folder for project notes')
-        .addText((text) => {
-          new FolderSuggest(this.app, text.inputEl, (value) => {
-            text.setValue(value)
-            void settings.updateProjects({ folder: value })
-          })
-
-          text
-            .setPlaceholder('Projects')
-            .setValue(projectSettings.folder)
-            .onChange((value) => {
-              void settings.updateProjects({ folder: value || 'projects' })
-            })
-        })
+    return {
+      type: 'page',
+      name: 'Advanced',
+      desc: 'Ignored folders, import/export and reset',
+      items: [
+        {
+          type: 'list',
+          heading: 'Ignored folders',
+          emptyState: 'No folders ignored',
+          items: ignored().map((_, i) =>
+            folder(`Folder ${i + 1}`, `general.ignoredFolders.${i}`, undefined, 'Folder/path')
+          ),
+          addItem: {
+            name: 'Add ignored folder',
+            action: () => void saveIgnored([...ignored(), '']),
+          },
+          onDelete: (index) => void saveIgnored(ignored().filter((_, i) => i !== index)),
+        },
+        {
+          type: 'group',
+          heading: 'Data',
+          items: [
+            {
+              name: 'Import/export settings',
+              desc: 'Import or export all plugin settings as JSON',
+              action: () => new ImportExportModal(this.app, manager, () => this.update()).open(),
+            },
+            {
+              name: 'Reset to defaults',
+              desc: 'Reset all settings to default values (cannot be undone)',
+              action: () => {
+                void (async () => {
+                  await manager.resetToDefaults()
+                  new Notice('Settings reset to defaults')
+                  this.update()
+                })()
+              },
+            },
+          ],
+        },
+      ],
     }
-
-    new Setting(containerEl)
-      .setName('Template file')
-      .setDesc('Path to template file (leave empty for default)')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          void settings.updateProjects({ templatePath: value })
-        })
-
-        text
-          .setPlaceholder('templates/project.md')
-          .setValue(projectSettings.templatePath)
-          .onChange((value) => {
-            void settings.updateProjects({ templatePath: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Open on create')
-      .setDesc('Open newly created project notes in the editor')
-      .addToggle((toggle) => {
-        toggle.setValue(projectSettings.openOnCreate).onChange((value) => {
-          void settings.updateProjects({ openOnCreate: value })
-        })
-      })
-  }
-
-  // ============================================
-  // Zettelkasten Sidebar View Section
-  // ============================================
-  private addZettelkastenSidebarSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const viewSettings = settings.getZettelkastenSidebar()
-
-    containerEl.createEl('p', {
-      text: 'Browse your notes by type in a collapsible sidebar view.',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl).setName('Enable sidebar view').addToggle((toggle) => {
-      toggle.setValue(viewSettings.enabled).onChange((value) => {
-        void (async () => {
-          await settings.updateZettelkastenSidebar({ enabled: value })
-          this.rerender()
-        })()
-      })
-    })
-
-    if (!viewSettings.enabled) return
-
-    // Section visibility
-    new Setting(containerEl).setName('Section visibility').setHeading()
-
-    new Setting(containerEl).setName('Show inbox').addToggle((toggle) => {
-      toggle.setValue(viewSettings.showInbox).onChange((value) => {
-        void settings.updateZettelkastenSidebar({ showInbox: value })
-      })
-    })
-
-    new Setting(containerEl).setName('Show zettels').addToggle((toggle) => {
-      toggle.setValue(viewSettings.showZettels).onChange((value) => {
-        void settings.updateZettelkastenSidebar({ showZettels: value })
-      })
-    })
-
-    new Setting(containerEl).setName('Show literature').addToggle((toggle) => {
-      toggle.setValue(viewSettings.showLiterature ?? true).onChange((value) => {
-        void settings.updateZettelkastenSidebar({ showLiterature: value })
-      })
-    })
-
-    new Setting(containerEl).setName('Show index').addToggle((toggle) => {
-      toggle.setValue(viewSettings.showIndex).onChange((value) => {
-        void settings.updateZettelkastenSidebar({ showIndex: value })
-      })
-    })
-
-    new Setting(containerEl).setName('Show projects').addToggle((toggle) => {
-      toggle.setValue(viewSettings.showProjects ?? false).onChange((value) => {
-        void settings.updateZettelkastenSidebar({ showProjects: value })
-      })
-    })
-
-    // Section names
-    new Setting(containerEl).setName('Section names').setHeading()
-
-    new Setting(containerEl).setName('Inbox section name').addText((text) => {
-      text
-        .setPlaceholder('Inbox')
-        .setValue(viewSettings.inboxName || 'Inbox')
-        .onChange((value) => {
-          void settings.updateZettelkastenSidebar({ inboxName: value })
-        })
-    })
-
-    new Setting(containerEl).setName('Zettels section name').addText((text) => {
-      text
-        .setPlaceholder('Zettels')
-        .setValue(viewSettings.zettelsName || 'Zettels')
-        .onChange((value) => {
-          void settings.updateZettelkastenSidebar({ zettelsName: value })
-        })
-    })
-
-    new Setting(containerEl).setName('Literature section name').addText((text) => {
-      text
-        .setPlaceholder('Literature')
-        .setValue(viewSettings.literatureName || 'Literature')
-        .onChange((value) => {
-          void settings.updateZettelkastenSidebar({ literatureName: value })
-        })
-    })
-
-    new Setting(containerEl).setName('Index section name').addText((text) => {
-      text
-        .setPlaceholder('Index')
-        .setValue(viewSettings.indexName || 'Index')
-        .onChange((value) => {
-          void settings.updateZettelkastenSidebar({ indexName: value })
-        })
-    })
-
-    new Setting(containerEl).setName('Projects section name').addText((text) => {
-      text
-        .setPlaceholder('Projects')
-        .setValue(viewSettings.projectsName || 'Projects')
-        .onChange((value) => {
-          void settings.updateZettelkastenSidebar({ projectsName: value })
-        })
-    })
-
-    // Dashboard notes
-    new Setting(containerEl).setName('Dashboard notes').setHeading()
-
-    containerEl.createEl('p', {
-      text: 'Optional dashboard notes to open when clicking section headers',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl)
-      .setName('Inbox dashboard note')
-      .setDesc('Note to open when clicking the inbox section header')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ dashboardFleetingNote: value })
-        })
-
-        text
-          .setPlaceholder('path/to/inbox-dashboard.md')
-          .setValue(viewSettings.dashboardFleetingNote || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ dashboardFleetingNote: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Zettels dashboard note')
-      .setDesc('Note to open when clicking the zettels section header')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ dashboardZettelNote: value })
-        })
-
-        text
-          .setPlaceholder('path/to/zettels-dashboard.md')
-          .setValue(viewSettings.dashboardZettelNote || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ dashboardZettelNote: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Literature dashboard note')
-      .setDesc('Note to open when clicking the literature section header')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ dashboardLiteratureNote: value })
-        })
-
-        text
-          .setPlaceholder('path/to/literature-dashboard.md')
-          .setValue(viewSettings.dashboardLiteratureNote || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ dashboardLiteratureNote: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Index dashboard note')
-      .setDesc('Note to open when clicking the index section header')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ dashboardIndexNote: value })
-        })
-
-        text
-          .setPlaceholder('path/to/index-dashboard.md')
-          .setValue(viewSettings.dashboardIndexNote || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ dashboardIndexNote: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Projects dashboard note')
-      .setDesc('Note to open when clicking the projects section header')
-      .addText((text) => {
-        new FileSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ dashboardProjectsNote: value })
-        })
-
-        text
-          .setPlaceholder('path/to/projects-dashboard.md')
-          .setValue(viewSettings.dashboardProjectsNote || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ dashboardProjectsNote: value })
-          })
-      })
-
-    // Section filters
-    new Setting(containerEl).setName('Section filters').setHeading()
-
-    containerEl.createEl('p', {
-      text: 'Optional tag, link or property filter for each section (for example project, [[note]] or status: active)',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl)
-      .setName('Inbox filter tag')
-      .setDesc(
-        'Additional tag, [[link]] or key: value property to filter inbox notes (leave empty for no filter)'
-      )
-      .addText((text) => {
-        new TagSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ inboxFilterTag: value })
-        })
-
-        text
-          .setPlaceholder('Optional filter tag')
-          .setValue(viewSettings.inboxFilterTag || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ inboxFilterTag: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Zettels filter tag')
-      .setDesc(
-        'Additional tag, [[link]] or key: value property to filter zettel notes (leave empty for no filter)'
-      )
-      .addText((text) => {
-        new TagSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ zettelsFilterTag: value })
-        })
-
-        text
-          .setPlaceholder('Optional filter tag')
-          .setValue(viewSettings.zettelsFilterTag || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ zettelsFilterTag: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Literature filter tag')
-      .setDesc(
-        'Additional tag, [[link]] or key: value property to filter literature notes (leave empty for no filter)'
-      )
-      .addText((text) => {
-        new TagSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ literatureFilterTag: value })
-        })
-
-        text
-          .setPlaceholder('Optional filter tag')
-          .setValue(viewSettings.literatureFilterTag || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ literatureFilterTag: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Index filter tag')
-      .setDesc(
-        'Additional tag, [[link]] or key: value property to filter index notes (leave empty for no filter)'
-      )
-      .addText((text) => {
-        new TagSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ indexFilterTag: value })
-        })
-
-        text
-          .setPlaceholder('Optional filter tag')
-          .setValue(viewSettings.indexFilterTag || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ indexFilterTag: value })
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Projects filter tag')
-      .setDesc(
-        'Additional tag, [[link]] or key: value property to filter project notes (leave empty for no filter)'
-      )
-      .addText((text) => {
-        new TagSuggest(this.app, text.inputEl, (value) => {
-          text.setValue(value)
-          void settings.updateZettelkastenSidebar({ projectsFilterTag: value })
-        })
-
-        text
-          .setPlaceholder('Optional filter tag')
-          .setValue(viewSettings.projectsFilterTag || '')
-          .onChange((value) => {
-            void settings.updateZettelkastenSidebar({ projectsFilterTag: value })
-          })
-      })
-  }
-
-  // ============================================
-  // Note Sequences Section
-  // ============================================
-  private addNoteSequenceSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const sequenceSettings = settings.getNoteSequences()
-
-    new Setting(containerEl).setName('Note sequences').setHeading()
-
-    containerEl.createEl('p', {
-      text: 'Visualize and navigate hierarchical note sequences with parent-child relationships.',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl).setName('Enable note sequences').addToggle((toggle) => {
-      toggle.setValue(sequenceSettings.enabled).onChange((value) => {
-        void (async () => {
-          await settings.updateNoteSequences({ enabled: value })
-          this.rerender()
-        })()
-      })
-    })
-
-    if (!sequenceSettings.enabled) return
-
-    new Setting(containerEl)
-      .setName('Show sequences view')
-      .setDesc('Display card view showing all note sequences')
-      .addToggle((toggle) => {
-        toggle.setValue(sequenceSettings.showSequencesView).onChange((value) => {
-          void settings.updateNoteSequences({ showSequencesView: value })
-        })
-      })
-
-    new Setting(containerEl)
-      .setName('Show sequence navigator sidebar')
-      .setDesc("Display tree view of the current note's sequence in the sidebar")
-      .addToggle((toggle) => {
-        toggle.setValue(sequenceSettings.showSequenceNavigator).onChange((value) => {
-          void settings.updateNoteSequences({ showSequenceNavigator: value })
-        })
-      })
-
-    new Setting(containerEl)
-      .setName('Auto-open navigator')
-      .setDesc('Automatically open sequence navigator when opening a zettel note')
-      .addToggle((toggle) => {
-        toggle.setValue(sequenceSettings.autoOpenNavigator).onChange((value) => {
-          void settings.updateNoteSequences({ autoOpenNavigator: value })
-        })
-      })
-  }
-
-  // ============================================
-  // Ignored Folders Section
-  // ============================================
-  private addIgnoredFoldersSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const generalSettings = settings.getGeneral()
-
-    new Setting(containerEl).setName('Ignored folders').setHeading()
-
-    new Setting(containerEl)
-      .setName('Add ignored folder')
-      .setDesc('Folders to exclude from indexing and search')
-      .addButton((button) => {
-        button
-          .setButtonText('Add folder')
-          .setCta()
-          .onClick(() => {
-            void (async () => {
-              const newFolders = [...generalSettings.ignoredFolders, '']
-              await settings.updateGeneral({ ignoredFolders: newFolders })
-              this.rerender()
-            })()
-          })
-      })
-
-    generalSettings.ignoredFolders.forEach((folder, index) => {
-      new Setting(containerEl)
-        .addText((text) => {
-          new FolderSuggest(this.app, text.inputEl, (value) => {
-            const newFolders = [...generalSettings.ignoredFolders]
-            newFolders[index] = value
-            void settings.updateGeneral({ ignoredFolders: newFolders })
-          })
-
-          text
-            .setPlaceholder('Folder/path')
-            .setValue(folder)
-            .onChange((value) => {
-              const newFolders = [...generalSettings.ignoredFolders]
-              newFolders[index] = value
-              void settings.updateGeneral({ ignoredFolders: newFolders })
-            })
-        })
-        .addButton((button) => {
-          button
-            .setIcon('trash')
-            .setTooltip('Remove folder')
-            .onClick(() => {
-              void (async () => {
-                const newFolders = generalSettings.ignoredFolders.filter((_, i) => i !== index)
-                await settings.updateGeneral({ ignoredFolders: newFolders })
-                this.rerender()
-              })()
-            })
-        })
-    })
-  }
-
-  // ============================================
-  // Advanced Section
-  // ============================================
-  private addAdvancedSection(containerEl: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-
-    new Setting(containerEl).setName('Advanced').setHeading()
-
-    new Setting(containerEl)
-      .setName('Import/export settings')
-      .setDesc('Import or export all plugin settings as JSON')
-      .addButton((button) => {
-        button
-          .setButtonText('Import/export')
-          .setCta()
-          .onClick(() => {
-            const modal = new ImportExportModal(this.app, settings, () => {
-              this.rerender()
-            })
-            modal.open()
-          })
-      })
-
-    new Setting(containerEl)
-      .setName('Reset to defaults')
-      .setDesc('Reset all settings to default values (cannot be undone)')
-      .addButton((button) => {
-        button
-          .setButtonText('Reset')
-          // eslint-disable-next-line @typescript-eslint/no-deprecated -- setDestructive needs Obsidian 1.13+, minAppVersion is 1.11
-          .setWarning()
-          .onClick(() => {
-            void (async () => {
-              await settings.resetToDefaults()
-              new Notice('Settings reset to defaults')
-              this.rerender()
-            })()
-          })
-      })
   }
 }
