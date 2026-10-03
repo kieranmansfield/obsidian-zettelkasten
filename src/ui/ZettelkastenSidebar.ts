@@ -729,8 +729,11 @@ export class ZettelkastenSidebar extends ItemView {
 
     // Toggle collapse function
     const toggleCollapse = () => {
-      // Don't allow collapse if no bookmarks
-      if (bookmarks.length === 0) return
+      // Nothing to collapse: tapping the heading adds the first bookmark
+      if (bookmarks.length === 0) {
+        this.addBookmark()
+        return
+      }
 
       const isCurrentlyCollapsed = this.collapsedSections.has(bookmarksName)
 
@@ -764,6 +767,14 @@ export class ZettelkastenSidebar extends ItemView {
     this.displayBookmarks(contentEl, bookmarks)
   }
 
+  /** Run the add-bookmark command (opens its modal) */
+  private addBookmark(): void {
+    const { commands } = this.app as unknown as {
+      commands: { executeCommandById: (id: string) => boolean }
+    }
+    commands.executeCommandById(`${this.plugin.manifest.id}:add-bookmark`)
+  }
+
   /**
    * Display bookmarks in the content area
    */
@@ -771,9 +782,13 @@ export class ZettelkastenSidebar extends ItemView {
     if (bookmarks.length === 0) {
       const emptyEl = container.createDiv({
         cls: 'tree-item-self',
-        text: 'No bookmarks yet',
+        text: 'No bookmarks yet. Tap to add one.',
       })
       emptyEl.addClass('zk-empty')
+      emptyEl.addEventListener('click', (e) => {
+        e.stopPropagation()
+        this.addBookmark()
+      })
       return
     }
 
