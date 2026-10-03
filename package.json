@@ -1,7 +1,7 @@
 {
   "name": "obsidian-zettelkasten",
   "packageManager": "pnpm@11.17.0",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "This is a sample plugin for Obsidian (https://obsidian.md)",
   "main": "main.js",
   "repository": {
