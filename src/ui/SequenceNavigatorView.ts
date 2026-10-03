@@ -54,7 +54,7 @@ export class SequenceNavigatorView extends ItemView {
     return 'layers'
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+   
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()

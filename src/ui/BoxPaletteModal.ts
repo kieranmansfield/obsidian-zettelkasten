@@ -199,7 +199,7 @@ class CreateBoxModal extends Modal {
     const boxSettings = this.settingsManager.getBoxes()
     const boxType: Box['type'] = (
       boxSettings.mode === BoxMode.FOLDER ? 'folder' : boxSettings.mode
-    ) as Box['type']
+    )
 
     // Box name input
     new Setting(contentEl)
@@ -269,7 +269,7 @@ class CreateBoxModal extends Modal {
       const boxSettings = this.settingsManager.getBoxes()
       const boxType: Box['type'] = (
         boxSettings.mode === BoxMode.FOLDER ? 'folder' : boxSettings.mode
-      ) as Box['type']
+      )
 
       const newBox: Box = {
         type: boxType,

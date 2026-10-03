@@ -12,7 +12,7 @@ export const VIEW_TYPE_NOTE_SEQUENCES = 'note-sequences-view'
  */
 export class NoteSequencesView extends ItemView {
   private sequenceService: NoteSequenceService
-  private refreshTimeout: NodeJS.Timeout | null = null
+  private refreshTimeout: number | null = null
   private rootFolder: string
 
   constructor(leaf: WorkspaceLeaf, sequenceService: NoteSequenceService, rootFolder: string) {
@@ -32,9 +32,9 @@ export class NoteSequencesView extends ItemView {
   private scheduleRefresh(): void {
     // Debounce refreshes to avoid excessive updates
     if (this.refreshTimeout) {
-      clearTimeout(this.refreshTimeout)
+      activeWindow.clearTimeout(this.refreshTimeout)
     }
-    this.refreshTimeout = setTimeout(() => {
+    this.refreshTimeout = activeWindow.setTimeout(() => {
       this.refresh()
       this.refreshTimeout = null
     }, 300)
@@ -59,7 +59,7 @@ export class NoteSequencesView extends ItemView {
     return 'layers'
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+   
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()
@@ -72,18 +72,14 @@ export class NoteSequencesView extends ItemView {
     const allFiles = this.app.vault.getMarkdownFiles()
     const core = this.sequenceService.getCore()
 
-    console.log('=== Note Sequence Cards Debug ===')
-    console.log('Total files in vault:', allFiles.length)
 
     // Check how many files have zettel IDs
     const filesWithIds = allFiles.filter((f) => {
       const id = core.extractZettelId(f.basename)
       return id !== null
     })
-    console.log('Files with zettel IDs:', filesWithIds.length)
 
     const rootZettels = core.findAllRoots(allFiles)
-    console.log('Root zettels found:', rootZettels.length)
 
     if (rootZettels.length === 0) {
       const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
@@ -206,11 +202,11 @@ export class NoteSequencesView extends ItemView {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+   
   async onClose(): Promise<void> {
     // Clear any pending refresh timeout
     if (this.refreshTimeout) {
-      clearTimeout(this.refreshTimeout)
+      activeWindow.clearTimeout(this.refreshTimeout)
       this.refreshTimeout = null
     }
   }

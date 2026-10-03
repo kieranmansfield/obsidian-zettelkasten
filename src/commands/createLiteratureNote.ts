@@ -40,7 +40,6 @@ export const createLiteratureNoteCommand: CommandFactory = (context) => {
           content: templateContent.replace('{{title}}', 'New Source'),
         })
 
-        console.log('Created literature note:', result)
 
         await finishNote(
           context.app,

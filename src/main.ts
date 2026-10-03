@@ -31,7 +31,6 @@ export default class ZettelkastenPlugin extends Plugin {
   private commandRegistry!: CommandRegistry
 
   async onload() {
-    console.log('Loading Zettelkasten plugin')
 
     // Register custom icon for plugin settings
     addIcon(
@@ -71,7 +70,6 @@ export default class ZettelkastenPlugin extends Plugin {
         this.registerCommands()
         // Ensure Zettelkasten view is in left sidebar on mobile
         this.ensureZettelkastenSidebarLocationOnMobile()
-        console.log('Zettelkasten plugin loaded successfully')
       } catch (err) {
         console.error('Error during plugin initialization:', err)
       }
@@ -285,7 +283,6 @@ export default class ZettelkastenPlugin extends Plugin {
   }
 
   onunload() {
-    console.log('Unloading Zettelkasten plugin')
 
     // Detach all custom views
   }

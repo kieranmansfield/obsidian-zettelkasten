@@ -47,12 +47,11 @@ export default class SettingsManager {
     }
 
     // Deep merge loaded data with defaults
-    this.settings = this.deepMerge(DEFAULT_SETTINGS, raw as Partial<PluginSettings>)
+    this.settings = this.deepMerge(DEFAULT_SETTINGS, raw)
 
     // Run migrations if needed
     await this.migrate()
 
-    console.log('Settings loaded:', this.settings)
   }
 
   /**
@@ -60,7 +59,6 @@ export default class SettingsManager {
    */
   async save(): Promise<void> {
     await this.plugin.saveData(this.settings)
-    console.log('Settings saved')
   }
 
   /**
@@ -363,7 +361,6 @@ export default class SettingsManager {
 
     // Example migration: if version is old, update something
     if (!currentVersion || currentVersion < '0.1.4') {
-      console.log('Migrating settings to v0.1.4')
       // Add any migration logic here
       this.settings.version = '0.1.4'
       needsSave = true
@@ -394,7 +391,8 @@ export default class SettingsManager {
       await this.save()
     } catch (error) {
       throw new Error(
-        `Failed to import settings: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to import settings: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error }
       )
     }
   }

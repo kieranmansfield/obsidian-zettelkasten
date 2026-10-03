@@ -710,3 +710,23 @@ body.is-phone .sequence-grid {
   color: var(--text-muted);
   font-size: 0.95em;
 }
+
+/* Sidebar indentation (previously inline styles; !important keeps their precedence) */
+.zettelkasten-sidebar .zk-indent-section {
+  margin-inline-start: 0 !important;
+  padding-inline-start: 24px !important;
+}
+
+/* 24px base + 12px indent */
+.zettelkasten-sidebar .zk-indent-item {
+  margin-inline-start: 0 !important;
+  padding-inline-start: 36px !important;
+}
+
+.zettelkasten-sidebar .zk-empty {
+  margin-inline-start: 0 !important;
+  padding-inline-start: 36px !important;
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: 12px;
+}

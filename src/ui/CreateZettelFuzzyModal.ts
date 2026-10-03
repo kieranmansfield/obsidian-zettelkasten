@@ -131,16 +131,13 @@ export class CreateZettelFuzzyModal extends FuzzySuggestModal<ZettelItem> {
   }
 
   onChooseItem(item: ZettelItem): void {
-    console.log('CreateZettelFuzzyModal: onChooseItem called', item)
 
     void (async () => {
       try {
         if (item.type === 'create-new') {
-          console.log('Creating new zettel with title:', item.title)
           await this.onCreate(item.title)
           new Notice(`Created zettel: ${item.title}`)
         } else if (item.file) {
-          console.log('Opening existing file:', item.file.basename)
           const leaf = this.app.workspace.getLeaf(false)
           await leaf.openFile(item.file)
           new Notice(`Opened: ${item.file.basename}`)

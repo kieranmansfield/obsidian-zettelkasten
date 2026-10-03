@@ -73,11 +73,6 @@ export default class CommandRegistry {
       }
     }
 
-    const enabledCount = Array.from(this.registeredCommands.values()).filter(
-      (r) => r.enabled
-    ).length
-
-    console.log(`Registered ${enabledCount}/${this.registeredCommands.size} commands`)
   }
 
   /**
@@ -172,7 +167,6 @@ export default class CommandRegistry {
    * This requires plugin reload in Obsidian
    */
   reloadAll(enabledCommands: Map<string, boolean>): void {
-    console.log('Command reload requested. Plugin reload required.')
     // Store for next load
     // In a real implementation, this would save to plugin settings
   }

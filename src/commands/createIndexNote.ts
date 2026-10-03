@@ -40,7 +40,6 @@ export const createIndexNoteCommand: CommandFactory = (context) => {
           content: templateContent.replace('{{title}}', 'New Index'),
         })
 
-        console.log('Created index note:', result)
 
         await finishNote(
           context.app,

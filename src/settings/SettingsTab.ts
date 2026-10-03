@@ -61,6 +61,12 @@ export default class SettingsTab extends PluginSettingTab {
   // ============================================
   // Commands Section
   // ============================================
+  /** Re-render the tab after a structural change */
+  private rerender(): void {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- getSettingDefinitions needs Obsidian 1.13+, minAppVersion is 1.11
+    this.display()
+  }
+
   private addCommandsSection(containerEl: HTMLElement): void {
     new Setting(containerEl).setName('Commands').setHeading()
 
@@ -98,7 +104,7 @@ export default class SettingsTab extends PluginSettingTab {
         toggle.setValue(boxSettings.enabled).onChange((value) => {
           void (async () => {
             await settings.updateBoxes({ enabled: value })
-            this.display()
+            this.rerender()
           })()
         })
       })
@@ -135,7 +141,7 @@ export default class SettingsTab extends PluginSettingTab {
             .onChange((value) => {
               void (async () => {
                 await settings.updateBoxes({ mode: value as BoxMode })
-                this.display()
+                this.rerender()
               })()
             })
         })
@@ -187,7 +193,7 @@ export default class SettingsTab extends PluginSettingTab {
                 void (async () => {
                   const newBoxes = [...boxSettings.boxes, config]
                   await settings.updateBoxes({ boxes: newBoxes })
-                  this.display()
+                  this.rerender()
                 })()
               })
               modal.open()
@@ -206,7 +212,7 @@ export default class SettingsTab extends PluginSettingTab {
                   const newBoxes = [...boxSettings.boxes]
                   newBoxes[index] = config
                   await settings.updateBoxes({ boxes: newBoxes })
-                  this.display()
+                  this.rerender()
                 })()
               })
               modal.open()
@@ -221,7 +227,7 @@ export default class SettingsTab extends PluginSettingTab {
                   void (async () => {
                     const newBoxes = boxSettings.boxes.filter((_, i) => i !== index)
                     await settings.updateBoxes({ boxes: newBoxes })
-                    this.display()
+                    this.rerender()
                   })()
                 })
             }
@@ -256,7 +262,7 @@ export default class SettingsTab extends PluginSettingTab {
           .onChange((v) => {
             void (async () => {
               await onChange(v as ZettelDetectionMode)
-              this.display()
+              this.rerender()
             })()
           })
       })
@@ -313,7 +319,7 @@ export default class SettingsTab extends PluginSettingTab {
       toggle.setValue(zettelSettings.enabled).onChange((value) => {
         void (async () => {
           await settings.updateZettel({ enabled: value })
-          this.display()
+          this.rerender()
         })()
       })
     })
@@ -359,7 +365,7 @@ export default class SettingsTab extends PluginSettingTab {
           .onChange((value) => {
             void (async () => {
               await settings.updateZettel({ filenameFormat: value as FilenameFormat })
-              this.display()
+              this.rerender()
             })()
           })
       })
@@ -431,7 +437,7 @@ export default class SettingsTab extends PluginSettingTab {
       toggle.setValue(fleetingSettings.enabled).onChange((value) => {
         void (async () => {
           await settings.updateFleeting({ enabled: value })
-          this.display()
+          this.rerender()
         })()
       })
     })
@@ -507,7 +513,7 @@ export default class SettingsTab extends PluginSettingTab {
       toggle.setValue(indexSettings.enabled).onChange((value) => {
         void (async () => {
           await settings.updateIndex({ enabled: value })
-          this.display()
+          this.rerender()
         })()
       })
     })
@@ -583,7 +589,7 @@ export default class SettingsTab extends PluginSettingTab {
       toggle.setValue(literatureSettings.enabled).onChange((value) => {
         void (async () => {
           await settings.updateLiterature({ enabled: value })
-          this.display()
+          this.rerender()
         })()
       })
     })
@@ -659,7 +665,7 @@ export default class SettingsTab extends PluginSettingTab {
       toggle.setValue(projectSettings.enabled).onChange((value) => {
         void (async () => {
           await settings.updateProjects({ enabled: value })
-          this.display()
+          this.rerender()
         })()
       })
     })
@@ -686,7 +692,7 @@ export default class SettingsTab extends PluginSettingTab {
           })
 
           text
-            .setPlaceholder('projects')
+            .setPlaceholder('Projects')
             .setValue(projectSettings.folder)
             .onChange((value) => {
               void settings.updateProjects({ folder: value || 'projects' })
@@ -736,7 +742,7 @@ export default class SettingsTab extends PluginSettingTab {
       toggle.setValue(viewSettings.enabled).onChange((value) => {
         void (async () => {
           await settings.updateZettelkastenSidebar({ enabled: value })
-          this.display()
+          this.rerender()
         })()
       })
     })
@@ -921,7 +927,7 @@ export default class SettingsTab extends PluginSettingTab {
     new Setting(containerEl).setName('Section filters').setHeading()
 
     containerEl.createEl('p', {
-      text: 'Optional tag (project), link ([[Note]]) or property (status: active, or status:) to further filter notes in each section',
+      text: 'Optional tag, link or property filter for each section (for example project, [[note]] or status: active)',
       cls: 'setting-item-description',
     })
 
@@ -1039,7 +1045,7 @@ export default class SettingsTab extends PluginSettingTab {
       toggle.setValue(sequenceSettings.enabled).onChange((value) => {
         void (async () => {
           await settings.updateNoteSequences({ enabled: value })
-          this.display()
+          this.rerender()
         })()
       })
     })
@@ -1094,7 +1100,7 @@ export default class SettingsTab extends PluginSettingTab {
             void (async () => {
               const newFolders = [...generalSettings.ignoredFolders, '']
               await settings.updateGeneral({ ignoredFolders: newFolders })
-              this.display()
+              this.rerender()
             })()
           })
       })
@@ -1125,7 +1131,7 @@ export default class SettingsTab extends PluginSettingTab {
               void (async () => {
                 const newFolders = generalSettings.ignoredFolders.filter((_, i) => i !== index)
                 await settings.updateGeneral({ ignoredFolders: newFolders })
-                this.display()
+                this.rerender()
               })()
             })
         })
@@ -1149,7 +1155,7 @@ export default class SettingsTab extends PluginSettingTab {
           .setCta()
           .onClick(() => {
             const modal = new ImportExportModal(this.app, settings, () => {
-              this.display()
+              this.rerender()
             })
             modal.open()
           })
@@ -1161,12 +1167,13 @@ export default class SettingsTab extends PluginSettingTab {
       .addButton((button) => {
         button
           .setButtonText('Reset')
+          // eslint-disable-next-line @typescript-eslint/no-deprecated -- setDestructive needs Obsidian 1.13+, minAppVersion is 1.11
           .setWarning()
           .onClick(() => {
             void (async () => {
               await settings.resetToDefaults()
               new Notice('Settings reset to defaults')
-              this.display()
+              this.rerender()
             })()
           })
       })

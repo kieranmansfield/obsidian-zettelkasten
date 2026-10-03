@@ -79,6 +79,7 @@ export class ImportExportModal extends Modal {
     new Setting(contentEl).addButton((button) => {
       button
         .setButtonText('Import')
+        // eslint-disable-next-line @typescript-eslint/no-deprecated -- setDestructive needs Obsidian 1.13+, minAppVersion is 1.11
         .setWarning()
         .onClick(async () => {
           if (!this.importJson.trim()) {

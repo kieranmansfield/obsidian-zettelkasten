@@ -35,7 +35,7 @@ interface MenuItem {
 export class ZettelkastenSidebar extends ItemView {
   private plugin: ZettelkastenPlugin
   private collapsedSections: Set<string> = new Set()
-  private refreshTimeout: NodeJS.Timeout | null = null
+  private refreshTimeout: number | null = null
 
   constructor(leaf: WorkspaceLeaf, plugin: ZettelkastenPlugin) {
     super(leaf)
@@ -95,9 +95,9 @@ export class ZettelkastenSidebar extends ItemView {
   private scheduleRefresh(): void {
     // Debounce refreshes to avoid excessive updates
     if (this.refreshTimeout) {
-      clearTimeout(this.refreshTimeout)
+      activeWindow.clearTimeout(this.refreshTimeout)
     }
-    this.refreshTimeout = setTimeout(() => {
+    this.refreshTimeout = activeWindow.setTimeout(() => {
       this.refresh()
       this.refreshTimeout = null
     }, 150)
@@ -109,7 +109,7 @@ export class ZettelkastenSidebar extends ItemView {
    */
   public refreshImmediate(): void {
     if (this.refreshTimeout) {
-      clearTimeout(this.refreshTimeout)
+      activeWindow.clearTimeout(this.refreshTimeout)
       this.refreshTimeout = null
     }
     this.refresh()
@@ -136,7 +136,7 @@ export class ZettelkastenSidebar extends ItemView {
     return 'square-library'
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+   
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()
@@ -222,11 +222,13 @@ export class ZettelkastenSidebar extends ItemView {
 
     // Literature Notes
     // Support both old 'showReferences' and new 'showLiterature' for backward compatibility
+    /* eslint-disable @typescript-eslint/no-deprecated -- reading legacy settings on purpose */
     const showLiterature = viewSettings.showLiterature ?? viewSettings.showReferences ?? true
     const showLiteratureFiles =
       viewSettings.showLiteratureFiles ?? viewSettings.showReferenceFiles ?? true
     const literatureFilterTag =
       viewSettings.literatureFilterTag || viewSettings.referencesFilterTag || ''
+    /* eslint-enable @typescript-eslint/no-deprecated */
 
     if (showLiterature && literatureSettings.enabled) {
       const useTagDetection = literatureSettings.detectionMode !== ZettelDetectionMode.FOLDER
@@ -365,8 +367,7 @@ export class ZettelkastenSidebar extends ItemView {
     headerEl.setAttribute('data-path', item.folder)
 
     // Apply native inline styles for padding
-    headerEl.style.marginInlineStart = '0px'
-    headerEl.style.paddingInlineStart = '24px'
+    headerEl.addClass('zk-indent-section')
 
     if (isDashboardActive) {
       headerEl.addClass('is-active')
@@ -430,7 +431,7 @@ export class ZettelkastenSidebar extends ItemView {
     // Content area for files (children)
     const contentEl = itemEl.createDiv({ cls: 'tree-item-children nav-folder-children' })
     if (isCollapsed) {
-      contentEl.style.display = 'none'
+      contentEl.setCssProps({ display: 'none' })
     }
 
     // Toggle collapse function
@@ -444,12 +445,12 @@ export class ZettelkastenSidebar extends ItemView {
         this.collapsedSections.delete(item.name)
         itemEl.removeClass('is-collapsed')
         collapseIconEl.removeClass('is-collapsed')
-        contentEl.style.display = ''
+        contentEl.setCssProps({ display: '' })
       } else {
         this.collapsedSections.add(item.name)
         itemEl.addClass('is-collapsed')
         collapseIconEl.addClass('is-collapsed')
-        contentEl.style.display = 'none'
+        contentEl.setCssProps({ display: 'none' })
       }
       this.saveCollapsedSections()
     }
@@ -549,8 +550,7 @@ export class ZettelkastenSidebar extends ItemView {
       const fileItemSelf = fileEl.createDiv({ cls: 'tree-item-self is-clickable nav-file-title' })
 
       // Apply native inline styles for padding (nested one level)
-      fileItemSelf.style.marginInlineStart = '0px'
-      fileItemSelf.style.paddingInlineStart = '36px' // 24px base + 12px indent
+      fileItemSelf.addClass('zk-indent-item')
 
       // Set the data attributes that Obsidian's file explorer uses
       fileItemSelf.setAttribute('data-path', file.path)
@@ -662,8 +662,7 @@ export class ZettelkastenSidebar extends ItemView {
     headerEl.setAttribute('draggable', 'true')
 
     // Apply native inline styles for padding
-    headerEl.style.marginInlineStart = '0px'
-    headerEl.style.paddingInlineStart = '24px'
+    headerEl.addClass('zk-indent-section')
 
     // Get bookmarks to check if there are any
     const bookmarks = viewSettings.bookmarks
@@ -725,7 +724,7 @@ export class ZettelkastenSidebar extends ItemView {
     // Content area for bookmarks (children)
     const contentEl = itemEl.createDiv({ cls: 'tree-item-children nav-folder-children' })
     if (isCollapsed) {
-      contentEl.style.display = 'none'
+      contentEl.setCssProps({ display: 'none' })
     }
 
     // Toggle collapse function
@@ -739,12 +738,12 @@ export class ZettelkastenSidebar extends ItemView {
         this.collapsedSections.delete(bookmarksName)
         itemEl.removeClass('is-collapsed')
         collapseIconEl.removeClass('is-collapsed')
-        contentEl.style.display = ''
+        contentEl.setCssProps({ display: '' })
       } else {
         this.collapsedSections.add(bookmarksName)
         itemEl.addClass('is-collapsed')
         collapseIconEl.addClass('is-collapsed')
-        contentEl.style.display = 'none'
+        contentEl.setCssProps({ display: 'none' })
       }
       this.saveCollapsedSections()
     }
@@ -774,11 +773,7 @@ export class ZettelkastenSidebar extends ItemView {
         cls: 'tree-item-self',
         text: 'No bookmarks yet',
       })
-      emptyEl.style.marginInlineStart = '0px'
-      emptyEl.style.paddingInlineStart = '36px'
-      emptyEl.style.color = 'var(--text-faint)'
-      emptyEl.style.fontStyle = 'italic'
-      emptyEl.style.fontSize = '12px'
+      emptyEl.addClass('zk-empty')
       return
     }
 
@@ -789,8 +784,7 @@ export class ZettelkastenSidebar extends ItemView {
       })
 
       // Apply native inline styles for padding (nested one level)
-      bookmarkItemSelf.style.marginInlineStart = '0px'
-      bookmarkItemSelf.style.paddingInlineStart = '36px' // 24px base + 12px indent
+      bookmarkItemSelf.addClass('zk-indent-item')
 
       // Icon based on type
       let iconName = 'file'
@@ -891,8 +885,7 @@ export class ZettelkastenSidebar extends ItemView {
     headerEl.setAttribute('draggable', 'true')
 
     // Apply native inline styles for padding
-    headerEl.style.marginInlineStart = '0px'
-    headerEl.style.paddingInlineStart = '24px'
+    headerEl.addClass('zk-indent-section')
 
     // Create elements in different order for mobile vs desktop
     if (Platform.isMobile) {
@@ -937,11 +930,11 @@ export class ZettelkastenSidebar extends ItemView {
     })
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+   
   async onClose(): Promise<void> {
     // Clear any pending refresh timeout
     if (this.refreshTimeout) {
-      clearTimeout(this.refreshTimeout)
+      activeWindow.clearTimeout(this.refreshTimeout)
       this.refreshTimeout = null
     }
   }

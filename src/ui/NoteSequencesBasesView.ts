@@ -12,7 +12,7 @@ export const VIEW_TYPE_NOTE_SEQUENCES_BASES = 'note-sequences-bases-view'
  */
 export class NoteSequencesBasesView extends ItemView {
   private sequenceService: NoteSequenceService
-  private refreshTimeout: NodeJS.Timeout | null = null
+  private refreshTimeout: number | null = null
   private rootFolder: string
 
   constructor(leaf: WorkspaceLeaf, sequenceService: NoteSequenceService, rootFolder: string) {
@@ -32,9 +32,9 @@ export class NoteSequencesBasesView extends ItemView {
   private scheduleRefresh(): void {
     // Debounce refreshes to avoid excessive updates
     if (this.refreshTimeout) {
-      clearTimeout(this.refreshTimeout)
+      activeWindow.clearTimeout(this.refreshTimeout)
     }
-    this.refreshTimeout = setTimeout(() => {
+    this.refreshTimeout = activeWindow.setTimeout(() => {
       this.refresh()
       this.refreshTimeout = null
     }, 300)
@@ -59,7 +59,7 @@ export class NoteSequencesBasesView extends ItemView {
     return 'network'
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+   
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()
@@ -74,11 +74,8 @@ export class NoteSequencesBasesView extends ItemView {
       ? this.app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(this.rootFolder))
       : this.app.vault.getMarkdownFiles()
 
-    console.log('Bases View - Total files:', allFiles.length)
-    console.log('Bases View - Root folder:', this.rootFolder)
 
     const rootZettels = core.findAllRoots(allFiles)
-    console.log('Bases (root zettels) found:', rootZettels.length)
 
     if (rootZettels.length === 0) {
       const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
@@ -221,11 +218,11 @@ export class NoteSequencesBasesView extends ItemView {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+   
   async onClose(): Promise<void> {
     // Clear any pending refresh timeout
     if (this.refreshTimeout) {
-      clearTimeout(this.refreshTimeout)
+      activeWindow.clearTimeout(this.refreshTimeout)
       this.refreshTimeout = null
     }
   }

@@ -79,7 +79,7 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
 
     // Remove initial selection
     void Promise.resolve().then(() => {
-      setTimeout(() => {
+      activeWindow.setTimeout(() => {
         const selectedEl = this.modalEl.querySelector('.suggestion-item.is-selected')
         if (selectedEl && !this.hasInteracted) {
           selectedEl.removeClass('is-selected')
@@ -128,7 +128,7 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
       if (text) {
         range.setStart(text, start)
         range.setEnd(text, end)
-        range.surroundContents(document.createElement('b'))
+        range.surroundContents(activeDocument.createEl('b'))
       }
     }
   }

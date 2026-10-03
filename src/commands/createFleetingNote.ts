@@ -40,7 +40,6 @@ export const createFleetingNoteCommand: CommandFactory = (context) => {
           content: templateContent.replace('{{title}}', 'Quick Note'),
         })
 
-        console.log('Created fleeting note:', result)
 
         await finishNote(
           context.app,

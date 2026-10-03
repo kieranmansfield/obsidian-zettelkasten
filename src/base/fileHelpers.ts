@@ -52,6 +52,11 @@ function toArray(v: unknown): string[] {
   return []
 }
 
+const lower = (x: unknown): string =>
+  typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean'
+    ? String(x).toLowerCase()
+    : ''
+
 function frontmatterValue(app: App, file: TFile, key: string): unknown {
   return app.metadataCache.getFileCache(file)?.frontmatter?.[key]
 }
@@ -65,7 +70,7 @@ function fileHasProperty(app: App, file: TFile, spec: string): boolean {
   if (!p) return false
   const v = frontmatterValue(app, file, p.key)
   if (v == null) return false
-  return !p.value || [v].flat().some((x) => String(x).toLowerCase() === p.value.toLowerCase())
+  return !p.value || [v].flat().some((x) => lower(x) === p.value.toLowerCase())
 }
 
 function fileHasTag(app: App, file: TFile, tag: string): boolean {
