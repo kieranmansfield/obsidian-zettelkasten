@@ -66,7 +66,6 @@ export const nextSiblingCommand: CommandFactory = (context) => {
         .navigateToChildren(parentResult.node.file)
         .filter((r) => r.success && r.node)
         .map((r) => r.node!.file)
-        .sort((a, b) => a.basename.localeCompare(b.basename))
 
       const currentIndex = siblings.findIndex((f) => f.path === activeFile.path)
 

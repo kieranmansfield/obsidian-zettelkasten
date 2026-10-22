@@ -106,12 +106,6 @@ export interface SequenceBuildOptions {
   maxDepth?: number
 
   /**
-   * Whether to sort children by zettel ID
-   * @default true
-   */
-  sortChildren?: boolean
-
-  /**
    * Filter function for nodes
    */
   filter?: (node: SequenceNode) => boolean

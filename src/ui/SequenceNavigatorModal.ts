@@ -70,7 +70,6 @@ export class SequenceNavigatorModal extends Modal {
         .navigateToChildren(parentResult.node.file)
         .filter((r) => r.success && r.node)
         .map((r) => r.node!.file)
-        .sort((a, b) => a.basename.localeCompare(b.basename))
 
       const currentIndex = siblings.findIndex((f) => f.path === this.currentFile.path)
       if (currentIndex > 0) {

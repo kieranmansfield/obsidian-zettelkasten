@@ -1,5 +1,6 @@
 // import type { Segment } from '../base/zettelId'
 import { Segment, deepSplitSegment, buildZettelId, generateTimeStampId } from '../base/zettelId'
+import { compareZettelIds } from '../base/zettelIdOrder'
 
 export default class ZettelId {
   timestamp: string
@@ -40,13 +41,7 @@ export default class ZettelId {
   }
 
   compare(other: ZettelId): number {
-    if (this.timestamp !== other.timestamp) {
-      return this.timestamp < other.timestamp ? -1 : 1
-    }
-    const a = this.segments.join('')
-    const b = other.segments.join('')
-    if (a === b) return 0
-    return a < b ? -1 : 1
+    return compareZettelIds(this.toString(), other.toString())
   }
 
   addSegment(segment: string): ZettelId {
@@ -66,11 +61,6 @@ export default class ZettelId {
     newSegments[newSegments.length - 1] = this.incrementSegment(newSegments[newSegments.length - 1])
 
     return new ZettelId(this.timestamp, newSegments)
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static isZettelIdString(value: any): value is string {
-    return typeof value === 'string' && value.length >= 17
   }
 
   nextSegmentforDepth(depth: number): string {

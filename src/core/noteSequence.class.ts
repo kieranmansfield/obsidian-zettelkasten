@@ -5,6 +5,13 @@ import type {
   SequenceMetadata,
   SequenceBuildOptions,
 } from '../base/noteSequence'
+import {
+  compareZettelFiles,
+  isChildOf,
+  isDescendantOf,
+  parentZettelId,
+  parseZettelId,
+} from '../base/zettelIdOrder'
 
 /**
  * NoteSequence
@@ -24,13 +31,7 @@ export default class NoteSequenceCore {
    * Supports both with and without prefix
    */
   extractZettelId(filename: string): string | null {
-    // Match timestamp pattern with optional prefix (17+ digits followed by optional segments)
-    const withPrefixMatch = filename.match(/^([a-z]+)?(\d{17,}(?:[a-z]+|\d+)*)/)
-    if (withPrefixMatch) {
-      return withPrefixMatch[2] // Return without prefix
-    }
-
-    return null
+    return parseZettelId(filename)?.id ?? null
   }
 
   /**
@@ -44,8 +45,7 @@ export default class NoteSequenceCore {
    * Check if a zettel ID is a root (no hierarchy segments)
    */
   isRootZettel(zettelId: string): boolean {
-    // Root IDs are just the timestamp (17 digits, no letters/numbers after)
-    return /^\d{17}$/.test(zettelId)
+    return parseZettelId(zettelId)?.segments.length === 0
   }
 
   /**
@@ -62,17 +62,7 @@ export default class NoteSequenceCore {
    * Returns null if this is already a root
    */
   getParentId(zettelId: string): string | null {
-    if (this.isRootZettel(zettelId)) {
-      return null
-    }
-
-    // Remove the last segment
-    const match = zettelId.match(/^(.+?)([a-z]+|\d+)$/)
-    if (match) {
-      return match[1]
-    }
-
-    return null
+    return parentZettelId(zettelId)
   }
 
   /**
@@ -80,27 +70,7 @@ export default class NoteSequenceCore {
    * Root = 0, direct children = 1, grandchildren = 2, etc.
    */
   calculateLevel(zettelId: string): number {
-    const rootId = this.getRootId(zettelId)
-    if (zettelId === rootId) {
-      return 0
-    }
-
-    const suffix = zettelId.substring(rootId.length)
-    if (!suffix) return 0
-
-    // Count transitions between letters and numbers
-    let level = 1
-    let lastWasLetter = /[a-z]/.test(suffix[0])
-
-    for (let i = 1; i < suffix.length; i++) {
-      const isLetter = /[a-z]/.test(suffix[i])
-      if (isLetter !== lastWasLetter) {
-        level++
-        lastWasLetter = isLetter
-      }
-    }
-
-    return level
+    return parseZettelId(zettelId)?.segments.length ?? 0
   }
 
   /**
@@ -108,21 +78,7 @@ export default class NoteSequenceCore {
    * Direct children have no intermediate levels
    */
   isDirectChild(parentId: string, childId: string): boolean {
-    // Child must start with parent ID
-    if (!childId.startsWith(parentId)) {
-      return false
-    }
-
-    // Extract the suffix after parent ID
-    const suffix = childId.substring(parentId.length)
-    if (!suffix) return false
-
-    // Direct child has only ONE segment type (all letters OR all numbers)
-    const hasLetters = /[a-z]/.test(suffix)
-    const hasNumbers = /\d/.test(suffix)
-
-    // If it has both, it's a grandchild or further
-    return !(hasLetters && hasNumbers)
+    return isChildOf(childId, parentId)
   }
 
   /**
@@ -156,35 +112,13 @@ export default class NoteSequenceCore {
   findChildren(parentFile: TFile, allFiles: TFile[], directOnly = true): TFile[] {
     const parentId = this.extractZettelId(parentFile.basename)
     if (!parentId) return []
-
-    const children: TFile[] = []
-
-    for (const file of allFiles) {
-      const childId = this.extractZettelId(file.basename)
-      if (!childId || childId === parentId) continue
-
-      // Check if this is a child
-      if (childId.startsWith(parentId)) {
-        if (directOnly) {
-          // Only include direct children
-          if (this.isDirectChild(parentId, childId)) {
-            children.push(file)
-          }
-        } else {
-          // Include all descendants
-          children.push(file)
-        }
-      }
-    }
-
-    // Sort by zettel ID
-    children.sort((a, b) => {
-      const aId = this.extractZettelId(a.basename) || ''
-      const bId = this.extractZettelId(b.basename) || ''
-      return aId.localeCompare(bId)
-    })
-
-    return children
+    const under = directOnly ? isChildOf : isDescendantOf
+    return allFiles
+      .filter((file) => {
+        const id = this.extractZettelId(file.basename)
+        return !!id && under(id, parentId)
+      })
+      .sort(compareZettelFiles)
   }
 
   /**
@@ -194,7 +128,6 @@ export default class NoteSequenceCore {
     const opts: SequenceBuildOptions = {
       includeRoot: true,
       maxDepth: -1,
-      sortChildren: true,
       ...options,
     }
 
@@ -213,7 +146,7 @@ export default class NoteSequenceCore {
     }
 
     // Recursively build children
-    this.buildNodeChildren(root, allFiles, opts)
+    this.buildNodeChildren(root, this.indexByParent(allFiles), opts)
 
     // Collect all nodes
     const allNodes: SequenceNode[] = []
@@ -237,7 +170,7 @@ export default class NoteSequenceCore {
    */
   private buildNodeChildren(
     node: SequenceNode,
-    allFiles: TFile[],
+    byParent: Map<string, TFile[]>,
     options: SequenceBuildOptions
   ): void {
     // Check max depth
@@ -245,12 +178,9 @@ export default class NoteSequenceCore {
       return
     }
 
-    const directChildren = this.findChildren(node.file, allFiles, true)
-
-    for (const childFile of directChildren) {
-      const childId = this.extractZettelId(childFile.basename)
-      if (!childId) continue
-
+    // indexByParent lists are already in ID order, so children need no sort
+    for (const childFile of byParent.get(node.zettelId) ?? []) {
+      const childId = this.extractZettelId(childFile.basename)!
       const childNode: SequenceNode = {
         file: childFile,
         zettelId: childId,
@@ -266,14 +196,9 @@ export default class NoteSequenceCore {
       }
 
       // Recursively build children
-      this.buildNodeChildren(childNode, allFiles, options)
+      this.buildNodeChildren(childNode, byParent, options)
 
       node.children.push(childNode)
-    }
-
-    // Sort children if requested
-    if (options.sortChildren) {
-      node.children.sort((a, b) => a.zettelId.localeCompare(b.zettelId))
     }
   }
 
@@ -312,7 +237,8 @@ export default class NoteSequenceCore {
     }
 
     return {
-      totalNotes: allNodes.length + 1, // +1 for root
+      // Root plus descendants, whether or not allNodes includes the root
+      totalNotes: 1 + allNodes.filter((n) => n !== root).length,
       maxDepth,
       created,
       modified,
@@ -335,6 +261,21 @@ export default class NoteSequenceCore {
     return new Date(year, month, day, hour, minute, second, millisecond)
   }
 
+  /** Direct children per parent ID, each list in ID order; parses every file once */
+  private indexByParent(files: TFile[]): Map<string, TFile[]> {
+    const byParent = new Map<string, TFile[]>()
+    for (const file of files) {
+      const id = this.extractZettelId(file.basename)
+      const parentId = id && parentZettelId(id)
+      if (!parentId) continue
+      const siblings = byParent.get(parentId)
+      if (siblings) siblings.push(file)
+      else byParent.set(parentId, [file])
+    }
+    for (const siblings of byParent.values()) siblings.sort(compareZettelFiles)
+    return byParent
+  }
+
   /**
    * Find all root zettels in a set of files
    */
@@ -348,12 +289,8 @@ export default class NoteSequenceCore {
       }
     }
 
-    // Sort by ID (most recent first)
-    roots.sort((a, b) => {
-      const aId = this.extractZettelId(a.basename) || ''
-      const bId = this.extractZettelId(b.basename) || ''
-      return bId.localeCompare(aId)
-    })
+    // Most recent first
+    roots.sort((a, b) => compareZettelFiles(b, a))
 
     return roots
   }
@@ -363,12 +300,12 @@ export default class NoteSequenceCore {
    */
   findAllSequences(files: TFile[], options?: SequenceBuildOptions): NoteSequence[] {
     const roots = this.findAllRoots(files)
+    const byParent = this.indexByParent(files)
     const sequences: NoteSequence[] = []
 
     for (const root of roots) {
-      const children = this.findChildren(root, files, false)
       // Only include if it has children
-      if (children.length > 0) {
+      if (byParent.has(this.extractZettelId(root.basename) ?? '')) {
         const sequence = this.buildSequence(root, files, options)
         sequences.push(sequence)
       }

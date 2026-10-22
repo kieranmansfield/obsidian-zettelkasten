@@ -2,6 +2,7 @@ import type { CommandFactory } from '../base/command'
 import { CreateNoteWithSuggestModal } from '../ui/CreateNoteWithSuggestModal'
 import { Notice, TFile, App } from 'obsidian'
 import { finishNote, zettelContent } from '../base/fileHelpers'
+import { parseZettelId } from '../base/zettelIdOrder'
 
 /**
  * Command: Create Zettel
@@ -73,18 +74,5 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
  * Adapted from master's getNoteTitlesByTag to work with folder-based detection
  */
 function getZettelFiles(app: App): TFile[] {
-  const files = app.vault.getMarkdownFiles()
-  const zettels: TFile[] = []
-
-  for (const file of files) {
-    // Check if file has a zettel ID (17 digits at start of filename)
-    const zettelIdPattern = /^\d{17}/
-    if (!zettelIdPattern.test(file.basename)) {
-      continue
-    }
-
-    zettels.push(file)
-  }
-
-  return zettels
+  return app.vault.getMarkdownFiles().filter((file) => parseZettelId(file.basename))
 }

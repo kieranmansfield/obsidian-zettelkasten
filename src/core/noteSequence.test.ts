@@ -37,3 +37,24 @@ describe('NoteSequenceCore', () => {
     expect(core.findRootFile(files[5], files)?.basename).toBe(T)
   })
 })
+
+describe('NoteSequenceCore natural order', () => {
+  const a1to10 = Array.from({ length: 10 }, (_, i) => `${T}a${i + 1}`)
+  const files = [T, `${T}a`, `${T}b`, ...a1to10].map(f)
+  const names = (fs: TFile[]) => fs.map((x) => x.basename.slice(17))
+
+  it('lists children by segment, not string', () => {
+    expect(names(core.findChildren(files[1], files))).toEqual(a1to10.map((id) => id.slice(17)))
+    expect(core.findChildren(f(`${T}a1`), files)).toEqual([])
+    expect(core.isDirectChild(T, `${T}aa`)).toBe(true)
+  })
+
+  it('counts every note once', () => {
+    const seq = core.buildSequence(files[0], files)
+    expect(seq.metadata.totalNotes).toBe(13)
+    expect(names(seq.root.children[0].children.map((n) => n.file))).toEqual(
+      a1to10.map((id) => id.slice(17))
+    )
+    expect(core.buildSequence(files[0], files, { includeRoot: false }).metadata.totalNotes).toBe(13)
+  })
+})
