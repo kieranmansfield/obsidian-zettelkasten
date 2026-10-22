@@ -47,32 +47,23 @@ export class ZettelkastenSidebar extends ItemView {
 
   private collapsedStorageKey: string = 'obsidian-zettelkasten.collapsedSections'
 
+  /** Per-vault state; falls back once to the old key that every vault shared */
   private loadCollapsedSections(): void {
     try {
-      const raw = window.localStorage.getItem(this.collapsedStorageKey)
-      if (!raw) return
-      const arr: unknown = JSON.parse(raw)
-      if (Array.isArray(arr)) {
-        arr.forEach((s: unknown) => {
-          if (typeof s === 'string') {
-            this.collapsedSections.add(s)
-          }
-        })
-      }
+      const stored: unknown =
+        this.app.loadLocalStorage(this.collapsedStorageKey) ??
+        JSON.parse(window.localStorage.getItem(this.collapsedStorageKey) ?? 'null')
+      if (!Array.isArray(stored)) return
+      stored.forEach((s: unknown) => {
+        if (typeof s === 'string') this.collapsedSections.add(s)
+      })
     } catch (e) {
       console.error('Failed to load collapsed sections', e)
     }
   }
 
   private saveCollapsedSections(): void {
-    try {
-      window.localStorage.setItem(
-        this.collapsedStorageKey,
-        JSON.stringify(Array.from(this.collapsedSections))
-      )
-    } catch (e) {
-      console.error('Failed to save collapsed sections', e)
-    }
+    this.app.saveLocalStorage(this.collapsedStorageKey, Array.from(this.collapsedSections))
   }
 
   private registerEvents(): void {
