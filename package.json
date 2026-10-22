@@ -9,7 +9,9 @@
     "url": "https://github.com/kieranmansfield/obsidian-zettelkasten.git"
   },
   "scripts": {
+    "predev": "pnpm types",
     "dev": "node esbuild.config.mjs",
+    "prebuild": "pnpm types",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json",
     "update": "ncu -i",
@@ -17,7 +19,9 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --config prettier.config.cjs --ignore-path .prettierignore --write .",
     "format:check": "prettier --config prettier.config.cjs --ignore-path .prettierignore --check .",
-    "test": "vitest run"
+    "pretest": "pnpm types",
+    "test": "vitest run",
+    "types": "pnpm update obsidian || echo \"obsidian types not updated (offline?)\""
   },
   "keywords": [],
   "author": "",

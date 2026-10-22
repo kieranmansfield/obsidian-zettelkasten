@@ -24,6 +24,7 @@ src/new/
 - All classes, services, and utilities are fully typed.
 - This ensures type safety, predictable behavior, and minimizes runtime errors.
 - Interfaces and types are used extensively for Notes, ZettelIds and Files.
+- The `obsidian` type definitions track `latest`: `pnpm dev`, `pnpm build` and `pnpm test` run `pnpm types` (`pnpm update obsidian`) first. Check new APIs against `minAppVersion` in `manifest.json`.
 
 ---
 
