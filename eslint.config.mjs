@@ -57,4 +57,9 @@ export default [
       ],
     },
   },
+  {
+    // Tests build fake TFiles; there is no real vault to narrow with instanceof
+    files: ['**/*.test.ts'],
+    rules: { 'obsidianmd/no-tfile-tfolder-cast': 'off' },
+  },
 ]

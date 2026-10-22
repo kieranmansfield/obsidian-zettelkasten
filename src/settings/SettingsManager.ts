@@ -1,6 +1,6 @@
 import type { Plugin } from 'obsidian'
 import { DEFAULT_SETTINGS } from './DefaultSettings'
-import { getIn, setIn } from 'src/base/objectPath'
+import { getIn, setIn } from '../base/objectPath'
 import type {
   PluginSettings,
   GeneralSettings,
