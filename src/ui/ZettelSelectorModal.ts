@@ -1,5 +1,6 @@
 import { App, FuzzySuggestModal, Notice, type TFile } from 'obsidian'
 import type NoteSequenceCore from '../core/noteSequence.class'
+import { getFileTitle } from '../base/fileHelpers'
 
 /**
  * Fuzzy modal for picking a zettel, e.g. a parent or child
@@ -25,9 +26,7 @@ class ZettelSelectorModal extends FuzzySuggestModal<TFile> {
   }
 
   getItemText(file: TFile): string {
-    const title: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.title
-    // Only use title if it's actually a string
-    return typeof title === 'string' && title.length > 0 ? title : file.basename
+    return getFileTitle(this.app, file)
   }
 
   renderSuggestion(value: { item: TFile }, el: HTMLElement): void {

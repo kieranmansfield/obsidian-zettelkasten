@@ -23,7 +23,7 @@ export function zettelRename(
   id: string,
   settings: Pick<ZettelSettings, 'filenameFormat' | 'separator'>
 ): string {
-  const title = app.metadataCache.getFileCache(file)?.frontmatter?.title as string | undefined
+  const title = frontmatterTitle(app.metadataCache.getFileCache(file))
   return `${zettelFilename(id, title ?? zettelTitle(file.basename), settings)}.md`
 }
 
@@ -50,15 +50,20 @@ export function zettelContent(
  * Prefers frontmatter title over filename
  */
 export function getFileTitle(app: App, file: TFile): string {
-  const cache = app.metadataCache.getFileCache(file)
-  return (cache?.frontmatter?.title as string | undefined) ?? file.basename
+  return getFileTitleFromCache(file, app.metadataCache.getFileCache(file))
 }
 
 /**
  * Get the display title for a file (alternative without app)
  */
 export function getFileTitleFromCache(file: TFile, cache: CachedMetadata | null): string {
-  return (cache?.frontmatter?.title as string | undefined) ?? file.basename
+  return frontmatterTitle(cache) ?? file.basename
+}
+
+/** The frontmatter title, if it is a non-empty string (an unfilled `title: {{title}}` parses as an object) */
+export function frontmatterTitle(cache: CachedMetadata | null): string | undefined {
+  const title: unknown = cache?.frontmatter?.title
+  return typeof title === 'string' && title ? title : undefined
 }
 
 function resolveTarget(app: App, target: string): TFile | null {

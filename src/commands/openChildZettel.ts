@@ -1,6 +1,7 @@
 import type { CommandFactory } from '../base/command'
 import { Notice, FuzzySuggestModal, App } from 'obsidian'
 import type { TFile } from 'obsidian'
+import { frontmatterTitle } from '../base/fileHelpers'
 
 /**
  * Modal for selecting from multiple children
@@ -22,7 +23,7 @@ class ChildSelectorModal extends FuzzySuggestModal<TFile> {
 
   getItemText(file: TFile): string {
     const cache = this.app.metadataCache.getFileCache(file)
-    return (cache?.frontmatter?.title as string | undefined) ?? file.basename
+    return frontmatterTitle(cache) ?? file.basename
   }
 
   onChooseItem(file: TFile): void {

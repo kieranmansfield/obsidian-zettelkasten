@@ -1,5 +1,6 @@
 import { App, FuzzySuggestModal, TFile } from 'obsidian'
 import type SettingsManager from '../settings/SettingsManager'
+import { frontmatterTitle } from '../base/fileHelpers'
 
 /**
  * OpenZettelModal
@@ -68,13 +69,13 @@ export class OpenZettelModal extends FuzzySuggestModal<TFile> {
   getItemText(file: TFile): string {
     // Get the title from frontmatter if available, otherwise use basename
     const cache = this.app.metadataCache.getFileCache(file)
-    return (cache?.frontmatter?.title as string | undefined) || file.basename
+    return frontmatterTitle(cache) || file.basename
   }
 
   renderSuggestion(match: { item: TFile }, el: HTMLElement): void {
     const file = match.item
     const cache = this.app.metadataCache.getFileCache(file)
-    const title = (cache?.frontmatter?.title as string | undefined) || file.basename
+    const title = frontmatterTitle(cache) || file.basename
 
     el.createDiv({ cls: 'suggestion-title', text: title })
     el.createDiv({ cls: 'suggestion-note', text: file.path })

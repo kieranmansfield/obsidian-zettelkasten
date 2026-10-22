@@ -1,4 +1,5 @@
 import { App, FuzzySuggestModal, FuzzyMatch, TFile } from 'obsidian'
+import { frontmatterTitle } from '../base/fileHelpers'
 
 interface ZettelItem {
   file: TFile | null
@@ -33,7 +34,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<ZettelItem> {
     // Build items list with title, filename, and aliases
     files.forEach((file) => {
       const cache = this.app.metadataCache.getFileCache(file)
-      const title = (cache?.frontmatter?.title as string | undefined) ?? undefined
+      const title = frontmatterTitle(cache)
 
       // Add main entry (using title if available, otherwise filename)
       this.items.push({
@@ -121,7 +122,7 @@ export class CreateNoteWithSuggestModal extends FuzzySuggestModal<ZettelItem> {
         if (fileToOpen) {
           // Open existing file
           const cache = this.app.metadataCache.getFileCache(fileToOpen)
-          const title = (cache?.frontmatter?.title as string | undefined) ?? fileToOpen.basename
+          const title = frontmatterTitle(cache) ?? fileToOpen.basename
           this.onSubmit(title, fileToOpen)
         } else if (inputValue) {
           // Create new zettel
