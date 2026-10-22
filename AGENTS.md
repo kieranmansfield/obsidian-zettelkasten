@@ -31,8 +31,10 @@ src/new/
 
 At the heart of the plugin is the **ZettelId system**, which generates unique identifiers for zettels based on a timestamp combined with alternating letter and number segments. This scheme provides both chronological ordering and human-readable uniqueness.
 
-- **Format:** The ZettelId consists of a timestamp portion (e.g., `20240612T1530`) followed by segments alternating between letters (`a-z`) and numbers (`0-9`), for example:  
-  `20240612T1530a1b2`
+- **Format:** a 17-digit timestamp `YYYYMMDDHHmmssSSS` followed by segments alternating between letters (`a-z`) and numbers (`0-9`), starting with letters, for example:  
+  `20240612153000123a1b2`
+- **Hierarchy:** the parent has the same timestamp and one segment fewer (`…123a1` → `…123a`); a child has exactly one more segment.
+- **Vault config for the zettelkasten skill:** `"id_regex": "\\d{17}(?:[a-z]+|\\d+)*"`, `"sequence": "folgezettel"`.
 
 - **Purpose:**
   - Ensures unique and sortable IDs for each zettel.

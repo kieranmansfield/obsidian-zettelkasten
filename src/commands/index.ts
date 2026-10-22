@@ -37,7 +37,7 @@ export { addBookmarkCommand, removeBookmarkCommand } from './manageBookmarks'
 // Add more command exports here as you create them
 
 /*
-TODO UPDATE Create Zettel Function with a Fuzzy Search Model (like quick switcher) that allows users to find notes already in boxes.
+TODO UPDATE Create Zettel Function with a Fuzzy Search Model (like quick switcher) that allows users to find notes already in the slip-box.
 
 
 

@@ -12,7 +12,7 @@ Inspired by [luhman-obsidian-plugin](https://github.com/Dyldog/luhman-obsidian-p
 
 ### 🏷️ Zettelkasten ID System
 
-- **Automatic ID Generation**: Create notes with Luhmann-style alternating letter/number IDs (e.g., `20231127123456a1b2`)
+- **Automatic ID Generation**: Create notes with Luhmann-style alternating letter/number IDs on a 17-digit timestamp `YYYYMMDDHHmmssSSS` (e.g., `20231127123456789a1b2`)
 - **Hierarchical Structure**: Build parent-child-grandchild relationships using ID patterns
 - **Flexible Prefixes**: Optional custom prefixes for different note types
 - **Multiple Formats**: Support for strict, separator, and fuzzy ID matching modes
@@ -55,6 +55,7 @@ projects/    one folder per writing project
 
 - The slip-box is one flat folder: no topic subfolders or topic boxes.
 - Permanent notes carry no type or category tags; zettels are detected by folder (or a property).
+- IDs are 17 digits plus Folgezettel segments. In the skill's `.zettelkasten/config.json` set `"id_regex": "\\d{17}(?:[a-z]+|\\d+)*"` and `"sequence": "folgezettel"`.
 - New notes use the method's templates: a permanent note continues an existing note with a link that says why, and cites its literature note with the page.
 
 ### 📝 Note Types & Templates
