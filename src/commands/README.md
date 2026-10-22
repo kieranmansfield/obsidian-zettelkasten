@@ -228,42 +228,11 @@ const creationCommands = registry.getCommandsByCategory()
 
 ### Settings Integration
 
-When implementing settings:
+Enabled state lives in `settings.commands.enabledCommands` and is managed by `SettingsManager`:
 
-1. **Read enabled state on load:**
-
-```typescript
-private getEnabledCommandsFromSettings(): Map<string, boolean> {
-  return new Map(Object.entries(this.settings.enabledCommands))
-}
-```
-
-2. **Save when changed:**
-
-```typescript
-public enableCommand(commandId: string): void {
-  this.commandRegistry.enableCommand(commandId)
-  this.settings.enabledCommands[commandId] = true
-  await this.saveSettings()
-}
-```
-
-3. **Settings UI can use:**
-
-```typescript
-const registry = plugin.getCommandRegistry()
-const categories = registry.getCommandsByCategory()
-
-// Display toggles for each command
-for (const [category, commands] of categories) {
-  // Render category header
-  for (const command of commands) {
-    if (command.metadata?.canBeDisabled) {
-      // Render toggle for command
-    }
-  }
-}
-```
+- On load, `main.ts` passes `settingsManager.getEnabledCommandsMap()` to `registry.registerAll()`.
+- `plugin.enableCommand(id)` / `plugin.disableCommand(id)` update the registry and save the setting.
+- Settings → Manage commands (`CommandsModal`) shows a toggle per command, grouped by category.
 
 ### Command Categories
 
@@ -275,13 +244,7 @@ Commands are organized by category:
 
 ### Important Notes
 
-⚠️ **Obsidian Limitation**: Obsidian doesn't provide a way to unregister commands at runtime. When you disable a command, it's marked as disabled but requires a plugin reload to fully remove it from the command palette.
-
-The CommandRegistry handles this gracefully:
-
-- Disabled commands are tracked
-- On next plugin load, disabled commands won't be registered
-- Settings persist across reloads
+Disabling a command calls `Plugin.removeCommand()` (Obsidian 1.7.2+), so it leaves the command palette straight away; enabling adds it back. No reload needed.
 
 ## Future Enhancements
 
@@ -292,4 +255,3 @@ Potential improvements to the command system:
 - **Dynamic Commands**: Generate commands based on data
 - **Command Palette Filters**: Custom filtering logic
 - **Undo/Redo**: Command pattern for undo support
-- **Hot Reload**: Reload commands without full plugin restart (when Obsidian API supports it)

@@ -2,7 +2,7 @@
   "name": "obsidian-zettelkasten",
   "packageManager": "pnpm@11.17.0",
   "version": "0.2.0",
-  "description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+  "description": "Bring Zettelkasten note-taking methods to Obsidian.",
   "main": "main.js",
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
     "types": "pnpm update obsidian || echo \"obsidian types not updated (offline?)\""
   },
   "keywords": [],
-  "author": "",
+  "author": "Kieran Mansfield",
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^10.0.1",

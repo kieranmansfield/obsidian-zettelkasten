@@ -18,7 +18,7 @@ export default class ZettelId {
 
   private static validateSegment(seg: string): void {
     if (!/^[a-zA-Z0-9]+$/.test(seg)) {
-      throw new Error(`Invalid Segment "${seg}" myst be alphanumeric`)
+      throw new Error(`Invalid Segment "${seg}" must be alphanumeric`)
     }
   }
 

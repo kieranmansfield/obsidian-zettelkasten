@@ -1,13 +1,14 @@
-# Obsidian Zettelkasten Plugin Architecture and Agent Guide (Updated)
-
-## Overview
+# Obsidian Zettelkasten Plugin
 
 The Obsidian Zettelkasten plugin provides a powerful system for managing and creating atomic notes ("zettels") within Obsidian, leveraging a unique ZettelId engine for note identification, TypeScript for type safety (`strict: true` enabled), and a modular command system. This document outlines the core architecture, key components, and best practices for interacting with and extending the plugin, including guidance for autonomous agents.
+
+## Key Directories
 
 The project is structured primarily under `src/` for all source code, organized as follows:
 
 ```
-src/new/
+src/
+├─ base/           # This is where interfaces and types are defined. Also any helper functions that cannot fit into a class or a service file can live here.
 ├─ core/           # Core logic and abstract/base classes (e.g., NoteCore, ZettelNote, ZettelId)
 ├─ service/        # Services for managing files, note sequences, etc.
 ├─ ui/             # Modals, palettes, and other UI components
@@ -16,17 +17,13 @@ src/new/
 ├─ main.ts         # Plugin entry point and initialization
 ```
 
----
-
-## TypeScript and Strict Typing
+## Standards - TypeScript and Strict Typing
 
 - The project uses **TypeScript** with `"strict": true` enabled.
 - All classes, services, and utilities are fully typed.
 - This ensures type safety, predictable behavior, and minimizes runtime errors.
 - Interfaces and types are used extensively for Notes, ZettelIds and Files.
 - The `obsidian` type definitions track `latest`: `pnpm dev`, `pnpm build` and `pnpm test` run `pnpm types` (`pnpm update obsidian`) first. Check new APIs against `minAppVersion` in `manifest.json`.
-
----
 
 ## ZettelId Engine
 
@@ -35,6 +32,8 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
 - **Format:** a 17-digit timestamp `YYYYMMDDHHmmssSSS` followed by segments alternating between letters (`a-z`) and numbers (`0-9`), starting with letters, for example:  
   `20240612153000123a1b2`
 - **Hierarchy:** the parent has the same timestamp and one segment fewer (`…123a1` → `…123a`); a child has exactly one more segment.
+- **Order:** segment by segment, numbers by value and letters in bijective base 26 (`a`…`z`, `aa`). Never compare IDs as strings: `a10` is a sibling of `a1` and sorts after `a9`. Use `src/base/zettelIdOrder.ts`.
+- **Unique per vault:** new IDs and sequence moves check every zettel in the vault, not just one folder.
 - **Vault config for the zettelkasten skill:** `"id_regex": "\\d{17}(?:[a-z]+|\\d+)*"`, `"sequence": "folgezettel"`, `"areas": {"slipbox": "slipbox"}`.
 
 - **Purpose:**

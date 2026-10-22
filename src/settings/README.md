@@ -179,24 +179,19 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
 ## Settings Migration
 
-The SettingsManager automatically handles migrations between versions:
+`load()` runs `migrateToSlipBox` on the raw data before merging it with the defaults (boxes and tag/link zettel detection become the flat slip-box folder), then `migrate()` for version bumps. Compare versions with `compareSemver`, never as strings (`'0.1.10' < '0.1.4'` is true):
 
 ```typescript
 private async migrate(): Promise<void> {
   const currentVersion = this.settings.version
+  let needsSave = false
 
-  // Example migration from v0.1.3 to v0.1.4
-  if (currentVersion < '0.1.4') {
-    console.log('Migrating settings to v0.1.4')
-
-    // Perform migration
-    // e.g., rename fields, transform data, etc.
-
+  if (compareSemver(currentVersion ?? '0.0.0', '0.1.4') < 0) {
     this.settings.version = '0.1.4'
-    await this.save()
+    needsSave = true
   }
 
-  // Add more migrations as needed
+  if (needsSave) await this.save()
 }
 ```
 
@@ -205,59 +200,26 @@ private async migrate(): Promise<void> {
 When you release a new version with breaking changes:
 
 1. Update `DEFAULT_SETTINGS.version`
-2. Add migration logic in `migrate()` method
-3. Test with old settings data
+2. Add a `compareSemver(currentVersion ?? '0.0.0', '<version>') < 0` block in `migrate()`, or a raw-data step next to `migrateToSlipBox` when an old key is renamed or removed
+3. Add a test in `SettingsManager.test.ts` with the old settings data
 
-Example:
+## Settings Tab
+
+`SettingsTab` is declarative: it has no `display()`. Obsidian renders the items returned by `getSettingDefinitions()` (groups, sub-pages, toggles, text fields, actions), and reads and writes values through two hooks keyed by dotted paths such as `zettel.defaultFolder`:
 
 ```typescript
-if (currentVersion < '0.2.0') {
-  // Rename field
-  if (this.settings.fleeting.folder === 'fleeting') {
-    this.settings.fleeting.folder = 'inbox'
-  }
+getControlValue(key: string): unknown {
+  return this.plugin.getSettingsManager().getPath(key)
+}
 
-  this.settings.version = '0.2.0'
-  needsSave = true
+async setControlValue(key: string, value: unknown): Promise<void> {
+  // emptied text fields fall back to the default
+  await this.plugin.getSettingsManager().setPath(key, next)
+  this.refreshDomState()
 }
 ```
 
-## Settings Tab Implementation (To Do)
-
-When implementing the settings UI, follow this pattern:
-
-```typescript
-import { App, PluginSettingTab, Setting } from 'obsidian'
-import type ZettelkastenPlugin from '../main'
-
-export class SettingsTab extends PluginSettingTab {
-  plugin: ZettelkastenPlugin
-
-  constructor(app: App, plugin: ZettelkastenPlugin) {
-    super(app, plugin)
-    this.plugin = plugin
-  }
-
-  display(): void {
-    const { containerEl } = this
-    containerEl.empty()
-
-    const settings = this.plugin.getSettingsManager()
-
-    new Setting(containerEl)
-      .setName('Slip-box folder')
-      .addText((text) => {
-        text
-          .setValue(settings.getZettel().defaultFolder)
-          .onChange(async (value) => {
-            await settings.updateZettel({ defaultFolder: value })
-          })
-      })
-
-    // Add more settings...
-  }
-}
-```
+To add a setting, add its default in `DefaultSettings.ts`, its type in `src/base/settings.ts`, and an item with that `key` in the matching page of `getSettingDefinitions()`.
 
 ## Best Practices
 
