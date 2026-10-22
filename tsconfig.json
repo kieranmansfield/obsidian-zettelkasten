@@ -17,5 +17,5 @@
     "strict": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["main.js", "src-stable/**/*", "node_modules/**/*", "src/old ui/**/*"]
+  "exclude": ["main.js", "node_modules/**/*"]
 }
