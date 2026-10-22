@@ -1,12 +1,12 @@
 import type { CommandFactory } from '../base/command'
 import { Notice } from 'obsidian'
-import ZettelId from '../core/zettelId.class'
-import { firstFreeId, renameZettelToId } from '../base/sequenceEdit'
+import { activeZettel, moveUnder } from '../base/sequenceEdit'
+import { parentZettelId } from '../base/zettelIdOrder'
 
 /**
  * Command: Outdent Zettel
  *
- * Makes the active zettel a sibling of its parent
+ * Moves the active zettel, with its descendants, up one level: to the end of its parent's siblings
  */
 export const outdentZettelCommand: CommandFactory = (context) => {
   return {
@@ -22,79 +22,27 @@ export const outdentZettelCommand: CommandFactory = (context) => {
     },
 
     execute: async () => {
-      const activeFile = context.app.workspace.getActiveFile()
-      if (!activeFile) {
-        new Notice('No active file')
+      const active = activeZettel(context)
+      if (!active) return
+
+      const parentId = parentZettelId(active.id)
+      const grandparentId = parentId && parentZettelId(parentId)
+
+      if (!grandparentId) {
+        new Notice(
+          parentId
+            ? "Can't outdent a child of a root: roots have no siblings"
+            : 'Cannot outdent a root zettel'
+        )
         return
       }
 
-      if (!context.noteSequenceService || !context.fileService) {
-        new Notice('Required services not available')
-        return
-      }
-
-      const core = context.noteSequenceService.getCore()
-      const currentIdString = core.extractZettelId(activeFile.basename)
-
-      if (!currentIdString) {
-        new Notice('Current file is not a zettel note')
-        return
-      }
-
-      // currentId used for validation but not required for the operation
-      // const currentId = ZettelId.parse(currentIdString)
-
-      // Get parent
-      const parentResult = context.noteSequenceService.navigateToParent(activeFile)
-
-      if (!parentResult.success || !parentResult.node) {
-        new Notice('Cannot outdent a root zettel')
-        return
-      }
-
-      const parentFile = parentResult.node.file
-      const parentIdString = core.extractZettelId(parentFile.basename)
-
-      if (!parentIdString) {
-        new Notice('Parent is not a valid zettel')
-        return
-      }
-
-      const parentId = ZettelId.parse(parentIdString)
-
-      // Get grandparent to find parent's siblings
-      const grandparentResult = context.noteSequenceService.navigateToParent(parentFile)
-
-      let parentSiblings
-      if (!grandparentResult.success || !grandparentResult.node) {
-        // Parent is a root - get all roots
-        parentSiblings = context.noteSequenceService
-          .getRootsInFolder(parentFile.parent?.path || '')
-          .sort((a, b) => a.basename.localeCompare(b.basename))
-      } else {
-        // Parent has a parent - get siblings of parent
-        parentSiblings = context.noteSequenceService
-          .navigateToChildren(grandparentResult.node.file)
-          .filter((r) => r.success && r.node)
-          .map((r) => r.node!.file)
-          .sort((a, b) => a.basename.localeCompare(b.basename))
-      }
-
-      // Find parent's position
-      const parentIndex = parentSiblings.findIndex((f) => f.path === parentFile.path)
-
-      if (parentIndex === -1) {
-        new Notice('Could not find parent in siblings')
-        return
-      }
-
-      // New ID: sibling after the parent
-      await renameZettelToId(
+      // ponytail: appends at the end of the parent's level; inserting right after the parent would renumber siblings
+      await moveUnder(
         context,
-        activeFile,
-        firstFreeId(core, parentId.nextSibling(), context.app.vault.getMarkdownFiles()),
-        `Outdented zettel to sibling of ${parentFile.basename}`,
-        'Failed to outdent zettel'
+        active.file,
+        grandparentId,
+        "Outdented to the end of its parent's level"
       )
     },
   }

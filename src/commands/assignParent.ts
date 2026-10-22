@@ -1,13 +1,12 @@
 import type { CommandFactory } from '../base/command'
-import { Notice } from 'obsidian'
 import { pickZettelInFolder } from '../ui/ZettelSelectorModal'
-import ZettelId from '../core/zettelId.class'
-import { nextChildId, renameZettelToId } from '../base/sequenceEdit'
+import { activeZettel, moveUnder } from '../base/sequenceEdit'
+import { parseZettelId } from '../base/zettelIdOrder'
 
 /**
  * Command: Assign Parent
  *
- * Opens a modal to select a parent zettel for the active note
+ * Moves the active zettel, with its descendants, to the end of a chosen zettel's children
  */
 export const assignParentCommand: CommandFactory = (context) => {
   return {
@@ -23,46 +22,16 @@ export const assignParentCommand: CommandFactory = (context) => {
     },
 
     execute: () => {
-      const activeFile = context.app.workspace.getActiveFile()
-      if (!activeFile) {
-        new Notice('No active file')
-        return
-      }
+      const active = activeZettel(context)
+      if (!active) return
 
-      if (!context.noteSequenceService || !context.fileService) {
-        new Notice('Required services not available')
-        return
-      }
-
-      const core = context.noteSequenceService.getCore()
-      const currentIdString = core.extractZettelId(activeFile.basename)
-
-      if (!currentIdString) {
-        new Notice('Current file is not a zettel note')
-        return
-      }
-
-      pickZettelInFolder(
-        context.app,
-        core,
-        activeFile,
-        'Select parent zettel...',
-        async (parentFile, allFiles) => {
-          const parentIdString = core.extractZettelId(parentFile.basename)
-
-          if (!parentIdString) {
-            new Notice('Selected file is not a valid zettel')
-            return
-          }
-
-          await renameZettelToId(
-            context,
-            activeFile,
-            nextChildId(core, parentFile, ZettelId.parse(parentIdString), allFiles),
-            `Assigned ${parentFile.basename} as parent`,
-            'Failed to assign parent'
-          )
-        }
+      pickZettelInFolder(context.app, active.file, 'Select parent zettel...', (parent) =>
+        moveUnder(
+          context,
+          active.file,
+          parseZettelId(parent.basename)!.id,
+          `Assigned ${parent.basename} as parent`
+        )
       )
     },
   }

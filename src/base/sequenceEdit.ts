@@ -1,57 +1,96 @@
-import { Notice, type TFile } from 'obsidian'
-import ZettelId from '../core/zettelId.class'
-import type NoteSequenceCore from '../core/noteSequence.class'
+import { Modal, Notice, Setting, type App, type TFile } from 'obsidian'
 import type { CommandContext } from './command'
 import { zettelRename } from './fileHelpers'
+import { parseZettelId, planMoveUnder, type SubtreeRename } from './zettelIdOrder'
 
-/** Next free child ID under a parent: its first child, or the sibling after its last child */
-export function nextChildId(
-  core: NoteSequenceCore,
-  parentFile: TFile,
-  parentId: ZettelId,
-  files: TFile[]
-): ZettelId | null {
-  const children = core.findChildren(parentFile, files, true)
-  const lastId = children.length
-    ? core.extractZettelId(children[children.length - 1].basename)
-    : null
-  // ponytail: children sort as strings (a10 before a9), so firstFreeId steps past taken IDs; natural order is WP1
-  return firstFreeId(
-    core,
-    lastId ? ZettelId.parse(lastId).nextSibling() : parentId.nextChild(),
-    children
-  )
+/** Every zettel in the vault with its ID; IDs are unique per vault */
+function vaultZettels(app: App): Array<{ path: string; id: string }> {
+  return app.vault.getMarkdownFiles().flatMap((file) => {
+    const id = parseZettelId(file.basename)?.id
+    return id ? [{ path: file.path, id }] : []
+  })
 }
 
-/** `id`, or the first sibling after it that no file in `files` uses */
-export function firstFreeId(
-  core: NoteSequenceCore,
-  id: ZettelId | null,
-  files: TFile[]
-): ZettelId | null {
-  const taken = new Set(files.map((f) => core.extractZettelId(f.basename)))
-  while (id && taken.has(id.toString())) id = id.nextSibling()
-  return id
-}
-
-/** Rename a zettel to a new ID, keeping its title and extension, and report the outcome */
-export async function renameZettelToId(
+/**
+ * Move a zettel and all its descendants to the end of `parentId`'s children.
+ * Asks before renaming more than one file, and stops at the first failed rename.
+ */
+export async function moveUnder(
   context: CommandContext,
   file: TFile,
-  id: ZettelId | null,
-  done: string,
-  failed: string
+  parentId: string,
+  done: string
 ): Promise<void> {
-  if (!id) {
-    new Notice('Error generating new ID')
+  const fromId = parseZettelId(file.basename)?.id
+  if (!fromId) {
+    new Notice('Current file is not a zettel note')
     return
   }
-  const newName = zettelRename(
-    context.app,
-    file,
-    id.toString(),
-    context.settingsManager!.getZettel()
-  )
-  const result = await context.fileService!.rename({ file, newName })
-  new Notice(result ? done : failed)
+  const plan = planMoveUnder(vaultZettels(context.app), fromId, parentId)
+  if ('error' in plan) {
+    new Notice(plan.error)
+    return
+  }
+  if (plan.conflicts.length) {
+    new Notice(`Not moved: IDs already in use: ${plan.conflicts.join(', ')}`)
+    return
+  }
+  console.debug('Zettelkasten: moving subtree', plan.renames)
+  if (plan.renames.length > 1 && !(await confirmRenames(context.app, plan.renames))) return
+  if (await applyRenames(context, plan.renames)) new Notice(done)
+}
+
+function confirmRenames(app: App, renames: SubtreeRename[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    let confirmed = false
+    const modal = new Modal(app)
+    modal.setTitle(`Rename ${renames.length} zettels?`)
+    const list = modal.contentEl.createEl('ul')
+    for (const r of renames) list.createEl('li', { text: `${r.oldId} → ${r.newId}` })
+    new Setting(modal.contentEl)
+      .addButton((b) => b.setButtonText('Cancel').onClick(() => modal.close()))
+      .addButton((b) =>
+        b
+          .setButtonText('Rename')
+          .setCta()
+          .onClick(() => {
+            confirmed = true
+            modal.close()
+          })
+      )
+    modal.onClose = () => resolve(confirmed)
+    modal.open()
+  })
+}
+
+async function applyRenames(context: CommandContext, renames: SubtreeRename[]): Promise<boolean> {
+  const settings = context.settingsManager!.getZettel()
+  for (const [i, r] of renames.entries()) {
+    const file = context.app.vault.getFileByPath(r.path)
+    try {
+      if (!file) throw new Error(`${r.path} not found`)
+      const newName = zettelRename(context.app, file, r.newId, settings)
+      await context.fileService!.rename({ file, newName })
+    } catch (err) {
+      console.error('Zettelkasten: rename failed', r, err)
+      new Notice(`Stopped after ${i} of ${renames.length} renames: ${r.oldId} → ${r.newId} failed`)
+      return false
+    }
+  }
+  return true
+}
+
+/** The active file and its zettel ID, or null after telling the user why not */
+export function activeZettel(context: CommandContext): { file: TFile; id: string } | null {
+  const file = context.app.workspace.getActiveFile()
+  const id = file && parseZettelId(file.basename)?.id
+  if (!file || !id) {
+    new Notice(file ? 'Current file is not a zettel note' : 'No active file')
+    return null
+  }
+  if (!context.settingsManager || !context.fileService) {
+    new Notice('Required services not available')
+    return null
+  }
+  return { file, id }
 }
