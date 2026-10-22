@@ -1,14 +1,12 @@
 import type { CommandFactory } from '../base/command'
 import { CreateNoteWithSuggestModal } from '../ui/CreateNoteWithSuggestModal'
 import { Notice, TFile, App } from 'obsidian'
-import { finishNote, zettelContent } from '../base/fileHelpers'
 import { parseZettelId } from '../base/zettelIdOrder'
 
 /**
  * Command: Create Zettel
  *
  * Creates a new atomic zettel with a unique ZettelId
- * Ported from master branch - DO NOT MODIFY FUNCTIONALITY
  */
 export const createZettelNoteCommand: CommandFactory = (context) => {
   return {
@@ -19,60 +17,27 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
     metadata: {
       category: 'note-creation',
       description: 'Create a new atomic zettel with a unique ZettelId',
-      canBeDisabled: true,
-      enabledByDefault: true,
     },
 
     execute: () => {
-      if (!context.zettelNote || !context.settingsManager || !context.fileService) {
-        console.error('Required services not available')
-        return
-      }
-
-      const settings = context.settingsManager.getZettel()
-
-      // Get existing zettel notes for autocomplete
-      const zettels = getZettelFiles(context.app)
-
-      new CreateNoteWithSuggestModal(context.app, zettels, (title: string) => {
-        void (async () => {
-          try {
-            // Load template from file or use inline template
-            const templateContent = await context.fileService!.loadTemplate(
-              settings.templatePath,
-              settings.template
+      const create = (title: string) => {
+        context.zettelNote.create(title).then(
+          (file) => new Notice(`Created zettel: ${file.basename}`),
+          (error: unknown) => {
+            new Notice(
+              `Error creating zettel: ${error instanceof Error ? error.message : String(error)}`
             )
-
-            const result = await context.zettelNote!.createNew({
-              title,
-              folder: settings.defaultFolder || undefined,
-              content: zettelContent(templateContent, title, settings),
-            })
-
-            new Notice(`Created zettel: ${result.filename}`)
-
-            await finishNote(
-              context.app,
-              result.path,
-              settings.zettelDetectionMode,
-              settings.zettelTag,
-              settings.openOnCreate
-            )
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-            new Notice(`Error creating zettel: ${errorMessage}`)
             console.error('Failed to create zettel:', error)
           }
-        })()
-      }).open()
+        )
+      }
+      const open = (file: TFile) => void context.app.workspace.getLeaf().openFile(file)
+      new CreateNoteWithSuggestModal(context.app, zettelFiles(context.app), create, open).open()
     },
   }
 }
 
-/**
- * Get all zettel files
- * Adapted from master's getNoteTitlesByTag to work with folder-based detection
- */
-function getZettelFiles(app: App): TFile[] {
+/** Every note with a zettel ID */
+function zettelFiles(app: App): TFile[] {
   return app.vault.getMarkdownFiles().filter((file) => parseZettelId(file.basename))
 }

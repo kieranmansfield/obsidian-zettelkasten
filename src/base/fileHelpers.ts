@@ -51,14 +51,7 @@ export function zettelContent(
  * Prefers frontmatter title over filename
  */
 export function getFileTitle(app: App, file: TFile): string {
-  return getFileTitleFromCache(file, app.metadataCache.getFileCache(file))
-}
-
-/**
- * Get the display title for a file (alternative without app)
- */
-export function getFileTitleFromCache(file: TFile, cache: CachedMetadata | null): string {
-  return frontmatterTitle(cache) ?? file.basename
+  return frontmatterTitle(app.metadataCache.getFileCache(file)) ?? file.basename
 }
 
 /** The frontmatter title, if it is a non-empty string (an unfilled `title: {{title}}` parses as an object) */
@@ -170,11 +163,8 @@ function stampFrontmatter(fm: Frontmatter, mode: ZettelDetectionMode, value: str
   }
 }
 
-/**
- * Stamp a newly created note so it is detected by its type's detection mode
- * (folder mode needs nothing), then optionally open it.
- */
-async function stampFile(
+/** Stamp a newly created note so its kind's detection mode finds it (folder mode needs nothing) */
+export async function stampFile(
   app: App,
   file: TFile,
   mode: ZettelDetectionMode,
@@ -184,19 +174,6 @@ async function stampFile(
   await app.fileManager.processFrontMatter(file, (fm: Frontmatter) =>
     stampFrontmatter(fm, mode, value)
   )
-}
-
-export async function finishNote(
-  app: App,
-  path: string,
-  mode: ZettelDetectionMode,
-  value: string,
-  open: boolean
-): Promise<void> {
-  const file = app.vault.getAbstractFileByPath(path)
-  if (!(file instanceof TFile)) return
-  await stampFile(app, file, mode, value)
-  if (open) await app.workspace.getLeaf().openFile(file)
 }
 
 /** `path` lies in `folder` or a subfolder; '' and '/' are the vault root */

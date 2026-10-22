@@ -1,241 +1,100 @@
-import type { TFile, Vault, App } from 'obsidian'
-import type {
-  NoteSequence,
-  SequenceNode,
-  SequenceBuildOptions,
-  SequenceReorderOptions,
-  SequenceReorderResult,
-  SequenceNavigationResult,
+import type { App, TFile } from 'obsidian'
+import {
+  buildSequence,
+  findChildren,
+  findRootFile,
+  findRoots,
+  type NoteSequence,
 } from '../base/noteSequence'
-import NoteSequenceCore from '../core/noteSequence.class'
-import type FileService from './file.service'
 import { isInFolder } from '../base/fileHelpers'
+import { compareZettelFiles, parentZettelId, parseZettelId } from '../base/zettelIdOrder'
+
+const idOf = (file: TFile): string | null => parseZettelId(file.basename)?.id ?? null
 
 /**
  * NoteSequenceService
  *
- * Service for managing note sequences in the vault.
- * Provides high-level operations for finding, building, and manipulating sequences.
+ * Answers sequence questions about a zettel: its parent, children, siblings, neighbours and
+ * sequence. A zettel's sequence lives in its own folder (and below), so timestamped notes in
+ * other areas such as the inbox never join it. Lists are in ID order, never string order.
  */
 export default class NoteSequenceService {
-  private core: NoteSequenceCore
-  private vault: Vault
-  private fileService: FileService
   private app: App
 
-  constructor(app: App, fileService: FileService) {
+  constructor(app: App) {
     this.app = app
-    this.vault = app.vault
-    this.core = new NoteSequenceCore(this.vault)
-    this.fileService = fileService
   }
 
-  /**
-   * Find all sequences in a specific folder
-   */
-  findSequencesInFolder(folderPath: string, options?: SequenceBuildOptions): NoteSequence[] {
-    const files = this.vault.getMarkdownFiles().filter((file) => isInFolder(file.path, folderPath))
-    return this.core.findAllSequences(files, options)
+  /** Markdown files in `file`'s folder and below */
+  private scope(file: TFile): TFile[] {
+    const folder = file.parent?.path ?? ''
+    return this.app.vault.getMarkdownFiles().filter((f) => isInFolder(f.path, folder))
   }
 
-  /**
-   * Find all sequences in the entire vault
-   */
-  findAllSequences(options?: SequenceBuildOptions): NoteSequence[] {
-    const files = this.vault.getMarkdownFiles()
-    return this.core.findAllSequences(files, options)
+  isZettel(file: TFile): boolean {
+    return idOf(file) !== null
   }
 
-  /**
-   * Get the sequence for a specific file
-   * Returns null if the file is not part of a sequence
-   */
-  getSequenceForFile(file: TFile, options?: SequenceBuildOptions): NoteSequence | null {
-    const zettelId = this.core.extractZettelId(file.basename)
-    if (!zettelId) return null
-
-    // Find the root file
-    const allFiles = this.vault
-      .getMarkdownFiles()
-      .filter((f) => isInFolder(f.path, file.parent?.path || ''))
-
-    const rootFile = this.core.findRootFile(file, allFiles)
-    if (!rootFile) return null
-
-    return this.core.buildSequence(rootFile, allFiles, options)
+  /** The whole sequence `file` belongs to, or null if it is not a zettel or its root is missing */
+  getSequenceForFile(file: TFile): NoteSequence | null {
+    const files = this.scope(file)
+    const root = findRootFile(file, files)
+    return root ? buildSequence(root, files) : null
   }
 
-  /**
-   * Navigate to parent node
-   */
-  navigateToParent(currentFile: TFile): SequenceNavigationResult {
-    const zettelId = this.core.extractZettelId(currentFile.basename)
-    if (!zettelId) {
-      return {
-        node: null,
-        sequence: null,
-        success: false,
-        error: 'Current file is not a zettel note',
-      }
-    }
-
-    const parentId = this.core.getParentId(zettelId)
-    if (!parentId) {
-      return {
-        node: null,
-        sequence: null,
-        success: false,
-        error: 'Current file is already a root zettel',
-      }
-    }
-
-    // Find the parent file
-    const allFiles = this.vault
-      .getMarkdownFiles()
-      .filter((f) => isInFolder(f.path, currentFile.parent?.path || ''))
-
-    for (const file of allFiles) {
-      const fileId = this.core.extractZettelId(file.basename)
-      if (fileId === parentId) {
-        const sequence = this.getSequenceForFile(file)
-        const node: SequenceNode = {
-          file,
-          zettelId: fileId,
-          level: this.core.calculateLevel(fileId),
-          children: [],
-        }
-
-        return {
-          node,
-          sequence,
-          success: true,
-        }
-      }
-    }
-
-    return {
-      node: null,
-      sequence: null,
-      success: false,
-      error: 'Parent file not found',
-    }
+  /** Sequences rooted at `roots` that have at least one child, in the order given */
+  sequencesWithChildren(roots: TFile[]): NoteSequence[] {
+    return roots
+      .map((root) => this.getSequenceForFile(root))
+      .filter((s): s is NoteSequence => !!s && s.root.children.length > 0)
   }
 
-  /**
-   * Navigate to children nodes
-   */
-  navigateToChildren(currentFile: TFile): SequenceNavigationResult[] {
-    const zettelId = this.core.extractZettelId(currentFile.basename)
-    if (!zettelId) {
-      return [
-        {
-          node: null,
-          sequence: null,
-          success: false,
-          error: 'Current file is not a zettel note',
-        },
-      ]
-    }
-
-    const allFiles = this.vault
-      .getMarkdownFiles()
-      .filter((f) => isInFolder(f.path, currentFile.parent?.path || ''))
-
-    const children = this.core.findChildren(currentFile, allFiles, true)
-
-    return children.map((childFile) => {
-      const childId = this.core.extractZettelId(childFile.basename)
-      if (!childId) {
-        return {
-          node: null,
-          sequence: null,
-          success: false,
-          error: 'Child file is not a valid zettel',
-        }
-      }
-
-      const sequence = this.getSequenceForFile(childFile)
-      const node: SequenceNode = {
-        file: childFile,
-        zettelId: childId,
-        level: this.core.calculateLevel(childId),
-        children: [],
-      }
-
-      return {
-        node,
-        sequence,
-        success: true,
-      }
-    })
+  /** Root zettels among `files`, most recent first */
+  roots(files: TFile[]): TFile[] {
+    return findRoots(files)
   }
 
-  /**
-   * Reorder a sequence (complex operation involving file renames)
-   * This is a placeholder for now - full implementation will be added later
-   */
-  reorderSequence(
-    rootFile: TFile,
-    newOrder: TFile[],
-    indentLevels: Map<TFile, number>,
-    options?: SequenceReorderOptions
-  ): SequenceReorderResult {
-    // TODO: Implement full reordering logic
-    // This involves:
-    // 1. Generating new IDs based on newOrder and indentLevels
-    // 2. Renaming files in correct order to avoid conflicts
-    // 3. Updating any internal links if needed
-    // 4. Handling errors and rollback
-
-    // Avoid unused variable warning - will be used when implemented
-    void rootFile
-    void newOrder
-    void indentLevels
-    void options
-
-    return {
-      success: false,
-      renamedFiles: new Map(),
-      errors: ['Reordering not yet implemented'],
-      filesAffected: 0,
-    }
+  parent(file: TFile): TFile | null {
+    const id = idOf(file)
+    const parentId = id && parentZettelId(id)
+    if (!parentId) return null
+    return this.scope(file).find((f) => idOf(f) === parentId) ?? null
   }
 
-  /**
-   * Check if a file is part of a sequence
-   */
-  isInSequence(file: TFile): boolean {
-    const zettelId = this.core.extractZettelId(file.basename)
-    if (!zettelId) return false
-
-    // Check if there are any related files (parent or children)
-    const allFiles = this.vault
-      .getMarkdownFiles()
-      .filter((f) => isInFolder(f.path, file.parent?.path || ''))
-
-    // Check for parent
-    const parentId = this.core.getParentId(zettelId)
-    if (parentId) {
-      return true // Has a parent, so it's in a sequence
-    }
-
-    // Check for children
-    const children = this.core.findChildren(file, allFiles, false)
-    return children.length > 0 // Has children, so it's a sequence root
+  /** Direct children in ID order */
+  children(file: TFile): TFile[] {
+    return findChildren(file, this.scope(file))
   }
 
-  /**
-   * Get all root zettels in a folder
-   */
-  getRootsInFolder(folderPath: string): TFile[] {
-    const files = this.vault.getMarkdownFiles().filter((file) => isInFolder(file.path, folderPath))
-    return this.core.findAllRoots(files)
+  /** `file` and its siblings in ID order; roots are siblings of the other roots in scope */
+  siblings(file: TFile): TFile[] {
+    const id = idOf(file)
+    if (!id) return []
+    const parentId = parentZettelId(id)
+    return this.scope(file)
+      .filter((f) => {
+        const fid = idOf(f)
+        return fid !== null && parentZettelId(fid) === parentId
+      })
+      .sort(compareZettelFiles)
   }
 
-  /**
-   * Export the core for advanced use cases
-   */
-  getCore(): NoteSequenceCore {
-    return this.core
+  /** The sibling `step` places away, or null past either end */
+  adjacent(file: TFile, step: 1 | -1): TFile | null {
+    const siblings = this.siblings(file)
+    const i = siblings.findIndex((f) => f.path === file.path)
+    return (i >= 0 && siblings[i + step]) || null
+  }
+
+  /** The root of the sequence `step` places away from `file`'s sequence, or null past either end */
+  adjacentSequence(file: TFile, step: 1 | -1): TFile | null {
+    const root = findRootFile(file, this.scope(file))
+    return root && this.adjacent(root, step)
+  }
+
+  /** The first root in `file`'s scope */
+  firstSequence(file: TFile): TFile | null {
+    const root = findRootFile(file, this.scope(file))
+    return (root && this.siblings(root)[0]) ?? null
   }
 }

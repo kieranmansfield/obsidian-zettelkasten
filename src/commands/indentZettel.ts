@@ -1,7 +1,7 @@
 import type { CommandFactory } from '../base/command'
 import { Notice } from 'obsidian'
 import { activeZettel, moveUnder } from '../base/sequenceEdit'
-import { compareZettelFiles, parentZettelId, parseZettelId } from '../base/zettelIdOrder'
+import { parseZettelId } from '../base/zettelIdOrder'
 
 /**
  * Command: Indent Zettel
@@ -18,26 +18,13 @@ export const indentZettelCommand: CommandFactory = (context) => {
     metadata: {
       category: 'note-sequences',
       description: 'Make zettel a child of previous sibling',
-      canBeDisabled: true,
-      enabledByDefault: true,
     },
 
     execute: async () => {
       const active = activeZettel(context)
       if (!active) return
 
-      const parentId = parentZettelId(active.id)
-      const siblings = context.app.vault
-        .getMarkdownFiles()
-        .filter((f) => {
-          const id = parseZettelId(f.basename)?.id
-          return (
-            id && f.parent?.path === active.file.parent?.path && parentZettelId(id) === parentId
-          )
-        })
-        .sort(compareZettelFiles)
-      const prev = siblings[siblings.findIndex((f) => f.path === active.file.path) - 1]
-
+      const prev = context.noteSequenceService.adjacent(active.file, -1)
       if (!prev) {
         new Notice('No previous sibling to indent under')
         return

@@ -9,7 +9,7 @@ The project is structured primarily under `src/` for all source code, organized 
 ```
 src/
 ├─ base/           # This is where interfaces and types are defined. Also any helper functions that cannot fit into a class or a service file can live here.
-├─ core/           # Core logic and abstract/base classes (e.g., NoteCore, ZettelNote, ZettelId)
+├─ core/           # NoteCore: the kinds of note and how they are created
 ├─ service/        # Services for managing files, note sequences, etc.
 ├─ ui/             # Modals, palettes, and other UI components
 ├─ commands/       # Modular command definitions
@@ -47,17 +47,15 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
 
 ### Core Layer (`core/`)
 
-- Contains base and concrete classes:
-  - `NoteCore` (abstract base for all notes)
-  - `ZettelNote`, `FleetingNote`, `IndexNote` (concrete note classes)
-  - `ZettelId` (ID generation and parsing)
-- Core classes define building blocks that services and UI components can leverage.
+- `NoteCore`: one class for every kind of note. `noteKinds()` builds the zettel, fleeting, structure and literature kinds; each differs in its filename, content and settings. `create(title)` loads the template, creates the file, stamps the detection marker and opens it.
+- Sequence trees (`buildSequence`, `findChildren`, `findRoots`) are pure functions in `src/base/noteSequence.ts`.
+- ID parsing, generation and ordering live in `src/base/zettelIdOrder.ts`.
 
 ### Service Layer (`service/`)
 
 - Handles interactions with Obsidian’s vault:
-  - `FileService` (creating, renaming, reading, deleting notes)
-  - Additional services like indexing or fleeting notes are included here.
+  - `FileService` (creating, renaming, reading notes, loading templates)
+  - `NoteSequenceService`: parent, children, siblings, adjacent sibling or sequence, and whole sequences. A sequence lives in the zettel's folder (and below), so timestamped notes in other areas never join it.
 - Services encapsulate business logic and vault operations.
 
 ### UI Layer (`ui/`)
@@ -89,7 +87,7 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
 
 - **File creation helpers** ensure consistent filenames, frontmatter, and default tags.
 - **FileService** manages vault operations using Obsidian APIs (`TFile`, `TFolder`, `Vault`).
-- **ZettelNote** always files zettels into the one flat slip-box folder (`zettel.defaultFolder`).
+- **Create Zettel** always files zettels into the one flat slip-box folder (`zettel.defaultFolder`).
 - Folder names do **not** use underscores; default folder is configurable.
 
 ---

@@ -1,31 +1,17 @@
-import { App, FuzzySuggestModal, Notice } from 'obsidian'
-import type { CommandContext } from '../base/command'
-import * as commands from '../commands'
-
-/**
- * Command item for the palette
- */
-interface SequenceCommandItem {
-  id: string
-  name: string
-  description: string
-  icon?: string
-  execute: () => void | Promise<void>
-}
+import { App, FuzzySuggestModal, Notice, setIcon } from 'obsidian'
+import type { BaseCommand } from '../base/command'
 
 /**
  * SequenceCommandPaletteModal
  *
  * Modal for quickly accessing note sequence commands
  */
-export class SequenceCommandPaletteModal extends FuzzySuggestModal<SequenceCommandItem> {
-  private context: CommandContext
-  private commandItems: SequenceCommandItem[]
+export class SequenceCommandPaletteModal extends FuzzySuggestModal<BaseCommand> {
+  private commandItems: BaseCommand[]
 
-  constructor(app: App, context: CommandContext) {
+  constructor(app: App, commands: BaseCommand[]) {
     super(app)
-    this.context = context
-    this.commandItems = []
+    this.commandItems = commands
     this.setPlaceholder('Select a note sequence command...')
     this.setInstructions([
       { command: '↑↓', purpose: 'to navigate' },
@@ -34,81 +20,32 @@ export class SequenceCommandPaletteModal extends FuzzySuggestModal<SequenceComma
     ])
   }
 
-  override onOpen(): void {
-    const superResult = super.onOpen()
-    // Handle case where super.onOpen() returns a promise
-    if (superResult instanceof Promise) {
-      void superResult.catch((error) => {
-        console.error('Error in super.onOpen():', error)
-      })
-    }
-    this.buildCommandItems()
-  }
-
-  private buildCommandItems() {
-    // Navigation commands
-    const navCommands = [
-      commands.openParentZettelCommand,
-      commands.openChildZettelCommand,
-      commands.nextSiblingCommand,
-      commands.nextChildCommand,
-      commands.nextSequenceCommand,
-    ]
-
-    // Manipulation commands
-    const manipCommands = [
-      commands.indentZettelCommand,
-      commands.outdentZettelCommand,
-      commands.assignParentCommand,
-      commands.assignChildCommand,
-    ]
-
-    // View commands
-    const viewCommands = [
-      commands.openNoteSequencesViewCommand,
-      commands.openSequenceNavigatorViewCommand,
-    ]
-
-    // Build items from commands
-    const allCommands = [...navCommands, ...manipCommands, ...viewCommands]
-
-    this.commandItems = allCommands.map((factory) => {
-      const cmd = factory(this.context)
-      return {
-        id: cmd.id,
-        name: cmd.name,
-        description: cmd.metadata?.description || '',
-        icon: cmd.icon,
-        execute: cmd.execute,
-      }
-    })
-  }
-
-  getItems(): SequenceCommandItem[] {
+  getItems(): BaseCommand[] {
     return this.commandItems
   }
 
-  getItemText(item: SequenceCommandItem): string {
+  getItemText(item: BaseCommand): string {
     return item.name
   }
 
-  renderSuggestion(match: { item: SequenceCommandItem }, el: HTMLElement) {
+  renderSuggestion(match: { item: BaseCommand }, el: HTMLElement) {
     const container = el.createDiv({ cls: 'sequence-command-item' })
 
     // Icon and title
     const titleContainer = container.createDiv({ cls: 'suggestion-title' })
     if (match.item.icon) {
-      titleContainer.createSpan({ cls: 'suggestion-icon', text: match.item.icon })
+      setIcon(titleContainer.createSpan({ cls: 'suggestion-icon' }), match.item.icon)
     }
     titleContainer.createSpan({ text: match.item.name })
 
     // Description
-    if (match.item.description) {
-      container.createDiv({ cls: 'suggestion-note', text: match.item.description })
+    const description = match.item.metadata?.description
+    if (description) {
+      container.createDiv({ cls: 'suggestion-note', text: description })
     }
   }
 
-  onChooseItem(item: SequenceCommandItem): void {
+  onChooseItem(item: BaseCommand): void {
     void (async () => {
       try {
         await item.execute()

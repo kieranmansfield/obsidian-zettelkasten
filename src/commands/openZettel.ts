@@ -17,8 +17,6 @@ export const openZettelCommand: CommandFactory = (context) => {
     metadata: {
       category: 'navigation',
       description: 'Search and open zettel notes',
-      canBeDisabled: true,
-      enabledByDefault: true,
     },
 
     execute: () => {

@@ -10,7 +10,7 @@ import {
 import type ZettelkastenPlugin from '../main'
 import { FilenameFormat, ZettelDetectionMode } from '../base/settings'
 import { getIn } from '../base/objectPath'
-import { TagSuggest } from '../ui/TagSuggest'
+import { TextSuggest, tagNames } from '../ui/TextSuggest'
 import { ImportExportModal } from '../ui/ImportExportModal'
 import { CommandsModal } from '../ui/CommandsModal'
 import { DEFAULT_SETTINGS } from '../settings/DefaultSettings'
@@ -34,38 +34,16 @@ const toggle = (name: string, key: string, desc?: string): SettingDefinition => 
   control: { type: 'toggle', key },
 })
 
-const text = (
-  name: string,
-  key: string,
-  desc?: string,
-  placeholder?: string
-): SettingDefinition => ({
-  name,
-  desc,
-  control: { type: 'text', key, placeholder },
-})
-
-const folder = (
-  name: string,
-  key: string,
-  desc?: string,
-  placeholder?: string
-): SettingDefinition => ({
-  name,
-  desc,
-  control: { type: 'folder', key, placeholder },
-})
-
-const file = (
-  name: string,
-  key: string,
-  desc?: string,
-  placeholder?: string
-): SettingDefinition => ({
-  name,
-  desc,
-  control: { type: 'file', key, placeholder },
-})
+const input =
+  (type: 'text' | 'folder' | 'file') =>
+  (name: string, key: string, desc?: string, placeholder?: string): SettingDefinition => ({
+    name,
+    desc,
+    control: { type, key, placeholder },
+  })
+const text = input('text')
+const folder = input('folder')
+const file = input('file')
 
 const dropdown = (
   name: string,
@@ -203,11 +181,6 @@ export default class SettingsTab extends PluginSettingTab {
               visible: this.is('zettel.filenameFormat', FilenameFormat.ID_TITLE),
             },
             ...common('zettel', 'zettel'),
-            toggle(
-              'Auto-link to parent',
-              'zettel.autoLinkToParent',
-              'Automatically add link to parent when creating child zettel'
-            ),
           ],
         }),
         this.noteTypePage({
@@ -295,7 +268,7 @@ export default class SettingsTab extends PluginSettingTab {
               visible: this.is(modeKey, ZettelDetectionMode.TAG),
               render: (setting) => {
                 setting.addText((input) => {
-                  new TagSuggest(this.app, input.inputEl, (value) => {
+                  new TextSuggest(this.app, input.inputEl, tagNames(this.app), (value) => {
                     input.setValue(value)
                     void this.setControlValue(tagKey, value)
                   })
@@ -330,7 +303,6 @@ export default class SettingsTab extends PluginSettingTab {
   // ============================================
   private sidebarPage(): SettingDefinitionPage {
     const s = 'zettelkastenSidebar'
-    const enabled = this.on(`${s}.enabled`)
     const sections = [
       {
         label: 'Inbox',
@@ -373,12 +345,9 @@ export default class SettingsTab extends PluginSettingTab {
       type: 'page',
       name: 'Sidebar',
       desc: 'The Zettelkasten sidebar: sections, names, dashboards and filters',
-      displayValue: this.status(`${s}.enabled`),
       items: [
-        { type: 'group', items: [toggle('Enable sidebar view', `${s}.enabled`)] },
         {
           type: 'group',
-          visible: enabled,
           items: [
             {
               type: 'page',
@@ -467,16 +436,6 @@ export default class SettingsTab extends PluginSettingTab {
               'noteSequences.showSequencesView',
               'Display card view showing all note sequences'
             ),
-            toggle(
-              'Show sequence navigator sidebar',
-              'noteSequences.showSequenceNavigator',
-              "Display tree view of the current note's sequence in the sidebar"
-            ),
-            toggle(
-              'Auto-open navigator',
-              'noteSequences.autoOpenNavigator',
-              'Automatically open sequence navigator when opening a zettel note'
-            ),
           ],
         },
       ],
@@ -488,31 +447,12 @@ export default class SettingsTab extends PluginSettingTab {
   // ============================================
   private advancedPage(): SettingDefinitionPage {
     const manager = this.plugin.getSettingsManager()
-    const ignored = () => manager.getGeneral().ignoredFolders
-
-    const saveIgnored = async (folders: string[]) => {
-      await manager.updateGeneral({ ignoredFolders: folders })
-      this.update()
-    }
 
     return {
       type: 'page',
       name: 'Advanced',
-      desc: 'Ignored folders, import/export and reset',
+      desc: 'Import/export and reset',
       items: [
-        {
-          type: 'list',
-          heading: 'Ignored folders',
-          emptyState: 'No folders ignored',
-          items: ignored().map((_, i) =>
-            folder(`Folder ${i + 1}`, `general.ignoredFolders.${i}`, undefined, 'Folder/path')
-          ),
-          addItem: {
-            name: 'Add ignored folder',
-            action: () => void saveIgnored([...ignored(), '']),
-          },
-          onDelete: (index) => void saveIgnored(ignored().filter((_, i) => i !== index)),
-        },
         {
           type: 'group',
           heading: 'Data',

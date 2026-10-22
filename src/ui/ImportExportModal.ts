@@ -106,9 +106,4 @@ export class ImportExportModal extends Modal {
     //   })
     // })
   }
-
-  onClose() {
-    const { contentEl } = this
-    contentEl.empty()
-  }
 }

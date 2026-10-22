@@ -1,8 +1,19 @@
-import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian'
-import type { NoteSequence } from '../base/noteSequence'
+import { ItemView, WorkspaceLeaf, debounce, type Workspace } from 'obsidian'
 import type NoteSequenceService from '../service/noteSequence.service'
+import { renderEmptyState, renderSequenceCards } from './sequenceCards'
+import { onFileChanges } from './viewEvents'
 
 export const VIEW_TYPE_NOTE_SEQUENCES = 'note-sequences-view'
+
+/** Focus the sequences tab, opening it if needed */
+export async function openNoteSequencesView(workspace: Workspace): Promise<void> {
+  let leaf = workspace.getLeavesOfType(VIEW_TYPE_NOTE_SEQUENCES)[0]
+  if (!leaf) {
+    leaf = workspace.getLeaf('tab')
+    await leaf.setViewState({ type: VIEW_TYPE_NOTE_SEQUENCES, active: true })
+  }
+  await workspace.revealLeaf(leaf)
+}
 
 /**
  * NoteSequencesView
@@ -12,32 +23,12 @@ export const VIEW_TYPE_NOTE_SEQUENCES = 'note-sequences-view'
  */
 export class NoteSequencesView extends ItemView {
   private sequenceService: NoteSequenceService
-  private refreshTimeout: number | null = null
-  private rootFolder: string
+  private scheduleRefresh = debounce(() => this.refresh(), 300, true)
 
-  constructor(leaf: WorkspaceLeaf, sequenceService: NoteSequenceService, rootFolder: string) {
+  constructor(leaf: WorkspaceLeaf, sequenceService: NoteSequenceService) {
     super(leaf)
     this.sequenceService = sequenceService
-    this.rootFolder = rootFolder
-    this.registerEvents()
-  }
-
-  private registerEvents(): void {
-    // Refresh view when files are created, deleted, or modified
-    this.registerEvent(this.app.vault.on('create', () => this.scheduleRefresh()))
-    this.registerEvent(this.app.vault.on('delete', () => this.scheduleRefresh()))
-    this.registerEvent(this.app.vault.on('rename', () => this.scheduleRefresh()))
-  }
-
-  private scheduleRefresh(): void {
-    // Debounce refreshes to avoid excessive updates
-    if (this.refreshTimeout) {
-      activeWindow.clearTimeout(this.refreshTimeout)
-    }
-    this.refreshTimeout = activeWindow.setTimeout(() => {
-      this.refresh()
-      this.refreshTimeout = null
-    }, 300)
+    onFileChanges(this, this.app.vault, this.scheduleRefresh)
   }
 
   public refresh(): void {
@@ -59,155 +50,35 @@ export class NoteSequencesView extends ItemView {
     return 'layers'
   }
 
-   
   async onOpen(): Promise<void> {
-    const container = this.containerEl.children[1] as HTMLElement
-    container.empty()
-    container.addClass('note-sequences-view')
-    this.renderContent(container)
+    this.refresh()
   }
 
   private renderContent(container: HTMLElement): void {
-    // Get all files - use entire vault, don't filter by folder
-    const allFiles = this.app.vault.getMarkdownFiles()
-    const core = this.sequenceService.getCore()
-
-
-    // Check how many files have zettel IDs
-    const filesWithIds = allFiles.filter((f) => {
-      const id = core.extractZettelId(f.basename)
-      return id !== null
-    })
-
-    const rootZettels = core.findAllRoots(allFiles)
-
-    if (rootZettels.length === 0) {
-      const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
-      emptyState.createEl('h3', {
-        text: 'No root zettel notes found',
-      })
-      emptyState.createEl('p', {
-        text: `Searched ${allFiles.length} files, found ${filesWithIds.length} with zettel IDs`,
-        cls: 'setting-item-description',
-      })
-      emptyState.createEl('p', {
-        text: 'Root zettel ids are 17 digits long, for example "20241202193045123"',
-        cls: 'setting-item-description',
-      })
-      emptyState.createEl('p', {
-        text: 'Create a zettel note using the create zettel note command',
-        cls: 'setting-item-description',
-      })
+    const roots = this.sequenceService.roots(this.app.vault.getMarkdownFiles())
+    if (roots.length === 0) {
+      renderEmptyState(
+        container,
+        'No root zettel notes found',
+        'Root zettel ids are 17 digits long, for example "20241202193045123"',
+        'Create a zettel note using the create zettel note command'
+      )
       return
     }
 
-    // Create grid container for cards
-    const gridContainer = container.createDiv({ cls: 'sequence-grid' })
-
-    // Display only root zettels that have children
-    rootZettels.forEach((rootFile) => {
-      const sequence = this.sequenceService.getSequenceForFile(rootFile)
-      if (sequence) {
-        // Only show cards that have children (level > 0)
-        const childNodes = sequence.allNodes.filter((node) => node.level > 0)
-        if (childNodes.length > 0) {
-          this.createSequenceCard(gridContainer, sequence)
-        }
-      }
-    })
-
-    // Show message if no sequences with children found
-    if (gridContainer.children.length === 0) {
-      const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
-      emptyState.createEl('h3', {
-        text: 'No note sequences with children found',
-      })
-      emptyState.createEl('p', {
-        text: 'Create child notes using the indent zettel or assign child commands',
-        cls: 'setting-item-description',
-      })
+    const sequences = this.sequenceService.sequencesWithChildren(roots)
+    if (sequences.length === 0) {
+      renderEmptyState(
+        container,
+        'No note sequences with children found',
+        'Create child notes using the indent zettel or assign child commands'
+      )
+      return
     }
+    renderSequenceCards(this.app, container, sequences)
   }
 
-  private createSequenceCard(container: HTMLElement, sequence: NoteSequence): void {
-    const card = container.createDiv({ cls: 'sequence-card' })
-
-    // Card header with parent note
-    const header = card.createDiv({ cls: 'sequence-card-header' })
-    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
-
-    // Parent icon
-    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
-    setIcon(iconEl, 'layers')
-
-    // Parent title/filename (clickable)
-    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
-    const cache = this.app.metadataCache.getFileCache(sequence.root.file)
-    const title = (cache?.frontmatter?.title as string | undefined) || sequence.root.file.basename
-    titleEl.setText(title)
-    titleEl.addEventListener('click', (e) => {
-      e.stopPropagation()
-      void this.app.workspace.getLeaf(false).openFile(sequence.root.file)
-    })
-
-    // Action buttons container
-    const actionsEl = headerContent.createDiv({ cls: 'sequence-card-actions' })
-
-    // Open in new tab button
-    const openBtn = actionsEl.createDiv({
-      cls: 'sequence-card-action-btn',
-      attr: { 'aria-label': 'Open sequence in new tab' },
-    })
-    setIcon(openBtn, 'external-link')
-    openBtn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      void this.app.workspace.getLeaf(true).openFile(sequence.root.file)
-    })
-
-    // Card body with children
-    const body = card.createDiv({ cls: 'sequence-card-body' })
-
-    // Filter out the root node (level 0) since it's already shown in the header
-    const childNodes = sequence.allNodes.filter((node) => node.level > 0)
-
-    if (childNodes.length === 0) {
-      body.createDiv({
-        cls: 'sequence-card-empty',
-        text: 'No children',
-      })
-    } else {
-      // Render child nodes only (excluding root)
-      childNodes.forEach((node) => {
-        // Adjust level for indent since we're excluding root (level 0)
-        // First children (level 1) should have minimal indent
-        const adjustedLevel = node.level - 1
-        const item = body.createDiv({
-          cls: 'sequence-child-item',
-          attr: { style: `padding-left: ${12 + adjustedLevel * 20}px` },
-        })
-
-        // Child title/filename
-        const childTitleEl = item.createDiv({ cls: 'sequence-child-title' })
-        const childCache = this.app.metadataCache.getFileCache(node.file)
-        const childTitle =
-          (childCache?.frontmatter?.title as string | undefined) || node.file.basename
-        childTitleEl.setText(childTitle)
-
-        // Click handler to open the file
-        item.addEventListener('click', (e) => {
-          e.stopPropagation()
-          void this.app.workspace.getLeaf(false).openFile(node.file)
-        })
-      })
-    }
-  }
-
-   
   async onClose(): Promise<void> {
-    // Clear any pending refresh timeout
-    if (this.refreshTimeout) {
-      activeWindow.clearTimeout(this.refreshTimeout)
-      this.refreshTimeout = null
-    }
+    this.scheduleRefresh.cancel()
   }
 }

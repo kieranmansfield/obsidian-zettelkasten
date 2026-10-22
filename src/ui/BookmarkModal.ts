@@ -1,39 +1,17 @@
-import { App, Modal, Setting } from 'obsidian'
-import type ZettelkastenPlugin from '../main'
-import { FileSuggest } from './FileSuggest'
-import { FolderSuggest } from './FolderSuggest'
-import { SearchQuerySuggest } from './SearchQuerySuggest'
-
-export interface Bookmark {
-  type: 'file' | 'search' | 'graph' | 'folder'
-  path?: string
-  title: string
-  query?: string
-}
+import { App, Modal, Notice, Setting, type TextComponent } from 'obsidian'
+import type { Bookmark } from '../base/settings'
+import { TextSuggest, filePaths, folderPaths, searchQueries } from './TextSuggest'
 
 export class BookmarkModal extends Modal {
-  plugin: ZettelkastenPlugin
-  type: 'file' | 'search' | 'graph' | 'folder'
+  type: Bookmark['type'] = 'file'
   path?: string
-  title: string
+  title = ''
   query?: string
   onSubmit: (bookmark: Bookmark) => void
+  private titleInput?: TextComponent
 
-  constructor(
-    app: App,
-    plugin: ZettelkastenPlugin,
-    onSubmit: (bookmark: Bookmark) => void,
-    initialType?: 'file' | 'search' | 'graph' | 'folder',
-    initialPath?: string,
-    initialQuery?: string,
-    initialTitle?: string
-  ) {
+  constructor(app: App, onSubmit: (bookmark: Bookmark) => void) {
     super(app)
-    this.plugin = plugin
-    this.type = initialType || 'file'
-    this.path = initialPath
-    this.query = initialQuery
-    this.title = initialTitle || ''
     this.onSubmit = onSubmit
   }
 
@@ -54,7 +32,7 @@ export class BookmarkModal extends Modal {
           .addOption('folder', 'Folder')
           .setValue(this.type)
           .onChange((value) => {
-            this.type = value as 'file' | 'search' | 'graph' | 'folder'
+            this.type = value as Bookmark['type']
             this.updateInputFields()
           })
       })
@@ -96,29 +74,14 @@ export class BookmarkModal extends Modal {
     // Path or query field depending on type
     if (this.type === 'file') {
       new Setting(container).setName('File path').addText((text) => {
-        const onSelect = (value: string) => {
+        new TextSuggest(this.app, text.inputEl, filePaths(this.app), (value) => {
           text.setValue(value)
-          this.path = value
-          // Auto-fill title from file name if title is empty
-          if (!this.title) {
-            const fileName = value.split('/').pop()?.replace('.md', '') || ''
-            this.title = fileName
-            this.updateTitleField()
-          }
-        }
-        new FileSuggest(this.app, text.inputEl, onSelect)
+          this.setPath(value)
+        })
         text
           .setPlaceholder('path/to/file.md')
           .setValue(this.path || '')
-          .onChange((value) => {
-            this.path = value
-            // Auto-fill title from file name if title is empty
-            if (!this.title) {
-              const fileName = value.split('/').pop()?.replace('.md', '') || ''
-              this.title = fileName
-              this.updateTitleField()
-            }
-          })
+          .onChange((value) => this.setPath(value))
       })
     } else if (this.type === 'search') {
       new Setting(container).setName('Search query').addText((text) => {
@@ -126,7 +89,7 @@ export class BookmarkModal extends Modal {
           text.setValue(value)
           this.query = value
         }
-        new SearchQuerySuggest(this.app, text.inputEl, onSelect)
+        new TextSuggest(this.app, text.inputEl, searchQueries(this.app), onSelect)
         text
           .setPlaceholder('Enter search query')
           .setValue(this.query || '')
@@ -136,29 +99,14 @@ export class BookmarkModal extends Modal {
       })
     } else if (this.type === 'folder') {
       new Setting(container).setName('Folder path').addText((text) => {
-        const onSelect = (value: string) => {
+        new TextSuggest(this.app, text.inputEl, folderPaths(this.app), (value) => {
           text.setValue(value)
-          this.path = value
-          // Auto-fill title from folder name if title is empty
-          if (!this.title) {
-            const folderName = value.split('/').pop() || ''
-            this.title = folderName
-            this.updateTitleField()
-          }
-        }
-        new FolderSuggest(this.app, text.inputEl, onSelect)
+          this.setPath(value)
+        })
         text
           .setPlaceholder('Path to folder')
           .setValue(this.path || '')
-          .onChange((value) => {
-            this.path = value
-            // Auto-fill title from folder name if title is empty
-            if (!this.title) {
-              const folderName = value.split('/').pop() || ''
-              this.title = folderName
-              this.updateTitleField()
-            }
-          })
+          .onChange((value) => this.setPath(value))
       })
     }
 
@@ -170,9 +118,17 @@ export class BookmarkModal extends Modal {
         .onChange((value) => {
           this.title = value
         })
-      // Store reference for updating
-      ;(container as HTMLElement & { titleInput?: typeof text }).titleInput = text
+      this.titleInput = text
     })
+  }
+
+  /** Set the path; an empty title takes the file or folder name */
+  private setPath(value: string): void {
+    this.path = value
+    if (!this.title) {
+      this.title = (value.split('/').pop() ?? '').replace(/\.md$/, '')
+      this.titleInput?.setValue(this.title)
+    }
   }
 
   private updateInputFields(): void {
@@ -182,46 +138,17 @@ export class BookmarkModal extends Modal {
     }
   }
 
-  private updateTitleField(): void {
-    const fieldsContainer = this.contentEl.querySelector('.bookmark-fields') as HTMLElement & {
-      titleInput?: { setValue: (value: string) => void }
-    }
-    if (fieldsContainer?.titleInput) {
-      fieldsContainer.titleInput.setValue(this.title)
-    }
-  }
-
   private validateAndSubmit(): boolean {
-    // Validate based on type
-    if (this.type === 'file' && !this.path) {
-      // Error: file path required
+    const target = { file: this.path, folder: this.path, search: this.query, graph: 'graph' }[
+      this.type
+    ]
+    if (!target || !this.title) {
+      new Notice(
+        `Fill in the ${target ? 'display name' : this.type === 'search' ? 'search query' : 'path'}`
+      )
       return false
     }
-    if (this.type === 'search' && !this.query) {
-      // Error: search query required
-      return false
-    }
-    if (this.type === 'folder' && !this.path) {
-      // Error: folder path required
-      return false
-    }
-    if (!this.title) {
-      // Error: title required
-      return false
-    }
-
-    this.onSubmit({
-      type: this.type,
-      path: this.path,
-      title: this.title,
-      query: this.query,
-    })
-
+    this.onSubmit({ type: this.type, path: this.path, title: this.title, query: this.query })
     return true
-  }
-
-  onClose(): void {
-    const { contentEl } = this
-    contentEl.empty()
   }
 }

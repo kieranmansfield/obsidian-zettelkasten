@@ -58,7 +58,6 @@ zettel: {
   template: string              // Template content
   filenameFormat: FilenameFormat // Filename format mode
   separator: string             // Separator between ID and title
-  autoLinkToParent: boolean     // Auto-link child to parent
   openOnCreate: boolean         // Open in editor after creation
 }
 ```
@@ -84,16 +83,10 @@ export default class ZettelkastenPlugin extends Plugin {
   private settingsManager!: SettingsManager
 
   async onload() {
-    // Load settings
-    await this.loadSettings()
-
-    // Use settings
-    console.log('Slip-box:', this.settingsManager.getZettel().defaultFolder)
-  }
-
-  private async loadSettings(): Promise<void> {
-    this.settingsManager = new SettingsManager(this)
+    // The callback runs after every save (main.ts refreshes the sidebar)
+    this.settingsManager = new SettingsManager(this, () => {})
     await this.settingsManager.load()
+    console.log('Slip-box:', this.settingsManager.get('zettel').defaultFolder)
   }
 }
 ```
@@ -105,32 +98,25 @@ export default class ZettelkastenPlugin extends Plugin {
 const allSettings = settingsManager.getAll()
 
 // Get specific section
-const zettelSettings = settingsManager.getZettel()
-const commandSettings = settingsManager.getCommands()
+const zettelSettings = settingsManager.get('zettel')
 
-// Check command enabled state
-const isEnabled = settingsManager.isCommandEnabled('create-zettel-note')
+// Read one value by dotted path
+const folder = settingsManager.getPath('zettel.defaultFolder')
+
+// Enabled state of every command the user has toggled
+const enabled = settingsManager.getEnabledCommandsMap()
 ```
 
 ### Updating Settings
 
 ```typescript
-// Update entire section
-await settingsManager.updateZettel({
-  defaultFolder: 'my-slip-box',
-})
+// Update one value by dotted path (saves and refreshes the sidebar)
+await settingsManager.setPath('zettel.defaultFolder', 'my-slip-box')
+await settingsManager.setPath('zettel.filenameFormat', FilenameFormat.ID_ONLY)
 
 // Update single command
 await settingsManager.enableCommand('create-zettel-note')
 await settingsManager.disableCommand('create-fleeting-note')
-
-// Update zettel settings
-await settingsManager.updateZettel({
-  template: '# {{title}}\n\nTags: \n\n',
-  openOnCreate: false,
-  filenameFormat: FilenameFormat.ID_ONLY, // Pure ID mode
-  separator: ' - ', // Custom separator
-})
 ```
 
 ### Resetting Settings
@@ -138,10 +124,6 @@ await settingsManager.updateZettel({
 ```typescript
 // Reset all settings to defaults
 await settingsManager.resetToDefaults()
-
-// Reset specific section
-await settingsManager.resetSection('commands')
-await settingsManager.resetSection('zettel')
 ```
 
 ### Import/Export
@@ -160,8 +142,6 @@ All default values are defined in `DEFAULT_SETTINGS`:
 
 ```typescript
 export const DEFAULT_SETTINGS: PluginSettings = {
-  version: '0.1.4',
-
   commands: {
     enabledCommands: {},
   },
@@ -169,7 +149,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   zettel: {
     defaultFolder: 'slipbox',
     template: PERMANENT_TEMPLATE,
-    autoLinkToParent: true,
     openOnCreate: true,
   },
 
@@ -179,29 +158,15 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
 ## Settings Migration
 
-`load()` runs `migrateToSlipBox` on the raw data before merging it with the defaults (boxes and tag/link zettel detection become the flat slip-box folder), then `migrate()` for version bumps. Compare versions with `compareSemver`, never as strings (`'0.1.10' < '0.1.4'` is true):
-
-```typescript
-private async migrate(): Promise<void> {
-  const currentVersion = this.settings.version
-  let needsSave = false
-
-  if (compareSemver(currentVersion ?? '0.0.0', '0.1.4') < 0) {
-    this.settings.version = '0.1.4'
-    needsSave = true
-  }
-
-  if (needsSave) await this.save()
-}
-```
+`load()` and `import()` both run the raw data through the same migrations before merging it over the
+defaults: `zettelkastenView` → `zettelkastenSidebar`, `migrateToSlipBox` (boxes and tag/link zettel
+detection become the flat slip-box folder) and `migrateReferencesToLiterature`. Migrations key off
+which old properties are present, not a version number.
 
 ### Adding New Migrations
 
-When you release a new version with breaking changes:
-
-1. Update `DEFAULT_SETTINGS.version`
-2. Add a `compareSemver(currentVersion ?? '0.0.0', '<version>') < 0` block in `migrate()`, or a raw-data step next to `migrateToSlipBox` when an old key is renamed or removed
-3. Add a test in `SettingsManager.test.ts` with the old settings data
+1. Add a raw-data step in `SettingsManager.apply()` that renames or removes the old key
+2. Add a test in `SettingsManager.test.ts` with the old settings data
 
 ## Settings Tab
 
@@ -227,7 +192,7 @@ To add a setting, add its default in `DefaultSettings.ts`, its type in `src/base
 
 ```typescript
 // ✅ Good - returns copy
-const zettel = settingsManager.getZettel()
+const zettel = settingsManager.get('zettel')
 
 // ❌ Bad - direct access
 const zettel = settingsManager['settings'].zettel
@@ -236,8 +201,8 @@ const zettel = settingsManager['settings'].zettel
 ### 2. Update Then Save
 
 ```typescript
-// ✅ Good - update methods auto-save
-await settingsManager.updateZettel({ defaultFolder: 'new-folder' })
+// ✅ Good - setPath saves
+await settingsManager.setPath('zettel.defaultFolder', 'new-folder')
 
 // ❌ Bad - manual modification
 settingsManager.settings.zettel.defaultFolder = 'new-folder'
@@ -246,11 +211,8 @@ settingsManager.settings.zettel.defaultFolder = 'new-folder'
 ### 3. Use Type-Safe Methods
 
 ```typescript
-// ✅ Good - type-safe
-await settingsManager.updateZettel({
-  template: '# {{title}}\n\n',
-  openOnCreate: true,
-})
+// ✅ Good - goes through the manager
+await settingsManager.setPath('zettel.openOnCreate', true)
 
 // ❌ Bad - bypasses type safety
 await settingsManager['settings'].zettel = { ... }
@@ -298,19 +260,10 @@ Filenames contain ZettelId + separator + title:
 You can customize the separator between ID and title:
 
 ```typescript
-await settingsManager.updateZettel({
-  separator: ' - '  // Use dash
-})
+await settingsManager.setPath('zettel.separator', '-')
 // Result: 20240612153000000a1b2 - My Note Title.md
 
-await settingsManager.updateZettel({
-  separator: ' | '  // Use pipe
-})
-// Result: 20240612153000000a1b2 | My Note Title.md
-
-await settingsManager.updateZettel({
-  separator: ' ⁝ '  // Default tricolon
-})
+await settingsManager.setPath('zettel.separator', '⁝') // Default tricolon
 // Result: 20240612153000000a1b2 ⁝ My Note Title.md
 ```
 
@@ -348,8 +301,8 @@ const settings = plugin.getSettingsManager()
 console.log(settings.getAll())
 
 // Test updates
-await settings.updateZettel({ defaultFolder: 'test-folder' })
-console.log(settings.getZettel())
+await settings.setPath('zettel.defaultFolder', 'test-folder')
+console.log(settings.get('zettel'))
 
 // Test export
 console.log(settings.export())

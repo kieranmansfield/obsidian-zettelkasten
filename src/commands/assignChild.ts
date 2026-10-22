@@ -16,8 +16,6 @@ export const assignChildCommand: CommandFactory = (context) => {
     metadata: {
       category: 'note-sequences',
       description: 'Assign a child zettel to the active note',
-      canBeDisabled: true,
-      enabledByDefault: true,
     },
 
     execute: () => {

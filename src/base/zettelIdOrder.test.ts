@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   compareZettelFiles,
   compareZettelIds,
+  generateTimeStampId,
   isChildOf,
   isDescendantOf,
   nextFreeChildId,
@@ -25,6 +26,12 @@ describe('parseZettelId', () => {
     })
     expect(parseZettelId(`zk${T}`)?.id).toBe(T)
     expect(parseZettelId('Index')).toBeNull()
+  })
+
+  it('reads a fresh timestamp as a root ID', () => {
+    const id = generateTimeStampId()
+    expect(id).toMatch(/^\d{17}$/)
+    expect(parseZettelId(id)).toEqual({ id, timestamp: id, segments: [] })
   })
 })
 

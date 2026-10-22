@@ -1,271 +1,94 @@
-import { Plugin, addIcon, Platform } from 'obsidian'
+import { Plugin, Platform } from 'obsidian'
 import FileService from './service/file.service'
-import ZettelNote from './core/zettelNote.class'
-import FleetingNote from './core/fleetingNote.class'
-import IndexNote from './core/indexNote.class'
-import LiteratureNote from './core/literatureNote.class'
+import { noteKinds } from './core/note.class'
 import NoteSequenceService from './service/noteSequence.service'
 import CommandRegistry from './commands/CommandRegistry'
 import SettingsManager from './settings/SettingsManager'
 import SettingsTab from './settings/SettingsTab'
-import type { CommandContext } from './base/command'
-import * as commands from './commands'
+import { allCommands } from './commands'
 import { NoteSequencesView, VIEW_TYPE_NOTE_SEQUENCES } from './ui/NoteSequencesView'
 import { SequenceNavigatorView, VIEW_TYPE_SEQUENCE_NAVIGATOR } from './ui/SequenceNavigatorView'
-import { ZettelkastenSidebar, VIEW_TYPE_ZETTELKASTEN } from './ui/ZettelkastenSidebar'
-import { NoteSequencesBasesView, VIEW_TYPE_NOTE_SEQUENCES_BASES } from './ui/NoteSequencesBasesView'
+import {
+  ZettelkastenSidebar,
+  VIEW_TYPE_ZETTELKASTEN,
+  revealZettelkastenSidebar,
+} from './ui/ZettelkastenSidebar'
 import { createNoteSequenceCardsViewRegistration } from './ui/NoteSequenceCardsView'
 
 export default class ZettelkastenPlugin extends Plugin {
   private settingsManager!: SettingsManager
-  private fileService!: FileService
-  private zettelNote!: ZettelNote
-  private fleetingNote!: FleetingNote
-  private indexNote!: IndexNote
-  private literatureNote!: LiteratureNote
-  private noteSequenceService!: NoteSequenceService
-  private commandRegistry!: CommandRegistry
+  private commandRegistry = new CommandRegistry(this)
 
   async onload() {
-
-    // Register custom icon for plugin settings
-    addIcon(
-      'zettelkasten-icon',
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor">
-        <rect x="10" y="30" width="15" height="50" stroke-width="2" fill="currentColor" opacity="0.3"/>
-        <rect x="28" y="25" width="15" height="55" stroke-width="2" fill="currentColor" opacity="0.4"/>
-        <rect x="46" y="28" width="15" height="52" stroke-width="2" fill="currentColor" opacity="0.5"/>
-        <rect x="64" y="22" width="15" height="58" stroke-width="2" fill="currentColor" opacity="0.3"/>
-        <rect x="82" y="26" width="15" height="54" stroke-width="2" fill="currentColor" opacity="0.4"/>
-        <line x1="5" y1="82" x2="100" y2="82" stroke-width="3"/>
-      </svg>`
-    )
-
-    // Load settings first
-    await this.loadSettings()
-
-    // Add settings tab
+    // Saved settings change what the sidebar shows
+    this.settingsManager = new SettingsManager(this, () => {
+      for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)) {
+        if (leaf.view instanceof ZettelkastenSidebar) leaf.view.refresh()
+      }
+    })
+    await this.settingsManager.load()
     this.addSettingTab(new SettingsTab(this.app, this))
 
-    // Initialize services immediately (don't wait for layout ready)
-    this.initializeServices()
+    const fileService = new FileService(this.app)
+    const noteSequenceService = new NoteSequenceService(this.app)
 
-    // Initialize note types
-    this.initializeNoteTypes()
+    // Views must be registered before Obsidian restores the workspace layout, or their tabs go blank
+    this.registerView(VIEW_TYPE_ZETTELKASTEN, (leaf) => new ZettelkastenSidebar(leaf, this))
+    this.registerView(
+      VIEW_TYPE_NOTE_SEQUENCES,
+      (leaf) => new NoteSequencesView(leaf, noteSequenceService)
+    )
+    this.registerView(
+      VIEW_TYPE_SEQUENCE_NAVIGATOR,
+      (leaf) => new SequenceNavigatorView(leaf, noteSequenceService)
+    )
 
-    // Register views BEFORE layout is ready to prevent ghost icons
-    // Views must be registered before Obsidian restores the workspace layout
-    this.registerViews()
+    const sequences = this.settingsManager.get('noteSequences')
+    if (sequences.enabled && sequences.showSequencesView) {
+      this.registerBasesView(
+        'note-sequence-cards',
+        createNoteSequenceCardsViewRegistration(noteSequenceService)
+      )
+    }
 
-    // Register Bases views
-    this.registerBasesViews()
-
-    // Register commands after layout is ready
     this.app.workspace.onLayoutReady(() => {
-      try {
-        this.registerCommands()
-        // Ensure Zettelkasten view is in left sidebar on mobile
-        this.ensureZettelkastenSidebarLocationOnMobile()
-      } catch (err) {
-        console.error('Error during plugin initialization:', err)
+      this.commandRegistry.registerAll(
+        allCommands,
+        {
+          app: this.app,
+          fileService,
+          settingsManager: this.settingsManager,
+          noteSequenceService,
+          ...noteKinds(this.app, fileService, this.settingsManager),
+        },
+        this.settingsManager.getEnabledCommandsMap()
+      )
+
+      // Mobile can restore the sidebar outside the left dock
+      const { workspace } = this.app
+      if (Platform.isMobile && workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN).length) {
+        void revealZettelkastenSidebar(workspace)
       }
     })
   }
 
-  /**
-   * Load plugin settings
-   */
-  private async loadSettings(): Promise<void> {
-    this.settingsManager = new SettingsManager(this)
-    await this.settingsManager.load()
-  }
-
-  /**
-   * Initialize core services
-   */
-  private initializeServices(): void {
-    this.fileService = new FileService(this.app)
-    this.noteSequenceService = new NoteSequenceService(this.app, this.fileService)
-  }
-
-  /**
-   * Initialize note type handlers
-   */
-  private initializeNoteTypes(): void {
-    this.zettelNote = new ZettelNote(this.fileService, this.settingsManager)
-    this.fleetingNote = new FleetingNote(this.fileService)
-    this.indexNote = new IndexNote(this.fileService)
-    this.literatureNote = new LiteratureNote(this.fileService)
-  }
-
-  /**
-   * Register views for Note Sequences and Zettelkasten Sidebar
-   */
-  private registerViews(): void {
-    const rootFolder = this.settingsManager.getZettel().defaultFolder
-
-    // Always register view types (even if disabled) to prevent ghost icons
-    this.registerView(VIEW_TYPE_ZETTELKASTEN, (leaf) => new ZettelkastenSidebar(leaf, this))
-
-    this.registerView(
-      VIEW_TYPE_NOTE_SEQUENCES,
-      (leaf) => new NoteSequencesView(leaf, this.noteSequenceService, rootFolder)
-    )
-
-    this.registerView(
-      VIEW_TYPE_NOTE_SEQUENCES_BASES,
-      (leaf) => new NoteSequencesBasesView(leaf, this.noteSequenceService, rootFolder)
-    )
-
-    this.registerView(
-      VIEW_TYPE_SEQUENCE_NAVIGATOR,
-      (leaf) => new SequenceNavigatorView(leaf, this.noteSequenceService)
-    )
-  }
-
-  /**
-   * Register Bases views
-   */
-  private registerBasesViews(): void {
-    const sequenceSettings = this.settingsManager.getNoteSequences()
-
-    if (!sequenceSettings.enabled || !sequenceSettings.showSequencesView) {
-      return
-    }
-
-    // Register Note Sequence Cards Bases View
-    const registration = createNoteSequenceCardsViewRegistration(this.noteSequenceService)
-    this.registerBasesView('note-sequence-cards', registration)
-  }
-
-  /**
-   * Register all plugin commands
-   */
-  private registerCommands(): void {
-    // Build command context with all dependencies
-    const context: CommandContext = {
-      app: this.app,
-      plugin: this,
-      fileService: this.fileService,
-      settingsManager: this.settingsManager,
-      noteSequenceService: this.noteSequenceService,
-      zettelNote: this.zettelNote,
-      fleetingNote: this.fleetingNote,
-      indexNote: this.indexNote,
-      literatureNote: this.literatureNote,
-    }
-
-    // Initialize command registry
-    this.commandRegistry = new CommandRegistry(this, context)
-
-    // Register all commands
-    this.commandRegistry
-      .add(commands.createZettelNoteCommand)
-      .add(commands.createFleetingNoteCommand)
-      .add(commands.createIndexNoteCommand)
-      .add(commands.createLiteratureNoteCommand)
-      .add(commands.openZettelCommand)
-      .add(commands.openIndexCommand)
-      .add(commands.openNoteSequencesViewCommand)
-      // .add(commands.openNoteSequencesBasesViewCommand)
-      .add(commands.openSequenceNavigatorViewCommand)
-      .add(commands.openSequenceNavigatorModalCommand)
-      .add(commands.openSequenceCommandPaletteCommand)
-      .add(commands.openZettelkastenSidebarCommand)
-      .add(commands.indentZettelCommand)
-      .add(commands.outdentZettelCommand)
-      .add(commands.assignParentCommand)
-      .add(commands.assignChildCommand)
-      .add(commands.openParentZettelCommand)
-      .add(commands.openChildZettelCommand)
-      .add(commands.nextSiblingCommand)
-      .add(commands.nextChildCommand)
-      .add(commands.nextSequenceCommand)
-      .add(commands.addBookmarkCommand)
-      .add(commands.removeBookmarkCommand)
-      .registerAll(this.getEnabledCommandsFromSettings())
-  }
-
-  /**
-   * Get enabled commands from settings
-   */
-  private getEnabledCommandsFromSettings(): Map<string, boolean> {
-    return this.settingsManager.getEnabledCommandsMap()
-  }
-
-  /**
-   * Get the settings manager (useful for settings UI)
-   */
   public getSettingsManager(): SettingsManager {
     return this.settingsManager
   }
 
-  /**
-   * Get the command registry (useful for settings UI)
-   */
   public getCommandRegistry(): CommandRegistry {
     return this.commandRegistry
   }
 
-  /**
-   * Enable a command: adds it to the command palette straight away
-   */
+  /** Add a command to the palette straight away and remember it */
   public async enableCommand(commandId: string): Promise<void> {
     this.commandRegistry.enableCommand(commandId)
     await this.settingsManager.enableCommand(commandId)
   }
 
-  /**
-   * Disable a command: removes it from the command palette straight away
-   */
+  /** Remove a command from the palette straight away and remember it */
   public async disableCommand(commandId: string): Promise<void> {
     this.commandRegistry.disableCommand(commandId)
     await this.settingsManager.disableCommand(commandId)
-  }
-
-  /**
-   * Ensure Zettelkasten sidebar is in the left sidebar on mobile
-   * This runs on layout ready to fix any workspace restoration issues
-   */
-  private ensureZettelkastenSidebarLocationOnMobile(): void {
-    // Only run on mobile devices
-    if (!Platform.isMobile) {
-      return
-    }
-
-    const { workspace } = this.app
-    const existing = workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
-
-    // If no view is open, nothing to do
-    if (existing.length === 0) {
-      return
-    }
-
-    const existingLeaf = existing[0]
-
-    // Check if the existing leaf's parent is the left split
-    const isInLeftSidebar = existingLeaf.getRoot() === workspace.leftSplit
-
-    // If it's not in the left sidebar, move it there
-    if (!isInLeftSidebar) {
-      // Close the view in the wrong location
-      existingLeaf.detach()
-
-      // Open in the correct location (left sidebar)
-      void (async () => {
-        const leaf = workspace.getLeftLeaf(false)
-        if (leaf) {
-          await leaf.setViewState({
-            type: VIEW_TYPE_ZETTELKASTEN,
-            active: true,
-          })
-        }
-      })()
-    }
-  }
-
-  onunload() {
-
-    // Detach all custom views
   }
 }

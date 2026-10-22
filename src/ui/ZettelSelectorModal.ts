@@ -24,13 +24,19 @@ class ZettelSelectorModal extends FuzzySuggestModal<TFile> {
     return getFileTitle(this.app, file)
   }
 
-  renderSuggestion(value: { item: TFile }, el: HTMLElement): void {
-    el.createDiv({ cls: 'suggestion-title', text: this.getItemText(value.item) })
-  }
-
   onChooseItem(file: TFile): void {
     this.onChoose(file)
   }
+}
+
+/** Pick one of `zettels` by title */
+export function pickZettel(
+  app: App,
+  zettels: TFile[],
+  placeholder: string,
+  onChoose: (file: TFile) => unknown
+): void {
+  new ZettelSelectorModal(app, zettels, placeholder, (file) => void onChoose(file)).open()
 }
 
 /** Pick another zettel from the active file's folder */
@@ -54,7 +60,5 @@ export function pickZettelInFolder(
     return
   }
 
-  new ZettelSelectorModal(app, zettels, placeholder, (file) => {
-    void onChoose(file)
-  }).open()
+  pickZettel(app, zettels, placeholder, onChoose)
 }

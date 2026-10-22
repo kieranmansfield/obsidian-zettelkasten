@@ -1,9 +1,7 @@
-import { Notice } from 'obsidian'
+import { FuzzySuggestModal, Notice, type App } from 'obsidian'
 import { BookmarkModal } from '../ui/BookmarkModal'
 import type { CommandFactory } from '../base/command'
-import { VIEW_TYPE_ZETTELKASTEN } from '../ui/ZettelkastenSidebar'
 import type { Bookmark } from '../base/settings'
-import type ZettelkastenPlugin from '../main'
 
 /**
  * Add Bookmark Command
@@ -19,43 +17,42 @@ export const addBookmarkCommand: CommandFactory = (context) => {
     metadata: {
       category: 'bookmarks',
       description: 'Add a new bookmark (file, search, graph, or folder)',
-      canBeDisabled: true,
-      enabledByDefault: true,
     },
 
     execute: () => {
-      if (!context.app || !context.settingsManager || !context.plugin) {
-        console.error('Required services not available')
-        return
-      }
-
-      const zkPlugin = context.plugin as ZettelkastenPlugin
       const settings = context.settingsManager
-
-      new BookmarkModal(context.app, zkPlugin, (bookmark: Bookmark) => {
+      new BookmarkModal(context.app, (bookmark) => {
         void (async () => {
-          // Get current bookmarks
-          const viewSettings = settings.getZettelkastenSidebar()
-          const bookmarks = [...viewSettings.bookmarks]
-
-          // Add new bookmark
-          bookmarks.push(bookmark)
-
-          // Save updated bookmarks
-          await settings.updateZettelkastenSidebar({ bookmarks })
-
+          const { bookmarks } = settings.get('zettelkastenSidebar')
+          // Saving refreshes an open sidebar
+          await settings.setPath('zettelkastenSidebar.bookmarks', [...bookmarks, bookmark])
           new Notice(`Bookmark "${bookmark.title}" added`)
-
-          // Refresh the view immediately if it's open
-          const leaves = context.app.workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
-          leaves.forEach((leaf) => {
-            if (leaf.view && 'refreshImmediate' in leaf.view) {
-              ;(leaf.view as { refreshImmediate: () => void }).refreshImmediate()
-            }
-          })
         })()
       }).open()
     },
+  }
+}
+
+class BookmarkPicker extends FuzzySuggestModal<Bookmark> {
+  constructor(
+    app: App,
+    private bookmarks: Bookmark[],
+    private onChoose: (bookmark: Bookmark) => void
+  ) {
+    super(app)
+    this.setPlaceholder('Select bookmark to remove...')
+  }
+
+  getItems(): Bookmark[] {
+    return this.bookmarks
+  }
+
+  getItemText(bookmark: Bookmark): string {
+    return bookmark.title
+  }
+
+  onChooseItem(bookmark: Bookmark): void {
+    this.onChoose(bookmark)
   }
 }
 
@@ -73,80 +70,26 @@ export const removeBookmarkCommand: CommandFactory = (context) => {
     metadata: {
       category: 'bookmarks',
       description: 'Remove an existing bookmark',
-      canBeDisabled: true,
-      enabledByDefault: true,
     },
 
-    execute: async () => {
-      if (!context.app || !context.settingsManager) {
-        console.error('Required services not available')
-        return
-      }
-
+    execute: () => {
       const settings = context.settingsManager
-      const viewSettings = settings.getZettelkastenSidebar()
-      const bookmarks = viewSettings.bookmarks
-
+      const { bookmarks } = settings.get('zettelkastenSidebar')
       if (bookmarks.length === 0) {
         new Notice('No bookmarks to remove')
         return
       }
 
-      // Create a quick picker to select bookmark to remove
-      const bookmarkNames = bookmarks.map((b: Bookmark) => b.title)
-
-      // Use Obsidian's suggester
-      const selected = await new Promise<string | null>((resolve, reject) => {
-        try {
-          // Using internal API - suppress the error for this line
-           
-          ;(
-            context.app.workspace as unknown as {
-              suggester: (
-                items: string[],
-                values: string[],
-                onSelect: (value: string) => void,
-                onCancel: () => void
-              ) => void
-            }
-          ).suggester(
-            bookmarkNames,
-            bookmarkNames,
-            (selected: string) => {
-              resolve(selected)
-            },
-            () => {
-              resolve(null)
-            }
+      new BookmarkPicker(context.app, bookmarks, (removed) => {
+        void (async () => {
+          // Saving refreshes an open sidebar
+          await settings.setPath(
+            'zettelkastenSidebar.bookmarks',
+            bookmarks.filter((b) => b !== removed)
           )
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error(String(error)))
-        }
-      })
-
-      if (!selected) {
-        return
-      }
-
-      // Find and remove the bookmark
-      const index = bookmarks.findIndex((b: Bookmark) => b.title === selected)
-      if (index !== -1) {
-        const removedBookmark = bookmarks[index]
-        const updatedBookmarks = bookmarks.filter((_: Bookmark, i: number) => i !== index)
-
-        // Save updated bookmarks
-        await settings.updateZettelkastenSidebar({ bookmarks: updatedBookmarks })
-
-        new Notice(`Bookmark "${removedBookmark.title}" removed`)
-
-        // Refresh the view immediately if it's open
-        const leaves = context.app.workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
-        leaves.forEach((leaf) => {
-          if (leaf.view && 'refreshImmediate' in leaf.view) {
-            ;(leaf.view as { refreshImmediate: () => void }).refreshImmediate()
-          }
-        })
-      }
+          new Notice(`Bookmark "${removed.title}" removed`)
+        })()
+      }).open()
     },
   }
 }

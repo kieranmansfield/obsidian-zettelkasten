@@ -1,5 +1,3 @@
-import { deepSplitSegment } from './zettelId'
-
 /**
  * Zettel ID rules: a 17-digit timestamp, then segments alternating letters (index 0, 2, …)
  * and numbers (index 1, 3, …). Hierarchy and order are segment-wise, never string-wise:
@@ -20,7 +18,21 @@ const ID_PATTERN = /^(?:[a-z]+)?(\d{17})((?:[a-z]+|\d+)*)/
 export function parseZettelId(basename: string): ParsedZettelId | null {
   const match = basename.match(ID_PATTERN)
   if (!match) return null
-  return { id: match[1] + match[2], timestamp: match[1], segments: deepSplitSegment(match[2]) }
+  return {
+    id: match[1] + match[2],
+    timestamp: match[1],
+    segments: match[2].match(/[a-z]+|\d+/g) ?? [],
+  }
+}
+
+/** New zettel ID timestamp, YYYYMMDDHHmmssSSS in local time */
+export function generateTimeStampId(): string {
+  const d = new Date()
+  const pad = (n: number, width = 2) => String(n).padStart(width, '0')
+  return (
+    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}` +
+    `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}${pad(d.getMilliseconds(), 3)}`
+  )
 }
 
 /** Kind of the segment at a given index: letters first, then alternating */

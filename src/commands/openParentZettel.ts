@@ -1,10 +1,8 @@
 import type { CommandFactory } from '../base/command'
-import { Notice } from 'obsidian'
+import { activeZettel, openZettel } from '../base/sequenceEdit'
 
 /**
  * Command: Open Parent Zettel / Up a Level
- *
- * Opens the parent zettel of the active note
  */
 export const openParentZettelCommand: CommandFactory = (context) => {
   return {
@@ -15,33 +13,18 @@ export const openParentZettelCommand: CommandFactory = (context) => {
     metadata: {
       category: 'note-sequences',
       description: 'Navigate to parent zettel',
-      canBeDisabled: true,
-      enabledByDefault: true,
     },
 
     execute: async () => {
-      const activeFile = context.app.workspace.getActiveFile()
-      if (!activeFile) {
-        new Notice('No active file')
-        return
-      }
-
-      if (!context.noteSequenceService) {
-        new Notice('Note sequence service not available')
-        return
-      }
-
-      const result = context.noteSequenceService.navigateToParent(activeFile)
-
-      if (!result.success || !result.node) {
-        new Notice(result.error || 'Failed to find parent zettel')
-        return
-      }
-
-      // Open the parent file
-      const leaf = context.app.workspace.getLeaf(false)
-      await leaf.openFile(result.node.file)
-      new Notice(`Navigated to parent: ${result.node.file.basename}`)
+      const active = activeZettel(context)
+      if (!active) return
+      const sequences = context.noteSequenceService
+      await openZettel(
+        context,
+        sequences.parent(active.file),
+        'Navigated to parent',
+        'No parent zettel found'
+      )
     },
   }
 }

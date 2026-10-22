@@ -1,9 +1,49 @@
 import { App, FuzzySuggestModal, FuzzyMatch, TFile } from 'obsidian'
 
+import { frontmatterTitle } from '../base/fileHelpers'
+
 interface ZettelItem {
   file: TFile
   displayText: string
   isAlias: boolean
+}
+
+/** One item per file (frontmatter title, else filename), plus one per alias */
+function zettelItems(app: App, files: TFile[]): ZettelItem[] {
+  return files.flatMap((file) => {
+    const cache = app.metadataCache.getFileCache(file)
+    const aliases: unknown = cache?.frontmatter?.aliases
+    return [
+      { file, displayText: frontmatterTitle(cache) ?? file.basename, isAlias: false },
+      ...(Array.isArray(aliases) ? aliases : [])
+        .filter((alias): alias is string => typeof alias === 'string')
+        .map((alias) => ({ file, displayText: alias, isAlias: true })),
+    ]
+  })
+}
+
+/** Title with the first match in bold; below it the filename, or "alias of <title>" */
+function renderZettelSuggestion(app: App, value: FuzzyMatch<ZettelItem>, el: HTMLElement): void {
+  const { item } = value
+  const title = frontmatterTitle(app.metadataCache.getFileCache(item.file))
+
+  const titleEl = el.createDiv({ cls: 'suggestion-title' })
+  titleEl.setText(item.displayText)
+  if (item.isAlias || title) {
+    el.createDiv({
+      cls: 'suggestion-note-filename',
+      text: item.isAlias ? `alias of ${title ?? item.file.basename}` : item.file.basename,
+    })
+  }
+
+  const [first] = value.match.matches
+  const text = titleEl.firstChild
+  if (first && text) {
+    const range = new Range()
+    range.setStart(text, first[0])
+    range.setEnd(text, first[1])
+    range.surroundContents(activeDocument.createEl('b'))
+  }
 }
 
 /**
@@ -14,10 +54,10 @@ interface ZettelItem {
  * - Doesn't auto-select until arrow key pressed
  */
 export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
-  private items: ZettelItem[] = []
+  protected items: ZettelItem[]
   private completion: (file: TFile) => void
   private initialQuery: string
-  private hasInteracted: boolean = false
+  protected hasInteracted = false
 
   constructor(
     app: App,
@@ -31,44 +71,15 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
     this.emptyStateText = 'No zettels found'
     this.setPlaceholder('Search for a zettel...')
 
-    // Build items list with title, filename, and aliases
-    files.forEach((file) => {
-      const cache = this.app.metadataCache.getFileCache(file)
-      const frontmatterTitle: unknown = cache?.frontmatter?.title
-      const title = typeof frontmatterTitle === 'string' ? frontmatterTitle : null
+    this.items = zettelItems(app, files)
 
-      // Add main entry (using title if available, otherwise filename)
-      this.items.push({
-        file,
-        displayText: title || file.basename,
-        isAlias: false,
+    // Note arrow-key use; the suggester's own handler still moves the selection
+    for (const key of ['ArrowDown', 'ArrowUp']) {
+      this.scope.register([], key, () => {
+        this.hasInteracted = true
+        return false
       })
-
-      // Add aliases as additional entries
-      const aliases: unknown = cache?.frontmatter?.aliases
-      if (aliases && Array.isArray(aliases)) {
-        aliases.forEach((alias: unknown) => {
-          if (typeof alias === 'string') {
-            this.items.push({
-              file,
-              displayText: alias,
-              isAlias: true,
-            })
-          }
-        })
-      }
-    })
-
-    // Override the default key handler to track interaction
-    this.scope.register([], 'ArrowDown', (evt: KeyboardEvent) => {
-      this.hasInteracted = true
-      return false // Let the default handler run
-    })
-
-    this.scope.register([], 'ArrowUp', (evt: KeyboardEvent) => {
-      this.hasInteracted = true
-      return false // Let the default handler run
-    })
+    }
   }
 
   onOpen(): void {
@@ -77,15 +88,12 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
     const event = new Event('input')
     this.inputEl.dispatchEvent(event)
 
-    // Remove initial selection
-    void Promise.resolve().then(() => {
-      activeWindow.setTimeout(() => {
-        const selectedEl = this.modalEl.querySelector('.suggestion-item.is-selected')
-        if (selectedEl && !this.hasInteracted) {
-          selectedEl.removeClass('is-selected')
-        }
-      }, 10)
-    })
+    // Like the quick switcher, nothing is selected until an arrow key is pressed
+    activeWindow.setTimeout(() => {
+      if (!this.hasInteracted) {
+        this.modalEl.querySelector('.suggestion-item.is-selected')?.removeClass('is-selected')
+      }
+    }, 10)
   }
 
   getItems(): ZettelItem[] {
@@ -97,43 +105,10 @@ export class ZettelSuggester extends FuzzySuggestModal<ZettelItem> {
   }
 
   renderSuggestion(value: FuzzyMatch<ZettelItem>, el: HTMLElement): void {
-    const item = value.item
-    const cache = this.app.metadataCache.getFileCache(item.file)
-    const frontmatterTitle: unknown = cache?.frontmatter?.title
-    const title =
-      (typeof frontmatterTitle === 'string' ? frontmatterTitle : null) || item.file.basename
-
-    // Main title
-    const titleEl = el.createDiv({ cls: 'suggestion-title' })
-    titleEl.setText(item.displayText)
-
-    // Show "alias of [title]" if this is an alias
-    if (item.isAlias) {
-      const aliasEl = el.createDiv({ cls: 'suggestion-note-filename' })
-      aliasEl.setText(`alias of ${title}`)
-    } else if (cache?.frontmatter?.title) {
-      // Show filename if we're displaying a title
-      const filenameEl = el.createDiv({ cls: 'suggestion-note-filename' })
-      filenameEl.setText(item.file.basename)
-    }
-
-    // Highlight matches
-    const matches = value.match.matches
-    if (matches && matches.length > 0) {
-      const start = matches[0][0]
-      const end = matches[0][1]
-      const range = new Range()
-      const text = titleEl.firstChild
-
-      if (text) {
-        range.setStart(text, start)
-        range.setEnd(text, end)
-        range.surroundContents(activeDocument.createEl('b'))
-      }
-    }
+    renderZettelSuggestion(this.app, value, el)
   }
 
-  onChooseItem(item: ZettelItem, _evt: MouseEvent | KeyboardEvent): void {
+  onChooseItem(item: ZettelItem): void {
     this.completion(item.file)
   }
 }

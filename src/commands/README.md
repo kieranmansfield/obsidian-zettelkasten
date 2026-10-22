@@ -53,25 +53,15 @@ export const myNewCommand: CommandFactory = (context) => {
 
 ### Step 2: Export from index.ts
 
-Add your command to `src/commands/index.ts`:
+Add your command to `allCommands` in `src/commands/index.ts`; `main.ts` registers that list:
 
 ```typescript
-export { myNewCommand } from './myNewCommand'
-```
+import { myNewCommand } from './myNewCommand'
 
-### Step 3: Register in main.ts
-
-Add your command to the registry in `src/main.ts`:
-
-```typescript
-private registerCommands(): void {
-  // ... existing code ...
-
-  this.commandRegistry
-    .add(commands.createZettelNoteCommand)
-    .add(commands.myNewCommand)  // Add here
-    .registerAll()
-}
+export const allCommands: CommandFactory[] = [
+  // ... existing commands ...
+  myNewCommand,
+]
 ```
 
 That's it! Your command is now registered and available in Obsidian's command palette.
@@ -152,42 +142,30 @@ return {
 
 ```typescript
 import type { CommandFactory } from '../base/command'
+import { activeZettel, openZettel } from '../base/sequenceEdit'
 
 /**
- * Command: Create Child Zettel
+ * Command: Previous Sibling
  *
- * Creates a new zettel as a child of the currently active zettel
+ * Opens the previous sibling of the active zettel
  */
-export const createChildZettelCommand: CommandFactory = (context) => {
+export const previousSiblingCommand: CommandFactory = (context) => {
   return {
-    id: 'create-child-zettel',
-    name: 'Create Child Zettel',
-    icon: 'file-plus-2',
+    id: 'previous-sibling',
+    name: 'Previous Sibling',
+    icon: 'arrow-left',
 
-    editorCallback: async (editor, view) => {
-      const { zettelNote } = context
-
-      // Get current file
-      const file = view.file
-      if (!file) return
-
-      // Extract parent ZettelId from filename
-      const [parentId] = file.basename.split(' ')
-
-      // Create child zettel
-      const result = await zettelNote.createChild(
-        ZettelId.parse(parentId),
-        {
-          title: 'Child Note',
-          content: `# Child Note\n\nParent: [[${file.basename}]]\n\n`,
-        }
-      )
-
-      console.log('Created child zettel:', result)
+    execute: async () => {
+      const active = activeZettel(context) // tells the user when there is none
+      if (!active) return
+      const prev = context.noteSequenceService.adjacent(active.file, -1)
+      await openZettel(context, prev, 'Navigated to previous sibling', 'Already at first sibling')
     },
   }
 }
 ```
+
+Every service in `CommandContext` is always present; commands need no null checks. Commands default to enabled; users switch them off in Settings → Manage commands. A thrown error or rejected promise from `execute` is logged by the registry.
 
 ## Dynamic Command Management
 
@@ -201,8 +179,6 @@ Each command includes metadata for settings integration:
 metadata: {
   category: 'note-creation',           // Groups commands in settings UI
   description: 'Create a new zettel',  // Shown in settings
-  canBeDisabled: true,                 // Can users disable this?
-  enabledByDefault: true,              // Initial state
 }
 ```
 
@@ -213,17 +189,8 @@ metadata: {
 plugin.enableCommand('create-zettel-note')
 plugin.disableCommand('create-fleeting-note')
 
-// Access the registry
-const registry = plugin.getCommandRegistry()
-
-// Check command state
-if (registry.isCommandEnabled('create-zettel-note')) {
-  // Command is active
-}
-
-// Get commands by category
-const creationCommands = registry.getCommandsByCategory()
-  .get('note-creation')
+// Every registered command, by ID
+const commands = plugin.getCommandRegistry().getAllCommands()
 ```
 
 ### Settings Integration

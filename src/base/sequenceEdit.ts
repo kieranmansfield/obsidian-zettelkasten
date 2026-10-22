@@ -64,13 +64,13 @@ function confirmRenames(app: App, renames: SubtreeRename[]): Promise<boolean> {
 }
 
 async function applyRenames(context: CommandContext, renames: SubtreeRename[]): Promise<boolean> {
-  const settings = context.settingsManager!.getZettel()
+  const settings = context.settingsManager.get('zettel')
   for (const [i, r] of renames.entries()) {
     const file = context.app.vault.getFileByPath(r.path)
     try {
       if (!file) throw new Error(`${r.path} not found`)
       const newName = zettelRename(context.app, file, r.newId, settings)
-      await context.fileService!.rename({ file, newName })
+      await context.fileService.rename(file, newName)
     } catch (err) {
       console.error('Zettelkasten: rename failed', r, err)
       new Notice(`Stopped after ${i} of ${renames.length} renames: ${r.oldId} → ${r.newId} failed`)
@@ -88,9 +88,20 @@ export function activeZettel(context: CommandContext): { file: TFile; id: string
     new Notice(file ? 'Current file is not a zettel note' : 'No active file')
     return null
   }
-  if (!context.settingsManager || !context.fileService) {
-    new Notice('Required services not available')
-    return null
-  }
   return { file, id }
+}
+
+/** Open `target` in the current tab and say `label: <name>`, or say `missing` when there is none */
+export async function openZettel(
+  context: CommandContext,
+  target: TFile | null,
+  label: string,
+  missing: string
+): Promise<void> {
+  if (!target) {
+    new Notice(missing)
+    return
+  }
+  await context.app.workspace.getLeaf(false).openFile(target)
+  new Notice(`${label}: ${target.basename}`)
 }

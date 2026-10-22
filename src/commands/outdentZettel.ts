@@ -17,8 +17,6 @@ export const outdentZettelCommand: CommandFactory = (context) => {
     metadata: {
       category: 'note-sequences',
       description: 'Make zettel a sibling of its parent',
-      canBeDisabled: true,
-      enabledByDefault: true,
     },
 
     execute: async () => {

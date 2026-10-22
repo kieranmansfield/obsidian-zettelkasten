@@ -1,4 +1,5 @@
 import type { CommandFactory } from '../base/command'
+import { activeZettel } from '../base/sequenceEdit'
 import { SequenceNavigatorModal } from '../ui/SequenceNavigatorModal'
 
 /**
@@ -15,29 +16,12 @@ export const openSequenceNavigatorModalCommand: CommandFactory = (context) => {
     metadata: {
       category: 'note-sequences',
       description: 'Open modal with arrow key shortcuts for sequence navigation',
-      canBeDisabled: true,
-      enabledByDefault: true,
     },
 
     execute: () => {
-      const activeFile = context.app.workspace.getActiveFile()
-
-      if (!activeFile) {
-        return
-      }
-
-      if (!context.noteSequenceService) {
-        return
-      }
-
-      // Check if this file is a zettel
-      const isZettel = context.noteSequenceService.getCore().isZettelNote(activeFile)
-      if (!isZettel) {
-        return
-      }
-
-      // Open the modal
-      new SequenceNavigatorModal(context.app, context.noteSequenceService, activeFile).open()
+      const active = activeZettel(context)
+      if (!active) return
+      new SequenceNavigatorModal(context.app, context.noteSequenceService, active.file).open()
     },
   }
 }

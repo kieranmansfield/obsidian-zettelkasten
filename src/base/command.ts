@@ -1,11 +1,8 @@
-import type { App, Command, Plugin } from 'obsidian'
+import type { App, Command } from 'obsidian'
 import type FileService from '../service/file.service'
 import type SettingsManager from '../settings/SettingsManager'
 import type NoteSequenceService from '../service/noteSequence.service'
-import type ZettelNote from '../core/zettelNote.class'
-import type FleetingNote from '../core/fleetingNote.class'
-import type IndexNote from '../core/indexNote.class'
-import type LiteratureNote from '../core/literatureNote.class'
+import type NoteCore from '../core/note.class'
 
 /**
  * Command metadata for settings and management
@@ -21,17 +18,6 @@ export interface CommandMetadata {
    * Description for settings UI
    */
   description?: string
-
-  /**
-   * Whether this command can be disabled in settings
-   * Some core commands might always need to be enabled
-   */
-  canBeDisabled?: boolean
-
-  /**
-   * Default enabled state
-   */
-  enabledByDefault?: boolean
 }
 
 /**
@@ -42,7 +28,7 @@ export interface BaseCommand extends Omit<Command, 'callback'> {
   /**
    * Execute the command
    */
-  execute: () => void | Promise<void>
+  execute: () => unknown
 
   /**
    * Metadata for settings integration
@@ -50,25 +36,16 @@ export interface BaseCommand extends Omit<Command, 'callback'> {
   metadata?: CommandMetadata
 }
 
-/**
- * Dependencies that commands might need
- * This grows as the plugin adds more services
- */
+/** Services every command receives; main.ts builds them all before registering commands */
 export interface CommandContext {
-  // Core services
   app: App
-  plugin?: Plugin
-
-  // Plugin services (add as needed)
-  fileService?: FileService
-  settingsManager?: SettingsManager
-  noteSequenceService?: NoteSequenceService
-
-  // Note types
-  zettelNote?: ZettelNote
-  fleetingNote?: FleetingNote
-  indexNote?: IndexNote
-  literatureNote?: LiteratureNote
+  fileService: FileService
+  settingsManager: SettingsManager
+  noteSequenceService: NoteSequenceService
+  zettelNote: NoteCore
+  fleetingNote: NoteCore
+  indexNote: NoteCore
+  literatureNote: NoteCore
 }
 
 /**

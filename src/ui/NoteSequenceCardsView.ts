@@ -1,14 +1,6 @@
-import {
-  BasesView,
-  BasesViewRegistration,
-  BasesViewFactory,
-  QueryController,
-  TFile,
-  setIcon,
-} from 'obsidian'
+import { BasesView, BasesViewRegistration, QueryController } from 'obsidian'
 import type NoteSequenceService from '../service/noteSequence.service'
-import type { NoteSequence } from '../base/noteSequence'
-import { getFileTitle } from '../base/fileHelpers'
+import { renderEmptyState, renderSequenceCards } from './sequenceCards'
 
 /**
  * NoteSequenceCardsView
@@ -16,7 +8,7 @@ import { getFileTitle } from '../base/fileHelpers'
  * Bases View layout that displays note sequences as cards.
  * This view is available when viewing a .base file.
  */
-export class NoteSequenceCardsView extends BasesView {
+class NoteSequenceCardsView extends BasesView {
   type = 'note-sequence-cards'
   private sequenceService: NoteSequenceService
   private contentEl: HTMLElement | null = null
@@ -52,169 +44,36 @@ export class NoteSequenceCardsView extends BasesView {
 
     const container = this.contentEl
 
-    // Get all files from the query result
     const files = this.data.data.map((entry) => entry.file).filter((f) => f !== null)
-
     if (files.length === 0) {
-      const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
-      emptyState.createEl('h3', { text: 'No notes in this base' })
-      emptyState.createEl('p', {
-        text: 'Add notes to this base to see them as sequence cards',
-        cls: 'setting-item-description',
-      })
+      renderEmptyState(
+        container,
+        'No notes in this base',
+        'Add notes to this base to see them as sequence cards'
+      )
       return
     }
 
-    // Get root zettels
-    const core = this.sequenceService.getCore()
-    const rootZettels = core.findAllRoots(files)
-
-    if (rootZettels.length === 0) {
-      const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
-      emptyState.createEl('h3', { text: 'No root zettel notes found' })
-      emptyState.createEl('p', {
-        text: 'Root zettel ids are 17 digits long, for example "20241202193045123"',
-        cls: 'setting-item-description',
-      })
+    const roots = this.sequenceService.roots(files)
+    if (roots.length === 0) {
+      renderEmptyState(
+        container,
+        'No root zettel notes found',
+        'Root zettel ids are 17 digits long, for example "20241202193045123"'
+      )
       return
     }
 
-    // Create grid container for cards
-    const gridContainer = container.createDiv({ cls: 'sequence-grid' })
-
-    // Display each root zettel with its children as a card
-    // Only show sequences with children (more than 1 note total)
-    rootZettels.forEach((rootFile) => {
-      const sequence = this.sequenceService.getSequenceForFile(rootFile)
-      if (sequence && sequence.allNodes.length > 1) {
-        this.createSequenceCard(gridContainer, sequence)
-      }
-    })
-
-    // If no sequences with children, show empty state
-    if (gridContainer.children.length === 0) {
-      const emptyState = container.createDiv({ cls: 'sequence-empty-state' })
-      emptyState.createEl('p', {
-        text: 'No sequences with children found.',
-      })
-      emptyState.createEl('p', {
-        text: 'Create child notes to see sequences displayed here.',
-        cls: 'setting-item-description',
-      })
+    const sequences = this.sequenceService.sequencesWithChildren(roots)
+    if (sequences.length === 0) {
+      renderEmptyState(
+        container,
+        'No sequences with children found',
+        'Create child notes to see sequences displayed here.'
+      )
+      return
     }
-  }
-
-  /**
-   * Create a card for a root note without children
-   */
-  private createRootOnlyCard(container: HTMLElement, file: TFile): void {
-    const card = container.createDiv({ cls: 'sequence-card' })
-
-    // Card header
-    const header = card.createDiv({ cls: 'sequence-card-header' })
-    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
-
-    // Icon
-    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
-    setIcon(iconEl, 'file')
-
-    // Title (clickable)
-    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
-    const title = getFileTitle(this.app, file)
-    titleEl.setText(title)
-    titleEl.addEventListener('click', (e) => {
-      e.stopPropagation()
-      void this.app.workspace.getLeaf(false).openFile(file)
-    })
-
-    // Card body
-    const body = card.createDiv({ cls: 'sequence-card-body' })
-    body.createDiv({
-      cls: 'sequence-card-empty',
-      text: 'No children',
-    })
-  }
-
-  /**
-   * Create a card for a note sequence
-   */
-  private createSequenceCard(container: HTMLElement, sequence: NoteSequence): void {
-    const card = container.createDiv({ cls: 'sequence-card' })
-
-    // Card header with parent note
-    const header = card.createDiv({ cls: 'sequence-card-header' })
-    const headerContent = header.createDiv({ cls: 'sequence-card-header-content' })
-
-    // Parent icon
-    const iconEl = headerContent.createDiv({ cls: 'sequence-card-icon' })
-    setIcon(iconEl, 'layers')
-
-    // Parent title (clickable)
-    const titleEl = headerContent.createDiv({ cls: 'sequence-card-title' })
-    const title = getFileTitle(this.app, sequence.root.file)
-    titleEl.setText(title)
-    titleEl.addEventListener('click', (e) => {
-      e.stopPropagation()
-      void this.app.workspace.getLeaf(false).openFile(sequence.root.file)
-    })
-
-    // Action buttons container
-    const actionsEl = headerContent.createDiv({ cls: 'sequence-card-actions' })
-
-    // Open in new tab button
-    const openBtn = actionsEl.createDiv({
-      cls: 'sequence-card-action-btn',
-      attr: { 'aria-label': 'Open sequence in new tab' },
-    })
-    setIcon(openBtn, 'external-link')
-    openBtn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      void this.app.workspace.getLeaf(true).openFile(sequence.root.file)
-    })
-
-    // Card body with children only (exclude root which is level 0)
-    const body = card.createDiv({ cls: 'sequence-card-body' })
-
-    // Filter to only show children (level > 0), excluding the root
-    const children = sequence.allNodes.filter((node) => node.level > 0)
-
-    if (children.length === 0) {
-      body.createDiv({
-        cls: 'sequence-card-empty',
-        text: 'No children',
-      })
-    } else {
-      // Render child nodes (flattened hierarchy)
-      children.forEach((node) => {
-        const item = body.createDiv({
-          cls: 'sequence-child-item',
-          // Adjust padding: level 1 gets base padding, each deeper level adds more
-          attr: { style: `padding-left: ${12 + (node.level - 1) * 20}px` },
-        })
-
-        // Child title
-        const childTitleEl = item.createDiv({ cls: 'sequence-child-title' })
-        const childTitle = getFileTitle(this.app, node.file)
-        childTitleEl.setText(childTitle)
-
-        // Click handler to open the file
-        item.addEventListener('click', (e) => {
-          e.stopPropagation()
-          void this.app.workspace.getLeaf(false).openFile(node.file)
-        })
-      })
-    }
-  }
-}
-
-/**
- * Factory function to create NoteSequenceCardsView instances
- */
-export function createNoteSequenceCardsViewFactory(
-  sequenceService: NoteSequenceService
-): BasesViewFactory {
-  return (controller: QueryController, containerEl: HTMLElement) => {
-    return new NoteSequenceCardsView(controller, containerEl, sequenceService)
+    renderSequenceCards(this.app, container, sequences)
   }
 }
 
@@ -227,6 +86,7 @@ export function createNoteSequenceCardsViewRegistration(
   return {
     name: 'Note Sequence Cards',
     icon: 'layers',
-    factory: createNoteSequenceCardsViewFactory(sequenceService),
+    factory: (controller: QueryController, containerEl: HTMLElement) =>
+      new NoteSequenceCardsView(controller, containerEl, sequenceService),
   }
 }

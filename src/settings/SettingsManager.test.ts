@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Plugin } from 'obsidian'
-import SettingsManager, { compareSemver } from './SettingsManager'
-import { INDEX_TEMPLATE, STRUCTURE_MARKER } from './DefaultSettings'
+import SettingsManager from './SettingsManager'
+import { DEFAULT_SETTINGS, INDEX_TEMPLATE, STRUCTURE_MARKER } from './DefaultSettings'
 
 const load = async (data: unknown) => {
   const m = new SettingsManager({
@@ -16,7 +16,6 @@ describe('SettingsManager', () => {
   it('defaults to the strict Zettelkasten areas', async () => {
     const s = await load(null)
     expect(s.zettel.defaultFolder).toBe('slipbox')
-    expect(s.zettel.zettelIdFormat).toBe('YYYYMMDDHHmmssSSS')
     expect(s.fleeting.folder).toBe('inbox')
     expect(s.literature.folder).toBe('reference')
     expect(s.boxes).toBeUndefined()
@@ -41,6 +40,19 @@ describe('SettingsManager', () => {
     expect(s.index.enabled).toBe(false)
   })
 
+  it('moves legacy reference settings to literature', async () => {
+    const s = await load({
+      zettelkastenSidebar: {
+        showReferences: false,
+        literatureFilterTag: '',
+        referencesFilterTag: 'src',
+      },
+    })
+    expect(s.zettelkastenSidebar.showLiterature).toBe(false)
+    expect(s.zettelkastenSidebar.literatureFilterTag).toBe('src')
+    expect(s.zettelkastenSidebar.showReferences).toBeUndefined()
+  })
+
   it('keeps an existing slip-box folder', async () => {
     const s = await load({ boxes: { rootFolder: 'old' }, zettel: { defaultFolder: 'Zettels' } })
     expect(s.zettel.defaultFolder).toBe('Zettels')
@@ -56,10 +68,29 @@ describe('SettingsManager', () => {
   })
 })
 
-describe('compareSemver', () => {
-  it('compares numerically', () => {
-    expect(compareSemver('0.1.10', '0.1.4')).toBeGreaterThan(0)
-    expect(compareSemver('0.1.4', '0.1.4')).toBe(0)
-    expect(compareSemver('0.0.9', '0.1.0')).toBeLessThan(0)
+describe('SettingsManager import', () => {
+  it('migrates an old export like saved data', async () => {
+    const m = new SettingsManager({
+      loadData: async () => null,
+      saveData: async () => {},
+    } as unknown as Plugin)
+    await m.import(JSON.stringify({ boxes: { rootFolder: 'old' }, zettel: { defaultFolder: '' } }))
+    expect(m.get('zettel').defaultFolder).toBe('old')
+    expect('boxes' in m.getAll()).toBe(false)
+    await expect(m.import('{oops')).rejects.toThrow('Failed to import settings')
+  })
+})
+
+describe('SettingsManager defaults', () => {
+  it('never writes through to DEFAULT_SETTINGS', async () => {
+    const m = new SettingsManager({
+      loadData: async () => null,
+      saveData: async () => {},
+    } as unknown as Plugin)
+    await m.load()
+    await m.enableCommand('some-command')
+    expect(DEFAULT_SETTINGS.commands.enabledCommands).toEqual({})
+    await m.resetToDefaults()
+    expect(m.getEnabledCommandsMap().size).toBe(0)
   })
 })

@@ -1,30 +1,48 @@
 import {
   ItemView,
   WorkspaceLeaf,
+  type Workspace,
   TFile,
   TFolder,
   setIcon,
   Menu,
   MenuItem as ObsidianMenuItem,
   Platform,
+  debounce,
 } from 'obsidian'
 import type ZettelkastenPlugin from '../main'
-import { VIEW_TYPE_NOTE_SEQUENCES } from './NoteSequencesView'
-import { matchesFilter, matchesMarker } from 'src/base/fileHelpers'
-import { STRUCTURE_MARKER } from 'src/settings/DefaultSettings'
+import { openNoteSequencesView } from './NoteSequencesView'
+import { onFileChanges } from './viewEvents'
+import { sidebarAreas, type MenuItem } from './sidebarAreas'
+import { getFileTitle, isInFolder, matchesFilter } from 'src/base/fileHelpers'
 import type { Bookmark } from 'src/base/settings'
-import { ZettelDetectionMode } from 'src/base/settings'
 
 export const VIEW_TYPE_ZETTELKASTEN = 'zettelkasten-view'
 
-interface MenuItem {
+/** Open or focus the sidebar in the left dock, first moving it there if mobile put it elsewhere */
+export async function revealZettelkastenSidebar(workspace: Workspace): Promise<void> {
+  for (const leaf of workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)) {
+    if (Platform.isMobile && leaf.getRoot() !== workspace.leftSplit) leaf.detach()
+  }
+  await workspace.ensureSideLeaf(VIEW_TYPE_ZETTELKASTEN, 'left', { active: true })
+}
+
+const BOOKMARK_ICONS: Record<Bookmark['type'], string> = {
+  file: 'file-text',
+  search: 'search',
+  graph: 'git-branch-plus',
+  folder: 'folder',
+}
+
+interface SectionOptions {
   name: string
   icon: string
-  folder: string
-  dashboardNote?: string
-  showFiles: boolean
-  filterFunc?: (file: TFile) => boolean
-  useFolderFilter: boolean // false for tag-based detection
+  /** Has children to show or hide */
+  collapsible: boolean
+  /** Heading action; a collapsible section toggles when there is none */
+  onOpen?: () => void
+  path?: string
+  active?: boolean
 }
 
 /**
@@ -36,7 +54,7 @@ interface MenuItem {
 export class ZettelkastenSidebar extends ItemView {
   private plugin: ZettelkastenPlugin
   private collapsedSections: Set<string> = new Set()
-  private refreshTimeout: number | null = null
+  private scheduleRefresh = debounce(() => this.refresh(), 150, true)
 
   constructor(leaf: WorkspaceLeaf, plugin: ZettelkastenPlugin) {
     super(leaf)
@@ -67,10 +85,8 @@ export class ZettelkastenSidebar extends ItemView {
   }
 
   private registerEvents(): void {
-    // Refresh panel when files are created, deleted, or modified
-    this.registerEvent(this.app.vault.on('create', () => this.scheduleRefresh()))
-    this.registerEvent(this.app.vault.on('delete', () => this.scheduleRefresh()))
-    this.registerEvent(this.app.vault.on('rename', () => this.scheduleRefresh()))
+    // Refresh panel when files are created, deleted, renamed or modified
+    onFileChanges(this, this.app.vault, this.scheduleRefresh)
     this.registerEvent(this.app.vault.on('modify', () => this.scheduleRefresh()))
 
     // Refresh when metadata changes (tags, frontmatter, etc.)
@@ -82,29 +98,6 @@ export class ZettelkastenSidebar extends ItemView {
 
     // Refresh when layout changes
     this.registerEvent(this.app.workspace.on('layout-change', () => this.scheduleRefresh()))
-  }
-
-  private scheduleRefresh(): void {
-    // Debounce refreshes to avoid excessive updates
-    if (this.refreshTimeout) {
-      activeWindow.clearTimeout(this.refreshTimeout)
-    }
-    this.refreshTimeout = activeWindow.setTimeout(() => {
-      this.refresh()
-      this.refreshTimeout = null
-    }, 150)
-  }
-
-  /**
-   * Immediately refresh the view without debouncing
-   * Use this for critical operations that need instant feedback
-   */
-  public refreshImmediate(): void {
-    if (this.refreshTimeout) {
-      activeWindow.clearTimeout(this.refreshTimeout)
-      this.refreshTimeout = null
-    }
-    this.refresh()
   }
 
   public refresh(): void {
@@ -128,398 +121,112 @@ export class ZettelkastenSidebar extends ItemView {
     return 'square-library'
   }
 
-   
   async onOpen(): Promise<void> {
-    const container = this.containerEl.children[1] as HTMLElement
-    container.empty()
-    // Add specific class for scoping CSS and native file explorer structure
-    container.addClass('zettelkasten-sidebar')
-    container.addClass('nav-files-container')
-    this.renderContent(container)
+    this.refresh()
   }
 
   private renderContent(container: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-
-    const fleetingSettings = settings.getFleeting()
-    const zettelSettings = settings.getZettel()
-    const literatureSettings = settings.getLiterature()
-    const indexSettings = settings.getIndex()
-    const viewSettings = settings.getZettelkastenSidebar()
-
-    const menuItems: MenuItem[] = []
-
-    // Fleeting Notes (Inbox)
-    if (viewSettings.showInbox && fleetingSettings.enabled) {
-      const useTagDetection = fleetingSettings.detectionMode !== ZettelDetectionMode.FOLDER
-      menuItems.push({
-        name: viewSettings.inboxName || 'Inbox',
-        icon: 'inbox',
-        folder: fleetingSettings.folder,
-        dashboardNote: viewSettings.dashboardFleetingNote,
-        showFiles: viewSettings.showInboxFiles,
-        useFolderFilter: !useTagDetection,
-        filterFunc: (file: TFile) => {
-          // Check detection mode
-          if (useTagDetection) {
-            if (!matchesMarker(this.app, file, fleetingSettings.tag, fleetingSettings.detectionMode)) {
-              return false
-            }
-          }
-          // else folder-based - will be filtered by folder in getFilesForItem
-
-          // Apply additional filter tag if specified
-          if (viewSettings.inboxFilterTag) {
-            return matchesFilter(this.app, file, viewSettings.inboxFilterTag)
-          }
-
-          return true
-        },
-      })
-    }
-
-    // Zettel Notes
-    if (viewSettings.showZettels && zettelSettings.enabled) {
-      const useTagDetection = zettelSettings.zettelDetectionMode !== ZettelDetectionMode.FOLDER
-      menuItems.push({
-        name: viewSettings.zettelsName || 'Zettels',
-        icon: 'gallery-vertical-end',
-        folder: zettelSettings.defaultFolder || '',
-        dashboardNote: viewSettings.dashboardZettelNote,
-        showFiles: viewSettings.showZettelFiles,
-        useFolderFilter: !useTagDetection,
-        filterFunc: (file: TFile) => {
-          // Check detection mode
-          if (useTagDetection) {
-            if (!matchesMarker(this.app, file, zettelSettings.zettelTag, zettelSettings.zettelDetectionMode)) {
-              return false
-            }
-          } else {
-            // Folder-based: also check for ZettelId pattern
-            const zettelIdPattern = /^\d{17}/
-            if (!zettelIdPattern.test(file.basename)) {
-              return false
-            }
-          }
-
-          // Apply additional filter tag if specified
-          if (viewSettings.zettelsFilterTag) {
-            return matchesFilter(this.app, file, viewSettings.zettelsFilterTag)
-          }
-
-          return true
-        },
-      })
-    }
-
-    // Literature Notes
-    // Support both old 'showReferences' and new 'showLiterature' for backward compatibility
-    /* eslint-disable @typescript-eslint/no-deprecated -- reading legacy settings on purpose */
-    const showLiterature = viewSettings.showLiterature ?? viewSettings.showReferences ?? true
-    const showLiteratureFiles =
-      viewSettings.showLiteratureFiles ?? viewSettings.showReferenceFiles ?? true
-    const literatureFilterTag =
-      viewSettings.literatureFilterTag || viewSettings.referencesFilterTag || ''
-    /* eslint-enable @typescript-eslint/no-deprecated */
-
-    if (showLiterature && literatureSettings.enabled) {
-      const useTagDetection = literatureSettings.detectionMode !== ZettelDetectionMode.FOLDER
-      menuItems.push({
-        name: viewSettings.literatureName || 'Literature',
-        icon: 'book-open',
-        folder: literatureSettings.folder,
-        dashboardNote: viewSettings.dashboardLiteratureNote,
-        showFiles: showLiteratureFiles,
-        useFolderFilter: !useTagDetection,
-        filterFunc: (file: TFile) => {
-          // Check detection mode
-          if (useTagDetection) {
-            if (!matchesMarker(this.app, file, literatureSettings.tag, literatureSettings.detectionMode)) {
-              return false
-            }
-          }
-          // else folder-based - will be filtered by folder in getFilesForItem
-
-          // Apply additional filter tag if specified
-          if (literatureFilterTag) {
-            return matchesFilter(this.app, file, literatureFilterTag)
-          }
-
-          return true
-        },
-      })
-    }
-
-    // Structure notes: `type: structure` notes in the slip-box
-    if (viewSettings.showIndex && indexSettings.enabled) {
-      menuItems.push({
-        name: viewSettings.indexName || 'Structure notes',
-        icon: 'list',
-        folder: zettelSettings.defaultFolder,
-        dashboardNote: viewSettings.dashboardIndexNote,
-        showFiles: viewSettings.showIndexFiles,
-        useFolderFilter: true,
-        filterFunc: (file: TFile) => {
-          if (!matchesMarker(this.app, file, STRUCTURE_MARKER, ZettelDetectionMode.PROPERTY)) {
-            return false
-          }
-
-          // Apply additional filter tag if specified
-          if (viewSettings.indexFilterTag) {
-            return matchesFilter(this.app, file, viewSettings.indexFilterTag)
-          }
-
-          return true
-        },
-      })
-    }
-
-    // Projects
-    const projectSettings = settings.getProjects()
-    if (viewSettings.showProjects && projectSettings.enabled) {
-      const useTagDetection = projectSettings.detectionMode !== ZettelDetectionMode.FOLDER
-      menuItems.push({
-        name: viewSettings.projectsName || 'Projects',
-        icon: 'folder-kanban',
-        folder: projectSettings.folder,
-        dashboardNote: viewSettings.dashboardProjectsNote,
-        showFiles: viewSettings.showProjectFiles,
-        useFolderFilter: !useTagDetection,
-        filterFunc: (file: TFile) => {
-          // Check detection mode
-          if (useTagDetection) {
-            if (!matchesMarker(this.app, file, projectSettings.tag, projectSettings.detectionMode)) {
-              return false
-            }
-          }
-          // else folder-based - will be filtered by folder in getFilesForItem
-
-          // Apply additional filter tag if specified
-          if (viewSettings.projectsFilterTag) {
-            return matchesFilter(this.app, file, viewSettings.projectsFilterTag)
-          }
-
-          return true
-        },
-      })
-    }
-
-    menuItems.forEach((item) => {
+    for (const item of sidebarAreas(this.app, this.plugin.getSettingsManager()))
       this.createMenuItem(container, item)
-    })
 
-    // Bookmarks section
     this.createBookmarksSection(container)
 
-    // Note Sequences section
-    const sequenceSettings = settings.getNoteSequences()
+    const sequenceSettings = this.plugin.getSettingsManager().get('noteSequences')
     if (sequenceSettings.enabled && sequenceSettings.showSequencesView) {
-      this.createNoteSequencesSection(container)
+      this.renderSection(container, {
+        name: 'Note Sequences',
+        icon: 'layers',
+        collapsible: false,
+        onOpen: () => void openNoteSequencesView(this.app.workspace),
+      })
     }
+  }
+
+  /**
+   * A section heading in file-explorer style (chevron, icon, name; mobile puts the chevron last)
+   * and its children container, collapsed state kept per section name
+   */
+  private renderSection(container: HTMLElement, section: SectionOptions): HTMLElement {
+    const collapsed = section.collapsible && this.collapsedSections.has(section.name)
+    const itemEl = container.createDiv({ cls: 'tree-item nav-folder' })
+    const headerEl = itemEl.createDiv({
+      cls: 'tree-item-self nav-folder-title is-clickable mod-collapsible zk-indent-section',
+    })
+    headerEl.setAttribute('draggable', 'true')
+    if (section.path !== undefined) headerEl.setAttribute('data-path', section.path)
+    headerEl.toggleClass('is-active', !!section.active)
+
+    const chevronEl = createDiv({ cls: 'tree-item-icon collapse-icon' })
+    if (section.collapsible) setIcon(chevronEl, 'right-triangle')
+    else chevronEl.addClass('zk-chevron-hidden') // keeps the spacing
+    const iconEl = createDiv({ cls: 'zk-section-icon' })
+    setIcon(iconEl, section.icon)
+    const nameEl = createDiv({
+      cls: 'tree-item-inner nav-folder-title-content',
+      text: section.name,
+    })
+    headerEl.append(
+      ...(Platform.isMobile ? [iconEl, nameEl, chevronEl] : [chevronEl, iconEl, nameEl])
+    )
+
+    const contentEl = itemEl.createDiv({ cls: 'tree-item-children nav-folder-children' })
+    const setCollapsed = (value: boolean) => {
+      itemEl.toggleClass('is-collapsed', value)
+      chevronEl.toggleClass('is-collapsed', value)
+      contentEl.setCssProps({ display: value ? 'none' : '' })
+    }
+    setCollapsed(collapsed)
+
+    const toggle = () => {
+      if (!section.collapsible) return section.onOpen?.()
+      const nowCollapsed = !this.collapsedSections.delete(section.name)
+      if (nowCollapsed) this.collapsedSections.add(section.name)
+      setCollapsed(nowCollapsed)
+      this.saveCollapsedSections()
+    }
+    const open = section.onOpen ?? toggle
+    const onClick = (action: () => void) => (e: MouseEvent) => {
+      e.stopPropagation()
+      action()
+    }
+    chevronEl.addEventListener('click', onClick(toggle))
+    iconEl.addEventListener('click', onClick(toggle))
+    nameEl.addEventListener('click', onClick(open))
+    // Clicks on the heading's padding and gaps
+    headerEl.addEventListener('click', (e) => {
+      if (e.target === headerEl) onClick(open)(e)
+    })
+    return contentEl
   }
 
   private createMenuItem(container: HTMLElement, item: MenuItem): void {
-    // Get files if enabled
-    let files: TFile[] = []
-    if (item.showFiles) {
-      files = this.getFilesForItem(item)
-    }
+    const files = item.showFiles ? this.getFilesForItem(item) : []
+    const dashboard = item.dashboardNote ? this.app.vault.getFileByPath(item.dashboardNote) : null
 
-    // Check dashboard file
-    let dashboardFile: TFile | null = null
-    if (item.dashboardNote) {
-      const file = this.app.vault.getAbstractFileByPath(item.dashboardNote)
-      if (file instanceof TFile) {
-        dashboardFile = file
-      }
-    }
-
-    // Check if dashboard is active
-    const activeFile = this.app.workspace.getActiveFile()
-    const isDashboardActive = dashboardFile && activeFile?.path === dashboardFile.path
-
-    // Check if collapsed
-    const isCollapsed = this.collapsedSections.has(item.name)
-
-    // Use native Obsidian classes to match file explorer
-    const itemEl = container.createDiv({
-      cls: `tree-item nav-folder${isCollapsed ? ' is-collapsed' : ''}`
+    const contentEl = this.renderSection(container, {
+      name: item.name,
+      icon: item.icon,
+      path: item.folder,
+      active: !!dashboard && this.app.workspace.getActiveFile()?.path === dashboard.path,
+      collapsible: files.length > 0,
+      onOpen: dashboard
+        ? () => void this.app.workspace.getLeaf(false).openFile(dashboard)
+        : undefined,
     })
-
-    // Header using native classes
-    const headerEl = itemEl.createDiv({
-      cls: 'tree-item-self nav-folder-title is-clickable mod-collapsible'
-    })
-    headerEl.setAttribute('draggable', 'true')
-    headerEl.setAttribute('data-path', item.folder)
-
-    // Apply native inline styles for padding
-    headerEl.addClass('zk-indent-section')
-
-    if (isDashboardActive) {
-      headerEl.addClass('is-active')
-    }
-
-    // Create elements in different order for mobile vs desktop
-    let collapseIconEl: HTMLElement
-    let sectionIconEl: HTMLElement
-    let nameEl: HTMLElement
-
-    if (Platform.isMobile) {
-      // Mobile: section icon, name, collapse icon (left to right)
-
-      // Custom section icon
-      sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
-      setIcon(sectionIconEl, item.icon)
-
-      // Item name
-      nameEl = headerEl.createDiv({
-        cls: 'tree-item-inner nav-folder-title-content',
-        text: item.name
-      })
-
-      // Collapse icon
-      collapseIconEl = headerEl.createDiv({
-        cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
-      })
-      // Only show chevron if there are files to display
-      if (item.showFiles && files.length > 0) {
-        setIcon(collapseIconEl, 'right-triangle')
-      } else {
-        // Keep the div for spacing but make it invisible
-        collapseIconEl.addClass('zk-chevron-hidden')
-      }
-    } else {
-      // Desktop: collapse icon, section icon, name (left to right)
-
-      // Collapse icon
-      collapseIconEl = headerEl.createDiv({
-        cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
-      })
-      // Only show chevron if there are files to display
-      if (item.showFiles && files.length > 0) {
-        setIcon(collapseIconEl, 'right-triangle')
-      } else {
-        // Keep the div for spacing but make it invisible
-        collapseIconEl.addClass('zk-chevron-hidden')
-      }
-
-      // Custom section icon
-      sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
-      setIcon(sectionIconEl, item.icon)
-
-      // Item name
-      nameEl = headerEl.createDiv({
-        cls: 'tree-item-inner nav-folder-title-content',
-        text: item.name
-      })
-    }
-
-    // Content area for files (children)
-    const contentEl = itemEl.createDiv({ cls: 'tree-item-children nav-folder-children' })
-    if (isCollapsed) {
-      contentEl.setCssProps({ display: 'none' })
-    }
-
-    // Toggle collapse function
-    const toggleCollapse = () => {
-      // Don't allow collapse if no files are shown
-      if (!item.showFiles || files.length === 0) return
-
-      const isCurrentlyCollapsed = this.collapsedSections.has(item.name)
-
-      if (isCurrentlyCollapsed) {
-        this.collapsedSections.delete(item.name)
-        itemEl.removeClass('is-collapsed')
-        collapseIconEl.removeClass('is-collapsed')
-        contentEl.setCssProps({ display: '' })
-      } else {
-        this.collapsedSections.add(item.name)
-        itemEl.addClass('is-collapsed')
-        collapseIconEl.addClass('is-collapsed')
-        contentEl.setCssProps({ display: 'none' })
-      }
-      this.saveCollapsedSections()
-    }
-
-    // Add click handlers to specific elements for reliable single-click behavior
-
-    // Collapse icon - always toggles
-    collapseIconEl.addEventListener('click', (e) => {
-      e.stopPropagation()
-      toggleCollapse()
-    })
-
-    // Section icon - always toggles
-    sectionIconEl.addEventListener('click', (e) => {
-      e.stopPropagation()
-      toggleCollapse()
-    })
-
-    // Title/name - opens dashboard or toggles
-    nameEl.addEventListener('click', (e) => {
-      e.stopPropagation()
-      if (dashboardFile) {
-        void this.app.workspace.getLeaf(false).openFile(dashboardFile)
-      } else if (item.showFiles) {
-        toggleCollapse()
-      }
-    })
-
-    // Header catch-all for clicks on padding/gaps
-    headerEl.addEventListener('click', (e) => {
-      // Only handle if not clicking on a child element
-      if (e.target === headerEl) {
-        e.stopPropagation()
-        if (dashboardFile) {
-          void this.app.workspace.getLeaf(false).openFile(dashboardFile)
-        } else if (item.showFiles) {
-          toggleCollapse()
-        }
-      }
-    })
-
-    // Display files (only if enabled)
-    if (item.showFiles) {
-      this.displayFiles(contentEl, files)
-    }
-
-    // Append the item to the container
-    container.appendChild(itemEl)
+    this.displayFiles(contentEl, files)
   }
 
+  /** The area's notes, most recently modified first */
   private getFilesForItem(item: MenuItem): TFile[] {
-    const allFiles = this.app.vault.getMarkdownFiles()
-
-    let files: TFile[]
-
-    // If using tag-based detection, search all files
-    // If using folder-based detection, filter by folder
-    if (!item.useFolderFilter) {
-      // Tag-based: get all markdown files
-      files = allFiles
-    } else {
-      // Folder-based: filter files in the folder
-      if (!item.folder) {
-        // If no folder (e.g., root), get all markdown files
-        files = allFiles
-      } else {
-        // Filter files in the folder (recursively)
-        files = allFiles.filter(
-          (file) => file.path.startsWith(item.folder + '/') || file.parent?.path === item.folder
-        )
-      }
-    }
-
-    // Apply additional filter if provided
-    if (item.filterFunc) {
-      files = files.filter(item.filterFunc)
-    }
-
-    // Sort by modification time (most recent first)
-    files.sort((a, b) => b.stat.mtime - a.stat.mtime)
-
-    return files
+    return this.app.vault
+      .getMarkdownFiles()
+      .filter(
+        (file) =>
+          (!item.inFolder || isInFolder(file.path, item.folder)) &&
+          (item.matches?.(file) ?? true) &&
+          (!item.filterTag || matchesFilter(this.app, file, item.filterTag))
+      )
+      .sort((a, b) => b.stat.mtime - a.stat.mtime)
   }
 
   private displayFiles(container: HTMLElement, files: TFile[]): void {
@@ -547,15 +254,10 @@ export class ZettelkastenSidebar extends ItemView {
         fileItemSelf.addClass('is-active')
       }
 
-      // File title (from frontmatter or filename)
-      const cache = this.app.metadataCache.getFileCache(file)
-      const frontmatterTitle = cache?.frontmatter?.title as unknown
-      const title =
-        (typeof frontmatterTitle === 'string' ? frontmatterTitle : null) || file.basename
-
-      // Inner content with proper nesting
-      const fileInner = fileItemSelf.createDiv({ cls: 'tree-item-inner nav-file-title-content' })
-      fileInner.setText(title)
+      fileItemSelf.createDiv({
+        cls: 'tree-item-inner nav-file-title-content',
+        text: getFileTitle(this.app, file),
+      })
 
       // Click handler to open file
       fileItemSelf.addEventListener('click', (e) => {
@@ -602,16 +304,7 @@ export class ZettelkastenSidebar extends ItemView {
           item
             .setTitle('Reveal in navigation')
             .setIcon('lucide-folder-open')
-            .onClick(() => {
-              // Reveal file in the main file explorer
-              const fileExplorer = this.app.workspace.getLeavesOfType('file-explorer')[0]
-              if (fileExplorer) {
-                const view = fileExplorer.view as { revealInFolder?: (file: TFile) => void }
-                if (view && view.revealInFolder) {
-                  view.revealInFolder(file)
-                }
-              }
-            })
+            .onClick(() => this.revealInExplorer(file))
         })
 
         menu.showAtMouseEvent(e)
@@ -626,131 +319,16 @@ export class ZettelkastenSidebar extends ItemView {
     })
   }
 
-  /**
-   * Create Bookmarks section with saved bookmarks
-   */
+  /** Saved bookmarks; with none, the heading adds the first one */
   private createBookmarksSection(container: HTMLElement): void {
-    const settings = this.plugin.getSettingsManager()
-    const viewSettings = settings.getZettelkastenSidebar()
-    const bookmarksName = viewSettings.bookmarksName || 'Bookmarks'
-
-    // Check if collapsed
-    const isCollapsed = this.collapsedSections.has(bookmarksName)
-
-    // Use native Obsidian classes
-    const itemEl = container.createDiv({
-      cls: `tree-item nav-folder${isCollapsed ? ' is-collapsed' : ''}`
+    const view = this.plugin.getSettingsManager().get('zettelkastenSidebar')
+    const { bookmarks } = view
+    const contentEl = this.renderSection(container, {
+      name: view.bookmarksName || 'Bookmarks',
+      icon: 'bookmark',
+      collapsible: bookmarks.length > 0,
+      onOpen: bookmarks.length > 0 ? undefined : () => this.addBookmark(),
     })
-
-    // Header using native classes
-    const headerEl = itemEl.createDiv({
-      cls: 'tree-item-self nav-folder-title is-clickable mod-collapsible'
-    })
-    headerEl.setAttribute('draggable', 'true')
-
-    // Apply native inline styles for padding
-    headerEl.addClass('zk-indent-section')
-
-    // Get bookmarks to check if there are any
-    const bookmarks = viewSettings.bookmarks
-
-    // Create elements in different order for mobile vs desktop
-    let collapseIconEl: HTMLElement
-    let sectionIconEl: HTMLElement
-
-    if (Platform.isMobile) {
-      // Mobile: section icon, name, collapse icon (left to right)
-
-      // Custom section icon for bookmarks
-      sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
-      setIcon(sectionIconEl, 'bookmark')
-
-      // Item name
-      headerEl.createDiv({
-        cls: 'tree-item-inner nav-folder-title-content',
-        text: bookmarksName
-      })
-
-      // Collapse icon
-      collapseIconEl = headerEl.createDiv({
-        cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
-      })
-      // Only show chevron if there are bookmarks to display
-      if (bookmarks.length > 0) {
-        setIcon(collapseIconEl, 'right-triangle')
-      } else {
-        // Keep the div for spacing but make it invisible
-        collapseIconEl.addClass('zk-chevron-hidden')
-      }
-    } else {
-      // Desktop: collapse icon, section icon, name (left to right)
-
-      // Collapse icon
-      collapseIconEl = headerEl.createDiv({
-        cls: `tree-item-icon collapse-icon${isCollapsed ? ' is-collapsed' : ''}`
-      })
-      // Only show chevron if there are bookmarks to display
-      if (bookmarks.length > 0) {
-        setIcon(collapseIconEl, 'right-triangle')
-      } else {
-        // Keep the div for spacing but make it invisible
-        collapseIconEl.addClass('zk-chevron-hidden')
-      }
-
-      // Custom section icon for bookmarks
-      sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
-      setIcon(sectionIconEl, 'bookmark')
-
-      // Item name
-      headerEl.createDiv({
-        cls: 'tree-item-inner nav-folder-title-content',
-        text: bookmarksName
-      })
-    }
-
-    // Content area for bookmarks (children)
-    const contentEl = itemEl.createDiv({ cls: 'tree-item-children nav-folder-children' })
-    if (isCollapsed) {
-      contentEl.setCssProps({ display: 'none' })
-    }
-
-    // Toggle collapse function
-    const toggleCollapse = () => {
-      // Nothing to collapse: tapping the heading adds the first bookmark
-      if (bookmarks.length === 0) {
-        this.addBookmark()
-        return
-      }
-
-      const isCurrentlyCollapsed = this.collapsedSections.has(bookmarksName)
-
-      if (isCurrentlyCollapsed) {
-        this.collapsedSections.delete(bookmarksName)
-        itemEl.removeClass('is-collapsed')
-        collapseIconEl.removeClass('is-collapsed')
-        contentEl.setCssProps({ display: '' })
-      } else {
-        this.collapsedSections.add(bookmarksName)
-        itemEl.addClass('is-collapsed')
-        collapseIconEl.addClass('is-collapsed')
-        contentEl.setCssProps({ display: 'none' })
-      }
-      this.saveCollapsedSections()
-    }
-
-    // Add click handler to collapse icon
-    collapseIconEl.addEventListener('click', (e) => {
-      e.stopPropagation()
-      toggleCollapse()
-    })
-
-    // Add click handler to header
-    headerEl.addEventListener('click', (e) => {
-      e.stopPropagation()
-      toggleCollapse()
-    })
-
-    // Display bookmarks
     this.displayBookmarks(contentEl, bookmarks)
   }
 
@@ -788,25 +366,8 @@ export class ZettelkastenSidebar extends ItemView {
       // Apply native inline styles for padding (nested one level)
       bookmarkItemSelf.addClass('zk-indent-item')
 
-      // Icon based on type
-      let iconName = 'file'
-      switch (bookmark.type) {
-        case 'file':
-          iconName = 'file-text'
-          break
-        case 'search':
-          iconName = 'search'
-          break
-        case 'graph':
-          iconName = 'git-branch-plus'
-          break
-        case 'folder':
-          iconName = 'folder'
-          break
-      }
-
       const iconEl = bookmarkItemSelf.createDiv({ cls: 'tree-item-icon' })
-      setIcon(iconEl, iconName)
+      setIcon(iconEl, BOOKMARK_ICONS[bookmark.type])
 
       // Title
       const titleEl = bookmarkItemSelf.createDiv({ cls: 'tree-item-inner nav-file-title-content' })
@@ -820,124 +381,37 @@ export class ZettelkastenSidebar extends ItemView {
     })
   }
 
-  /**
-   * Handle clicking on a bookmark
-   */
+  /** Open a bookmark: a file in the current tab, a search in the search pane, the graph, or a folder in the file explorer */
   private async handleBookmarkClick(bookmark: Bookmark): Promise<void> {
+    const { workspace } = this.app
+    const target = bookmark.path ? this.app.vault.getAbstractFileByPath(bookmark.path) : null
     switch (bookmark.type) {
-      case 'file':
-        if (bookmark.path) {
-          const file = this.app.vault.getAbstractFileByPath(bookmark.path)
-          if (file instanceof TFile) {
-            await this.app.workspace.getLeaf(false).openFile(file)
-          }
-        }
-        break
-
-      case 'search':
-        if (bookmark.query) {
-          // Open search view with the query
-          const searchLeaf = this.app.workspace.getLeavesOfType('search')[0]
-          if (searchLeaf) {
-            void this.app.workspace.revealLeaf(searchLeaf)
-             
-            ;(searchLeaf.view as unknown as { setQuery: (query: string) => void }).setQuery(
-              bookmark.query
-            )
-          }
-        }
-        break
-
       case 'graph':
-        // Open graph view
-        void this.app.workspace.getLeaf(false).setViewState({
-          type: 'graph',
-          active: true,
-        })
-        break
-
+        return workspace.getLeaf(false).setViewState({ type: 'graph', active: true })
+      case 'search':
+        return this.openSearch(bookmark.query)
+      case 'file':
+        if (target instanceof TFile) await workspace.getLeaf(false).openFile(target)
+        return
       case 'folder':
-        if (bookmark.path) {
-          const folder = this.app.vault.getAbstractFileByPath(bookmark.path)
-          if (folder instanceof TFolder) {
-            // Reveal folder in file explorer
-            const fileExplorer = this.app.workspace.getLeavesOfType('file-explorer')[0]
-            if (fileExplorer && fileExplorer.view) {
-               
-              ;(
-                fileExplorer.view as unknown as { revealInFolder: (folder: unknown) => void }
-              ).revealInFolder(folder)
-            }
-          }
-        }
-        break
+        if (target instanceof TFolder) this.revealInExplorer(target)
     }
   }
 
-  /**
-   * Create Note Sequences section - simple link to open view
-   */
-  private createNoteSequencesSection(container: HTMLElement): void {
-    // Use native Obsidian classes to match other sections
-    const itemEl = container.createDiv({ cls: 'tree-item nav-folder' })
-
-    const headerEl = itemEl.createDiv({
-      cls: 'tree-item-self nav-folder-title is-clickable mod-collapsible'
-    })
-    headerEl.setAttribute('draggable', 'true')
-
-    // Apply native inline styles for padding
-    headerEl.addClass('zk-indent-section')
-
-    // Create elements in different order for mobile vs desktop
-    if (Platform.isMobile) {
-      // Mobile: section icon, name, collapse icon (left to right)
-
-      // Custom section icon
-      const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
-      setIcon(sectionIconEl, 'layers')
-
-      // Name
-      headerEl.createDiv({
-        cls: 'tree-item-inner nav-folder-title-content',
-        text: 'Note Sequences'
-      })
-
-      // Empty collapse icon for alignment (no children to collapse, so hide it)
-      headerEl.createDiv({ cls: 'tree-item-icon collapse-icon zk-chevron-hidden' })
-    } else {
-      // Desktop: collapse icon, section icon, name (left to right)
-
-      // Empty collapse icon for alignment (no children to collapse, so hide it)
-      headerEl.createDiv({ cls: 'tree-item-icon collapse-icon zk-chevron-hidden' })
-
-      // Custom section icon
-      const sectionIconEl = headerEl.createDiv({ cls: 'zk-section-icon' })
-      setIcon(sectionIconEl, 'layers')
-
-      // Name
-      headerEl.createDiv({
-        cls: 'tree-item-inner nav-folder-title-content',
-        text: 'Note Sequences'
-      })
-    }
-
-    // Click handler to open Note Sequences view
-    headerEl.addEventListener('click', (e) => {
-      e.stopPropagation()
-      void this.app.workspace.getLeaf('tab').setViewState({
-        type: VIEW_TYPE_NOTE_SEQUENCES,
-        active: true,
-      })
-    })
+  private async openSearch(query: string | undefined): Promise<void> {
+    const leaf = this.app.workspace.getLeavesOfType('search')[0]
+    if (!query || !leaf) return
+    await this.app.workspace.revealLeaf(leaf)
+    ;(leaf.view as unknown as { setQuery: (query: string) => void }).setQuery(query)
   }
 
-   
+  private revealInExplorer(file: TFile | TFolder): void {
+    const explorer = this.app.workspace.getLeavesOfType('file-explorer')[0]?.view as unknown as
+      { revealInFolder?: (file: TFile | TFolder) => void } | undefined
+    explorer?.revealInFolder?.(file)
+  }
+
   async onClose(): Promise<void> {
-    // Clear any pending refresh timeout
-    if (this.refreshTimeout) {
-      activeWindow.clearTimeout(this.refreshTimeout)
-      this.refreshTimeout = null
-    }
+    this.scheduleRefresh.cancel()
   }
 }

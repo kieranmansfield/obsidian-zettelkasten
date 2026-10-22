@@ -28,49 +28,20 @@ export class CommandsModal extends Modal {
       cls: 'setting-item-description',
     })
 
-    // Get all commands from registry
-    const commandRegistry = this.plugin.getCommandRegistry()
-    const commands = commandRegistry.getAllCommands()
-
-    // Group commands by category
-    const commandsByCategory = this.groupCommandsByCategory(commands)
-
-    // Render each category
-    for (const [category, categoryCommands] of Object.entries(commandsByCategory)) {
-      this.renderCategorySection(contentEl, category, categoryCommands)
-    }
-
-    // Close button
-    // new Setting(contentEl).addButton((button) => {
-    //   button
-    //     .setButtonText('Close')
-    //     .setCta()
-    //     .onClick(() => {
-    //       this.close()
-    //     })
-    // })
-  }
-
-  private groupCommandsByCategory(
-    commands: Map<string, BaseCommand>
-  ): Record<string, Array<{ id: string; command: BaseCommand }>> {
-    const grouped: Record<string, Array<{ id: string; command: BaseCommand }>> = {}
-
-    for (const [id, command] of commands.entries()) {
+    const byCategory = new Map<string, BaseCommand[]>()
+    for (const command of this.plugin.getCommandRegistry().getAllCommands()) {
       const category = command.metadata?.category || 'Other'
-      if (!grouped[category]) {
-        grouped[category] = []
-      }
-      grouped[category].push({ id, command })
+      byCategory.set(category, [...(byCategory.get(category) ?? []), command])
     }
-
-    return grouped
+    for (const [category, commands] of byCategory) {
+      this.renderCategorySection(contentEl, category, commands)
+    }
   }
 
   private renderCategorySection(
     container: HTMLElement,
     category: string,
-    commands: Array<{ id: string; command: BaseCommand }>
+    commands: BaseCommand[]
   ): void {
     const section = container.createDiv({ cls: 'commands-category-section' })
 
@@ -78,29 +49,23 @@ export class CommandsModal extends Modal {
     section.createEl('h3', { text: this.formatCategoryName(category) })
 
     // Render each command
-    commands.forEach(({ id, command }) => {
-      const settingsManager = this.plugin.getSettingsManager()
-      const enabledCommands = settingsManager.getEnabledCommandsMap()
-      const isEnabled = enabledCommands.get(id) !== false
+    const enabled = this.plugin.getSettingsManager().getEnabledCommandsMap()
+    commands.forEach(({ id, name, metadata }) => {
+      const isEnabled = enabled.get(id) !== false
 
       new Setting(section)
-        .setName(command.name)
-        .setDesc(command.metadata?.description || '')
+        .setName(name)
+        .setDesc(metadata?.description || '')
         .addToggle((toggle) => {
           toggle.setValue(isEnabled).onChange(async (value) => {
             if (value) {
               await this.plugin.enableCommand(id)
-              new Notice(`Enabled: ${command.name}`)
+              new Notice(`Enabled: ${name}`)
             } else {
               await this.plugin.disableCommand(id)
-              new Notice(`Disabled: ${command.name}`)
+              new Notice(`Disabled: ${name}`)
             }
           })
-
-          // Disable toggle if command can't be disabled
-          if (command.metadata?.canBeDisabled === false) {
-            toggle.setDisabled(true)
-          }
         })
     })
   }
@@ -111,10 +76,5 @@ export class CommandsModal extends Modal {
       .split('-')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
-  }
-
-  onClose() {
-    const { contentEl } = this
-    contentEl.empty()
   }
 }

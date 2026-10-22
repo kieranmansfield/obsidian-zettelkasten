@@ -45,17 +45,6 @@ export enum ZettelDetectionMode {
 }
 
 /**
- * General plugin settings
- */
-export interface GeneralSettings {
-  /**
-   * Folders to ignore when indexing/searching
-   * @default []
-   */
-  ignoredFolders: string[]
-}
-
-/**
  * Settings for command availability
  */
 export interface CommandSettings {
@@ -90,12 +79,6 @@ export interface ZettelSettings {
   zettelTag: string
 
   /**
-   * Format for ZettelId timestamps
-   * @default "YYYYMMDDHHmmssSSS"
-   */
-  zettelIdFormat: string
-
-  /**
    * The slip-box: one flat folder holding permanent notes, structure notes and the Index
    * @default "slipbox"
    */
@@ -124,12 +107,6 @@ export interface ZettelSettings {
    * @default ""
    */
   separator: string
-
-  /**
-   * Whether to automatically link to parent when creating child zettel
-   * @default true
-   */
-  autoLinkToParent: boolean
 
   /**
    * Whether to open newly created zettels in editor
@@ -326,12 +303,6 @@ export interface ProjectSettings {
  */
 export interface ZettelkastenSidebarSettings {
   /**
-   * Enable/disable Zettelkasten sidebar view
-   * @default true
-   */
-  enabled: boolean
-
-  /**
    * Custom name for inbox section
    * @default "Inbox"
    */
@@ -492,22 +463,6 @@ export interface ZettelkastenSidebarSettings {
    * @default []
    */
   bookmarks: Bookmark[]
-
-  // Keep old property for backward compatibility during migration
-  /**
-   * @deprecated Use showLiterature instead
-   */
-  showReferences?: boolean
-
-  /**
-   * @deprecated Use showLiteratureFiles instead
-   */
-  showReferenceFiles?: boolean
-
-  /**
-   * @deprecated Use literatureFilterTag instead
-   */
-  referencesFilterTag?: string
 }
 
 /**
@@ -525,34 +480,12 @@ export interface NoteSequenceSettings {
    * @default true
    */
   showSequencesView: boolean
-
-  /**
-   * Show sequence navigator (tree view of current note's sequence)
-   * @default true
-   */
-  showSequenceNavigator: boolean
-
-  /**
-   * Auto-open sequence navigator when opening a zettel
-   * @default false
-   */
-  autoOpenNavigator: boolean
 }
 
 /**
  * Main plugin settings interface
  */
 export interface PluginSettings {
-  /**
-   * Plugin version (for migration purposes)
-   */
-  version: string
-
-  /**
-   * General settings
-   */
-  general: GeneralSettings
-
   /**
    * Command settings
    */

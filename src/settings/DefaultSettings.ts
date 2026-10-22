@@ -61,24 +61,22 @@ export const STRUCTURE_MARKER = 'type: structure'
 /**
  * Default zettel settings
  */
-export const DEFAULT_ZETTEL_SETTINGS: ZettelSettings = {
+const DEFAULT_ZETTEL_SETTINGS: ZettelSettings = {
   enabled: true,
   zettelDetectionMode: ZettelDetectionMode.FOLDER,
   zettelTag: 'type: permanent',
-  zettelIdFormat: 'YYYYMMDDHHmmssSSS',
   defaultFolder: 'slipbox',
   templatePath: '',
   template: PERMANENT_TEMPLATE,
   filenameFormat: FilenameFormat.ID_TITLE,
   separator: '',
-  autoLinkToParent: true,
   openOnCreate: true,
 }
 
 /**
  * Default fleeting settings (fleeting notes have no format, Ahrens 2.1)
  */
-export const DEFAULT_FLEETING_SETTINGS: FleetingSettings = {
+const DEFAULT_FLEETING_SETTINGS: FleetingSettings = {
   enabled: true,
   detectionMode: ZettelDetectionMode.FOLDER,
   tag: 'fleeting',
@@ -91,7 +89,7 @@ export const DEFAULT_FLEETING_SETTINGS: FleetingSettings = {
 /**
  * Default structure note settings
  */
-export const DEFAULT_INDEX_SETTINGS: IndexSettings = {
+const DEFAULT_INDEX_SETTINGS: IndexSettings = {
   enabled: true,
   templatePath: '',
   template: STRUCTURE_TEMPLATE,
@@ -101,7 +99,7 @@ export const DEFAULT_INDEX_SETTINGS: IndexSettings = {
 /**
  * Default literature settings
  */
-export const DEFAULT_LITERATURE_SETTINGS: LiteratureSettings = {
+const DEFAULT_LITERATURE_SETTINGS: LiteratureSettings = {
   enabled: true,
   detectionMode: ZettelDetectionMode.FOLDER,
   tag: 'literature',
@@ -114,7 +112,7 @@ export const DEFAULT_LITERATURE_SETTINGS: LiteratureSettings = {
 /**
  * Default project settings
  */
-export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
+const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   enabled: false,
   detectionMode: ZettelDetectionMode.FOLDER,
   tag: 'project',
@@ -127,8 +125,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
 /**
  * Default Zettelkasten view settings
  */
-export const DEFAULT_ZETTELKASTEN_SIDEBAR_SETTINGS: ZettelkastenSidebarSettings = {
-  enabled: true,
+const DEFAULT_ZETTELKASTEN_SIDEBAR_SETTINGS: ZettelkastenSidebarSettings = {
   inboxName: 'Inbox',
   zettelsName: 'Zettels',
   literatureName: 'Literature',
@@ -161,32 +158,24 @@ export const DEFAULT_ZETTELKASTEN_SIDEBAR_SETTINGS: ZettelkastenSidebarSettings 
 /**
  * Default note sequence settings
  */
-export const DEFAULT_NOTE_SEQUENCE_SETTINGS: NoteSequenceSettings = {
+const DEFAULT_NOTE_SEQUENCE_SETTINGS: NoteSequenceSettings = {
   enabled: true,
   showSequencesView: true,
-  showSequenceNavigator: true,
-  autoOpenNavigator: false,
 }
 
 /**
  * Default plugin settings
  */
 export const DEFAULT_SETTINGS: PluginSettings = {
-  version: '0.1.4',
-
-  general: {
-    ignoredFolders: [],
-  },
-
   commands: {
     enabledCommands: {},
   },
 
-  zettel: { ...DEFAULT_ZETTEL_SETTINGS },
-  fleeting: { ...DEFAULT_FLEETING_SETTINGS },
-  index: { ...DEFAULT_INDEX_SETTINGS },
-  literature: { ...DEFAULT_LITERATURE_SETTINGS },
-  projects: { ...DEFAULT_PROJECT_SETTINGS },
-  zettelkastenSidebar: { ...DEFAULT_ZETTELKASTEN_SIDEBAR_SETTINGS },
-  noteSequences: { ...DEFAULT_NOTE_SEQUENCE_SETTINGS },
+  zettel: DEFAULT_ZETTEL_SETTINGS,
+  fleeting: DEFAULT_FLEETING_SETTINGS,
+  index: DEFAULT_INDEX_SETTINGS,
+  literature: DEFAULT_LITERATURE_SETTINGS,
+  projects: DEFAULT_PROJECT_SETTINGS,
+  zettelkastenSidebar: DEFAULT_ZETTELKASTEN_SIDEBAR_SETTINGS,
+  noteSequences: DEFAULT_NOTE_SEQUENCE_SETTINGS,
 }
