@@ -45,7 +45,7 @@ Controls which commands are available in the command palette.
 ### 2. Areas
 
 There are no boxes. Notes live in fixed areas (strict Zettelkasten): `fleeting.folder` (`inbox`),
-`literature.folder` (`reference`), `zettel.defaultFolder` (`slip-box`, flat: zettels, structure notes and
+`literature.folder` (`reference`), `zettel.defaultFolder` (`slipbox`, flat: zettels, structure notes and
 `Index.md`) and `projects.folder` (`projects`). Old `boxes` settings are migrated on load (`migrateToSlipBox`).
 
 ### 3. Note Type Settings
@@ -167,7 +167,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   },
 
   zettel: {
-    defaultFolder: 'slip-box',
+    defaultFolder: 'slipbox',
     template: PERMANENT_TEMPLATE,
     autoLinkToParent: true,
     openOnCreate: true,

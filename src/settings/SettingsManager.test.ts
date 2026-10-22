@@ -15,7 +15,7 @@ const load = async (data: unknown) => {
 describe('SettingsManager', () => {
   it('defaults to the strict Zettelkasten areas', async () => {
     const s = await load(null)
-    expect(s.zettel.defaultFolder).toBe('slip-box')
+    expect(s.zettel.defaultFolder).toBe('slipbox')
     expect(s.zettel.zettelIdFormat).toBe('YYYYMMDDHHmmssSSS')
     expect(s.fleeting.folder).toBe('inbox')
     expect(s.literature.folder).toBe('reference')

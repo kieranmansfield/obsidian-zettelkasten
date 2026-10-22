@@ -66,7 +66,7 @@ export const DEFAULT_ZETTEL_SETTINGS: ZettelSettings = {
   zettelDetectionMode: ZettelDetectionMode.FOLDER,
   zettelTag: 'type: permanent',
   zettelIdFormat: 'YYYYMMDDHHmmssSSS',
-  defaultFolder: 'slip-box',
+  defaultFolder: 'slipbox',
   templatePath: '',
   template: PERMANENT_TEMPLATE,
   filenameFormat: FilenameFormat.ID_TITLE,

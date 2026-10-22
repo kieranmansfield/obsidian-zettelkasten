@@ -97,7 +97,7 @@ export interface ZettelSettings {
 
   /**
    * The slip-box: one flat folder holding permanent notes, structure notes and the Index
-   * @default "slip-box"
+   * @default "slipbox"
    */
   defaultFolder: string
 

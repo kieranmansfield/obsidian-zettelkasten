@@ -7,7 +7,7 @@ import { firstFreeId, nextChildId } from './sequenceEdit'
 vi.mock('obsidian', () => ({ Notice: class {} }))
 
 const T = '20241021130500123'
-const f = (basename: string) => ({ basename, path: `slip-box/${basename}.md` }) as unknown as TFile
+const f = (basename: string) => ({ basename, path: `slipbox/${basename}.md` }) as unknown as TFile
 const core = new NoteSequenceCore({} as Vault)
 const next = (parent: string, ids: string[]) =>
   nextChildId(core, f(parent), ZettelId.parse(parent), [parent, ...ids].map(f))?.toString()

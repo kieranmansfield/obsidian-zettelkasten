@@ -49,13 +49,13 @@ The plugin follows a strict Zettelkasten layout (Ahrens, zettelkasten.de, Duffne
 ```
 inbox/       fleeting notes, any format; process within 2 days
 reference/   literature notes, one per source ("Surname YYYY"), in your own words
-slip-box/    FLAT: permanent notes ("ID Title"), structure notes and Index.md. Nothing else.
+slipbox/     FLAT: permanent notes ("ID Title"), structure notes and Index.md. Nothing else.
 projects/    one folder per writing project
 ```
 
 - The slip-box is one flat folder: no topic subfolders or topic boxes.
 - Permanent notes carry no type or category tags; zettels are detected by folder (or a property).
-- IDs are 17 digits plus Folgezettel segments. In the skill's `.zettelkasten/config.json` set `"id_regex": "\\d{17}(?:[a-z]+|\\d+)*"` and `"sequence": "folgezettel"`.
+- IDs are 17 digits plus Folgezettel segments. In the skill's `.zettelkasten/config.json` set `"id_regex": "\\d{17}(?:[a-z]+|\\d+)*"`, `"sequence": "folgezettel"` and `"areas": {"slipbox": "slipbox"}`.
 - New notes use the method's templates: a permanent note continues an existing note with a link that says why, and cites its literature note with the page.
 
 ### 📝 Note Types & Templates
@@ -147,7 +147,7 @@ projects/    one folder per writing project
 
 1. **Configure Zettel Location**:
     - Go to Settings → Zettelkasten
-    - Set the slip-box folder (default `slip-box`)
+    - Set the slip-box folder (default `slipbox`)
     - Choose detection mode (folder or property)
 
 2. **Set Up the Panel** (optional):

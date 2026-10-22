@@ -34,7 +34,7 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
 - **Format:** a 17-digit timestamp `YYYYMMDDHHmmssSSS` followed by segments alternating between letters (`a-z`) and numbers (`0-9`), starting with letters, for example:  
   `20240612153000123a1b2`
 - **Hierarchy:** the parent has the same timestamp and one segment fewer (`…123a1` → `…123a`); a child has exactly one more segment.
-- **Vault config for the zettelkasten skill:** `"id_regex": "\\d{17}(?:[a-z]+|\\d+)*"`, `"sequence": "folgezettel"`.
+- **Vault config for the zettelkasten skill:** `"id_regex": "\\d{17}(?:[a-z]+|\\d+)*"`, `"sequence": "folgezettel"`, `"areas": {"slipbox": "slipbox"}`.
 
 - **Purpose:**
   - Ensures unique and sortable IDs for each zettel.
@@ -81,7 +81,7 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
 
 - `PluginSettings` defines configuration options.
 - `SettingsTab` exposes them in Obsidian’s UI.
-- Includes configurable defaults for the areas: `inbox`, `reference`, `slip-box`, `projects`.
+- Includes configurable defaults for the areas: `inbox`, `reference`, `slipbox`, `projects`.
 
 ---
 
@@ -98,7 +98,7 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
 
 The plugin enforces the strict Zettelkasten layout (see the `obsidian-zettelkasten` skill):
 
-- **Areas**: `inbox/` (fleeting, one capture place), `reference/` (literature notes), `slip-box/` (flat: permanent notes, structure notes, `Index.md`), `projects/<project>/`.
+- **Areas**: `inbox/` (fleeting, one capture place), `reference/` (literature notes), `slipbox/` (flat: permanent notes, structure notes, `Index.md`), `projects/<project>/`.
 - **No boxes**: topic folders inside the slip-box and category tags are not supported (removed in favour of one flat slip-box).
 - **No type tags on permanent notes**: zettel detection is folder or property only; legacy tag/link settings migrate to folder.
 - **Structure notes** (settings key `index`, command `create-index-note`) are `<ID> <topic>` notes marked `type: structure` in the slip-box.

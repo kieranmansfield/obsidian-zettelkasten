@@ -183,7 +183,7 @@ export default class SettingsTab extends PluginSettingTab {
               'Slip-box folder',
               'zettel.defaultFolder',
               'One flat folder for zettels, structure notes and the Index. No subfolders.',
-              'slip-box'
+              'slipbox'
             ),
             dropdown(
               'Filename format',

@@ -6,7 +6,7 @@ const T = '20241021130500123'
 const f = (basename: string) =>
   ({
     basename,
-    path: `slip-box/${basename}.md`,
+    path: `slipbox/${basename}.md`,
     extension: 'md',
     stat: { mtime: 0 },
   }) as unknown as TFile
