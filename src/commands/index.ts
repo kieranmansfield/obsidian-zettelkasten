@@ -9,7 +9,6 @@ export { createZettelNoteCommand } from './createZettelNote'
 export { createFleetingNoteCommand } from './createFleetingNote'
 export { createIndexNoteCommand } from './createIndexNote'
 export { createLiteratureNoteCommand } from './createLiteratureNote'
-export { openBoxPaletteCommand } from './openBoxPalette'
 export { openZettelCommand } from './openZettel'
 export { openIndexCommand } from './openIndex'
 export { openNoteSequencesViewCommand } from './openNoteSequencesView'
@@ -38,7 +37,6 @@ export { addBookmarkCommand, removeBookmarkCommand } from './manageBookmarks'
 // Add more command exports here as you create them
 
 /*
-✓ DONE Open Box Palette Command - Now works as a per-box quick switcher. Select a box, then fuzzy search notes within it.
 TODO UPDATE Create Zettel Function with a Fuzzy Search Model (like quick switcher) that allows users to find notes already in boxes.
 
 

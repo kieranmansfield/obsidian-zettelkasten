@@ -11,6 +11,7 @@ import {
 import type ZettelkastenPlugin from '../main'
 import { VIEW_TYPE_NOTE_SEQUENCES } from './NoteSequencesView'
 import { matchesFilter, matchesMarker } from 'src/base/fileHelpers'
+import { STRUCTURE_MARKER } from 'src/settings/DefaultSettings'
 import type { Bookmark } from 'src/base/settings'
 import { ZettelDetectionMode } from 'src/base/settings'
 
@@ -258,24 +259,19 @@ export class ZettelkastenSidebar extends ItemView {
       })
     }
 
-    // Index Notes
+    // Structure notes: `type: structure` notes in the slip-box
     if (viewSettings.showIndex && indexSettings.enabled) {
-      const useTagDetection = indexSettings.detectionMode !== ZettelDetectionMode.FOLDER
       menuItems.push({
-        name: viewSettings.indexName || 'Index',
+        name: viewSettings.indexName || 'Structure notes',
         icon: 'list',
-        folder: indexSettings.folder,
+        folder: zettelSettings.defaultFolder,
         dashboardNote: viewSettings.dashboardIndexNote,
         showFiles: viewSettings.showIndexFiles,
-        useFolderFilter: !useTagDetection,
+        useFolderFilter: true,
         filterFunc: (file: TFile) => {
-          // Check detection mode
-          if (useTagDetection) {
-            if (!matchesMarker(this.app, file, indexSettings.tag, indexSettings.detectionMode)) {
-              return false
-            }
+          if (!matchesMarker(this.app, file, STRUCTURE_MARKER, ZettelDetectionMode.PROPERTY)) {
+            return false
           }
-          // else folder-based - will be filtered by folder in getFilesForItem
 
           // Apply additional filter tag if specified
           if (viewSettings.indexFilterTag) {

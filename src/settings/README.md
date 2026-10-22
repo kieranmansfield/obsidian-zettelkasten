@@ -42,17 +42,11 @@ commands: {
 
 Controls which commands are available in the command palette.
 
-### 2. Box Settings
+### 2. Areas
 
-```typescript
-boxes: {
-  rootFolder: string          // Root folder for all boxes (default: "zettels")
-  defaultBox: string          // Default box for new zettels
-  autoCreateBoxes: boolean    // Auto-create boxes when referenced
-}
-```
-
-Configures box/folder management.
+There are no boxes. Notes live in fixed areas (strict Zettelkasten): `fleeting.folder` (`inbox`),
+`literature.folder` (`reference`), `zettel.defaultFolder` (`slip-box`, flat: zettels, structure notes and
+`Index.md`) and `projects.folder` (`projects`). Old `boxes` settings are migrated on load (`migrateToSlipBox`).
 
 ### 3. Note Type Settings
 
@@ -94,8 +88,7 @@ export default class ZettelkastenPlugin extends Plugin {
     await this.loadSettings()
 
     // Use settings
-    const boxSettings = this.settingsManager.getBoxes()
-    console.log('Root folder:', boxSettings.rootFolder)
+    console.log('Slip-box:', this.settingsManager.getZettel().defaultFolder)
   }
 
   private async loadSettings(): Promise<void> {
@@ -112,7 +105,6 @@ export default class ZettelkastenPlugin extends Plugin {
 const allSettings = settingsManager.getAll()
 
 // Get specific section
-const boxSettings = settingsManager.getBoxes()
 const zettelSettings = settingsManager.getZettel()
 const commandSettings = settingsManager.getCommands()
 
@@ -124,9 +116,8 @@ const isEnabled = settingsManager.isCommandEnabled('create-zettel-note')
 
 ```typescript
 // Update entire section
-await settingsManager.updateBoxes({
-  rootFolder: 'my-zettels',
-  defaultBox: 'inbox',
+await settingsManager.updateZettel({
+  defaultFolder: 'my-slip-box',
 })
 
 // Update single command
@@ -150,7 +141,7 @@ await settingsManager.resetToDefaults()
 
 // Reset specific section
 await settingsManager.resetSection('commands')
-await settingsManager.resetSection('boxes')
+await settingsManager.resetSection('zettel')
 ```
 
 ### Import/Export
@@ -175,15 +166,9 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     enabledCommands: {},
   },
 
-  boxes: {
-    rootFolder: 'zettels',
-    defaultBox: '',
-    autoCreateBoxes: true,
-  },
-
   zettel: {
-    defaultFolder: '',
-    template: '# {{title}}\n\n',
+    defaultFolder: 'slip-box',
+    template: PERMANENT_TEMPLATE,
     autoLinkToParent: true,
     openOnCreate: true,
   },
@@ -228,9 +213,8 @@ Example:
 ```typescript
 if (currentVersion < '0.2.0') {
   // Rename field
-  if (this.settings.boxes.folder) {
-    this.settings.boxes.rootFolder = this.settings.boxes.folder
-    delete (this.settings.boxes as any).folder
+  if (this.settings.fleeting.folder === 'fleeting') {
+    this.settings.fleeting.folder = 'inbox'
   }
 
   this.settings.version = '0.2.0'
@@ -260,17 +244,13 @@ export class SettingsTab extends PluginSettingTab {
 
     const settings = this.plugin.getSettingsManager()
 
-    // Box Settings Section
-    containerEl.createEl('h2', { text: 'Box Settings' })
-
     new Setting(containerEl)
-      .setName('Root Folder')
-      .setDesc('Root folder for all boxes')
+      .setName('Slip-box folder')
       .addText((text) => {
         text
-          .setValue(settings.getBoxes().rootFolder)
+          .setValue(settings.getZettel().defaultFolder)
           .onChange(async (value) => {
-            await settings.updateBoxes({ rootFolder: value })
+            await settings.updateZettel({ defaultFolder: value })
           })
       })
 
@@ -285,20 +265,20 @@ export class SettingsTab extends PluginSettingTab {
 
 ```typescript
 // ✅ Good - returns copy
-const boxes = settingsManager.getBoxes()
+const zettel = settingsManager.getZettel()
 
 // ❌ Bad - direct access
-const boxes = settingsManager['settings'].boxes
+const zettel = settingsManager['settings'].zettel
 ```
 
 ### 2. Update Then Save
 
 ```typescript
 // ✅ Good - update methods auto-save
-await settingsManager.updateBoxes({ rootFolder: 'new-folder' })
+await settingsManager.updateZettel({ defaultFolder: 'new-folder' })
 
 // ❌ Bad - manual modification
-settingsManager.settings.boxes.rootFolder = 'new-folder'
+settingsManager.settings.zettel.defaultFolder = 'new-folder'
 ```
 
 ### 3. Use Type-Safe Methods
@@ -406,8 +386,8 @@ const settings = plugin.getSettingsManager()
 console.log(settings.getAll())
 
 // Test updates
-await settings.updateBoxes({ rootFolder: 'test-folder' })
-console.log(settings.getBoxes())
+await settings.updateZettel({ defaultFolder: 'test-folder' })
+console.log(settings.getZettel())
 
 // Test export
 console.log(settings.export())

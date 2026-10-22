@@ -10,7 +10,7 @@ The project is structured primarily under `src/` for all source code, organized 
 src/
 ├─ base/           # This is where interfaces and types are definied. Also any helper functions that cannot fit into a class or a service file can live here.
 ├─ core/           # Core logic and abstract/base classes (e.g., NoteCore, ZettelNote, ZettelId)
-├─ service/        # Services for managing files, boxes, indexing, etc.
+├─ service/        # Services for managing files, note sequences, etc.
 ├─ ui/             # Modals, palettes, and other UI components
 ├─ commands/       # Modular command definitions
 ├─ settings/       # Plugin settings and settings tab
@@ -22,7 +22,7 @@ src/
 - The project uses **TypeScript** with `"strict": true` enabled.
 - All classes, services, and utilities are fully typed.
 - This ensures type safety, predictable behavior, and minimizes runtime errors.
-- Interfaces and types are used extensively for Notes, ZettelIds, Files, and Boxes.
+- Interfaces and types are used extensively for Notes, ZettelIds and Files.
 
 ## ZettelId Engine
 
@@ -46,14 +46,12 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
   - `NoteCore` (abstract base for all notes)
   - `ZettelNote`, `FleetingNote`, `IndexNote` (concrete note classes)
   - `ZettelId` (ID generation and parsing)
-  - `BoxManager` (high-level box orchestration)
 - Core classes define building blocks that services and UI components can leverage.
 
 ### Service Layer (`service/`)
 
 - Handles interactions with Obsidian’s vault:
   - `FileService` (creating, renaming, reading, deleting notes)
-  - `BoxService` (managing folders/tags for boxes)
   - Additional services like indexing or fleeting notes are included here.
 - Services encapsulate business logic and vault operations.
 
@@ -61,7 +59,6 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
 
 - Contains all modals, palettes, and suggesters:
   - Create note modals
-  - Box selection modals
   - Bookmark modals
 - Provides user interaction while relying on services for data operations.
 
@@ -71,15 +68,15 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
 - Commands are small, stable entry points to invoke actions:
   - `Create Zettel Note`
   - `Create Fleeting Note`
-  - `Create Index Note`
-  - `Open Box Palette`
+  - `Create Structure Note` (id `create-index-note`)
+  - `Open Index`
 - Commands allow both user and agent interaction.
 
 ### Settings Layer (`settings/`)
 
 - `PluginSettings` defines configuration options.
 - `SettingsTab` exposes them in Obsidian’s UI.
-- Includes configurable defaults such as the root folder for boxes (`zettels` by default).
+- Includes configurable defaults for the areas: `inbox`, `reference`, `slip-box`, `projects`.
 
 ---
 
@@ -87,16 +84,21 @@ At the heart of the plugin is the **ZettelId system**, which generates unique id
 
 - **File creation helpers** ensure consistent filenames, frontmatter, and default tags.
 - **FileService** manages vault operations using Obsidian APIs (`TFile`, `TFolder`, `Vault`).
-- **ZettelNote** integrates with `BoxManager` to resolve folder paths for notes automatically.
+- **ZettelNote** always files zettels into the one flat slip-box folder (`zettel.defaultFolder`).
 - Folder names do **not** use underscores; default folder is configurable.
 
 ---
 
-## Box Management
+## Zettelkasten Structure
 
-- Boxes represent organizational units for zettels and can be **folders** or **tags**.
-- `BoxService` handles creation, listing, and folder/tag normalization.
-- `BoxManager` orchestrates boxes, delegates folder creation to `BoxService`, and provides default folder fallback.
+The plugin enforces the strict Zettelkasten layout (see the `obsidian-zettelkasten` skill):
+
+- **Areas**: `inbox/` (fleeting, one capture place), `reference/` (literature notes), `slip-box/` (flat: permanent notes, structure notes, `Index.md`), `projects/<project>/`.
+- **No boxes**: topic folders inside the slip-box and category tags are not supported (removed in favour of one flat slip-box).
+- **No type tags on permanent notes**: zettel detection is folder or property only; legacy tag/link settings migrate to folder.
+- **Structure notes** (settings key `index`, command `create-index-note`) are `<ID> <topic>` notes marked `type: structure` in the slip-box.
+- **Index**: a single `Index.md` in the slip-box, opened or created by `open-index`.
+- **Templates** follow the skill's note formats; `{{title}}` and `{{date}}` are filled on creation.
 
 ---
 
@@ -129,7 +131,7 @@ Developers and agents can extend functionality:
 The plugin is designed around a **strictly typed TypeScript architecture**, modular services, and a clear separation of concerns:
 
 - Core classes define notes and IDs.
-- Services manage files and boxes.
+- Services manage files and note sequences.
 - UI and commands provide user interaction.
 - Agents should interact via stable, typed APIs to ensure reliability.
 

@@ -42,18 +42,9 @@ export class OpenZettelModal extends FuzzySuggestModal<TFile> {
   private getZettelFiles(): Promise<TFile[]> {
     const allFiles = this.app.vault.getMarkdownFiles()
     const settings = this.settingsManager.getZettel()
-    const boxSettings = this.settingsManager.getBoxes()
 
-    // Filter files that are in zettel folders
-    // This is a simple approach - looking for files in the default zettel folder
-    // or the boxes root folder if boxes are enabled
-    const zettelFolders: string[] = []
-
-    if (boxSettings.enabled && boxSettings.rootFolder) {
-      zettelFolders.push(boxSettings.rootFolder)
-    } else if (settings.defaultFolder) {
-      zettelFolders.push(settings.defaultFolder)
-    }
+    // Zettels live in the slip-box folder
+    const zettelFolders: string[] = settings.defaultFolder ? [settings.defaultFolder] : []
 
     // If no specific folders, return all markdown files
     if (zettelFolders.length === 0) {

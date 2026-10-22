@@ -1,6 +1,7 @@
 import type { CommandFactory } from '../base/command'
 import { Notice } from 'obsidian'
 import ZettelId from '../core/zettelId.class'
+import { nextChildId, renameZettelToId } from '../base/sequenceEdit'
 
 /**
  * Command: Indent Zettel
@@ -84,48 +85,14 @@ export const indentZettelCommand: CommandFactory = (context) => {
 
       const prevId = ZettelId.parse(prevIdString)
 
-      // Generate new ID as last child of previous sibling
-      const existingChildren = core.findChildren(prevSibling, siblings, true)
-      let newId: ZettelId
-
-      if (existingChildren.length === 0) {
-        // First child
-        newId = prevId.nextChild()
-      } else {
-        // Find the last child and get next sibling of it
-        const lastChild = existingChildren[existingChildren.length - 1]
-        const lastChildIdString = core.extractZettelId(lastChild.basename)
-        if (!lastChildIdString) {
-          new Notice('Error finding last child')
-          return
-        }
-        const lastChildId = ZettelId.parse(lastChildIdString)
-        const nextSiblingId = lastChildId.nextSibling()
-        if (!nextSiblingId) {
-          new Notice('Error generating new ID')
-          return
-        }
-        newId = nextSiblingId
-      }
-
-      // Get title from frontmatter to preserve it
-      const cache = context.app.metadataCache.getFileCache(activeFile)
-      const title = (cache?.frontmatter?.title as string | undefined) ?? ''
-
-      // Build new filename
-      const newFilename = title ? `${newId.toString()} ${title}` : newId.toString()
-
-      // Rename the file
-      const result = await context.fileService.rename({
-        file: activeFile,
-        newName: newFilename,
-      })
-
-      if (result) {
-        new Notice(`Indented zettel under ${prevSibling.basename}`)
-      } else {
-        new Notice('Failed to indent zettel')
-      }
+      // New ID: last child of the previous sibling
+      await renameZettelToId(
+        context,
+        activeFile,
+        nextChildId(core, prevSibling, prevId, siblings),
+        `Indented zettel under ${prevSibling.basename}`,
+        'Failed to indent zettel'
+      )
     },
   }
 }

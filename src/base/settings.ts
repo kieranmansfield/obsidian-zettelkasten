@@ -14,7 +14,7 @@ export enum FilenameFormat {
   ID_ONLY = 'id-only',
 
   /**
-   * ZettelId + separator + title (e.g., "20240612153000000a1b2 ⁝ My Note.md")
+   * ZettelId + title (e.g., "20240612153000000a1b2 My Note.md"), with an optional separator
    */
   ID_TITLE = 'id-title',
 }
@@ -67,107 +67,6 @@ export interface CommandSettings {
 }
 
 /**
- * Box mode type
- */
-export enum BoxMode {
-  /**
-   * Boxes organized by folders
-   */
-  FOLDER = 'folder',
-
-  /**
-   * Boxes organized by tags
-   */
-  TAG = 'tag',
-
-  /**
-   * Boxes organized by links to a target note
-   */
-  LINK = 'link',
-
-  /**
-   * Boxes organized by a frontmatter property
-   */
-  PROPERTY = 'property',
-}
-
-/**
- * Individual box configuration
- */
-export interface BoxConfig {
-  /**
-   * Box ID (unique identifier)
-   */
-  id: string
-
-  /**
-   * Box name
-   */
-  name: string
-
-  /**
-   * Box value (folder path or tag name depending on mode)
-   */
-  value: string
-
-  /**
-   * Whether this is the default box (non-deletable)
-   */
-  isDefault: boolean
-
-  /**
-   * Note type settings for this box
-   */
-  zettel: ZettelSettings
-  fleeting: FleetingSettings
-  index: IndexSettings
-  literature: LiteratureSettings
-}
-
-/**
- * Settings for box management
- */
-export interface BoxSettings {
-  /**
-   * Enable/disable the box system
-   * When disabled, all notes go to a single folder
-   * @default false
-   */
-  enabled: boolean
-
-  /**
-   * Box organization mode (folder or tag based)
-   * @default BoxMode.FOLDER
-   */
-  mode: BoxMode
-
-  /**
-   * Root folder for all boxes (or single folder when boxes disabled)
-   * @default "zettels"
-   */
-  rootFolder: string
-
-  /**
-   * Default box/folder for new zettels when not specified
-   * @default ""
-   */
-  defaultBox: string
-
-  /**
-   * Whether to create boxes automatically when referenced
-   * Only applies when boxes are enabled
-   * @default true
-   */
-  autoCreateBoxes: boolean
-
-  /**
-   * Array of configured boxes (when boxes enabled)
-   * @default []
-   */
-  boxes: BoxConfig[]
-}
-
-/**
  * Settings for zettel notes
  */
 export interface ZettelSettings {
@@ -178,14 +77,15 @@ export interface ZettelSettings {
   enabled: boolean
 
   /**
-   * How to detect zettel notes (folder-based or tag-based)
+   * How to detect zettel notes: FOLDER (the slip-box) or PROPERTY.
+   * TAG and LINK are not allowed: they stamp type tags or bare links onto permanent notes.
    * @default ZettelDetectionMode.FOLDER
    */
   zettelDetectionMode: ZettelDetectionMode
 
   /**
-   * Tag to identify zettel notes (only used when zettelDetectionMode is TAG)
-   * @default "zettel"
+   * Property that marks zettel notes (only used when zettelDetectionMode is PROPERTY)
+   * @default "type: permanent"
    */
   zettelTag: string
 
@@ -196,8 +96,8 @@ export interface ZettelSettings {
   zettelIdFormat: string
 
   /**
-   * Default folder for zettel notes (relative to box root)
-   * @default ""
+   * The slip-box: one flat folder holding permanent notes, structure notes and the Index
+   * @default "slip-box"
    */
   defaultFolder: string
 
@@ -210,19 +110,18 @@ export interface ZettelSettings {
 
   /**
    * Inline template content (used if templatePath is empty)
-   * @default "# {{title}}\n\n"
    */
   template: string
 
   /**
    * Filename format mode
-   * @default FilenameFormat.ID_ONLY
+   * @default FilenameFormat.ID_TITLE
    */
   filenameFormat: FilenameFormat
 
   /**
-   * Separator between ID and title (only used when filenameFormat is ID_TITLE)
-   * @default "⁝"
+   * Optional separator between ID and title (only used when filenameFormat is ID_TITLE)
+   * @default ""
    */
   separator: string
 
@@ -262,8 +161,8 @@ export interface FleetingSettings {
   tag: string
 
   /**
-   * Folder for fleeting notes
-   * @default "fleeting"
+   * Folder for fleeting notes: the single capture inbox
+   * @default "inbox"
    */
   folder: string
 
@@ -288,48 +187,30 @@ export interface FleetingSettings {
 }
 
 /**
- * Settings for index notes
+ * Settings for structure notes and the Index.
+ * Both live in the slip-box (zettel.defaultFolder); structure notes are marked `type: structure`.
  */
 export interface IndexSettings {
   /**
-   * Enable/disable index note type
+   * Enable/disable structure notes
    * @default true
    */
   enabled: boolean
 
   /**
-   * How to detect index notes (folder-based or tag-based)
-   * @default ZettelDetectionMode.FOLDER
-   */
-  detectionMode: ZettelDetectionMode
-
-  /**
-   * Tag to identify index notes (only used when detectionMode is TAG)
-   * @default "index"
-   */
-  tag: string
-
-  /**
-   * Folder for index notes
-   * @default "index"
-   */
-  folder: string
-
-  /**
-   * Path to template file (relative to vault root)
+   * Path to structure note template file (relative to vault root)
    * If empty, uses inline template
    * @default ""
    */
   templatePath: string
 
   /**
-   * Inline template content (used if templatePath is empty)
-   * @default "# {{title}}\n\n## Overview\n\n## Notes\n\n"
+   * Inline structure note template (used if templatePath is empty)
    */
   template: string
 
   /**
-   * Whether to open newly created index notes in editor
+   * Whether to open newly created structure notes in editor
    * @default true
    */
   openOnCreate: boolean
@@ -358,8 +239,8 @@ export interface LiteratureSettings {
   tag: string
 
   /**
-   * Folder for literature notes
-   * @default "literature"
+   * Folder for literature notes, one per source
+   * @default "reference"
    */
   folder: string
 
@@ -372,7 +253,6 @@ export interface LiteratureSettings {
 
   /**
    * Inline template content (used if templatePath is empty)
-   * @default "# {{title}}\n\n## Metadata\n- Author: \n- Year: \n- Type: \n\n## Summary\n\n## Key Points\n\n"
    */
   template: string
 
@@ -679,11 +559,6 @@ export interface PluginSettings {
   commands: CommandSettings
 
   /**
-   * Box settings
-   */
-  boxes: BoxSettings
-
-  /**
    * Zettel note settings
    */
   zettel: ZettelSettings
@@ -694,7 +569,7 @@ export interface PluginSettings {
   fleeting: FleetingSettings
 
   /**
-   * Index note settings
+   * Structure note and Index settings
    */
   index: IndexSettings
 

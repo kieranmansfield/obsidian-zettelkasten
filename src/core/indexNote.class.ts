@@ -2,12 +2,13 @@ import type { FileCreateInput, FileRenameInput } from '../base/file'
 import type { NoteCreateInput, NoteRenameInput } from '../base/note'
 import NoteCore from './note.class'
 import FileService from '../service/file.service'
+import ZettelId from './zettelId.class'
 
 /**
- * Index Note
+ * Structure Note (settings key and class name stay "index" for compatibility)
  *
- * - Uses a title-based filename
- * - Typically stored in _index or main folder
+ * - Filename "<ZettelId> <topic>", like any slip-box note
+ * - Stored in the slip-box
  */
 export default class IndexNote extends NoteCore {
   private fileService: FileService
@@ -34,15 +35,15 @@ export default class IndexNote extends NoteCore {
   }
 
   protected buildFilename(input: NoteCreateInput): string {
-    const title = this.sanitizeName(input.title)
-    return `${title}`.trim()
+    return `${ZettelId.create().toString()} ${this.sanitizeName(input.title)}`.trim()
   }
 
   protected buildRenameRequest(
     file: FileRenameInput['file'],
     input: NoteRenameInput
   ): FileRenameInput {
-    const newFilename = `${this.sanitizeName(input.newTitle)}`
+    const [idString] = file.basename.split(' ')
+    const newFilename = `${idString} ${this.sanitizeName(input.newTitle)}`
     return {
       file,
       newName: `${newFilename}.md`,

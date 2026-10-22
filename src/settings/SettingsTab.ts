@@ -8,22 +8,22 @@ import {
   type SettingGroupItem,
 } from 'obsidian'
 import type ZettelkastenPlugin from '../main'
-import { FilenameFormat, BoxMode, ZettelDetectionMode } from '../base/settings'
-import type { BoxConfig } from '../base/settings'
+import { FilenameFormat, ZettelDetectionMode } from '../base/settings'
 import { getIn } from '../base/objectPath'
 import { TagSuggest } from '../ui/TagSuggest'
-import { BoxConfigModal } from '../ui/BoxConfigModal'
 import { ImportExportModal } from '../ui/ImportExportModal'
 import { CommandsModal } from '../ui/CommandsModal'
-import { DEFAULT_SETTINGS, createDefaultBoxConfig } from '../settings/DefaultSettings'
+import { DEFAULT_SETTINGS } from '../settings/DefaultSettings'
 
 interface NoteTypePage {
   name: string
   desc: string
   key: 'zettel' | 'fleeting' | 'literature' | 'index' | 'projects'
-  /** Setting names differ for zettels (zettelDetectionMode / zettelTag) */
-  modeKey: string
-  tagKey: string
+  /** Setting names differ for zettels (zettelDetectionMode / zettelTag); omit for no detection settings */
+  modeKey?: string
+  tagKey?: string
+  /** Allowed detection modes (default: all) */
+  modes?: ZettelDetectionMode[]
   /** Settings shown under "Creation" */
   creation: SettingGroupItem[]
 }
@@ -132,7 +132,7 @@ export default class SettingsTab extends PluginSettingTab {
       {
         type: 'group',
         heading: 'Organisation',
-        items: [this.boxesPage(), this.noteTypesPage()],
+        items: [this.noteTypesPage()],
       },
       {
         type: 'group',
@@ -145,122 +145,6 @@ export default class SettingsTab extends PluginSettingTab {
         items: [this.advancedPage()],
       },
     ]
-  }
-
-  // ============================================
-  // Boxes
-  // ============================================
-  private boxesPage(): SettingDefinitionPage {
-    const manager = this.plugin.getSettingsManager()
-    const enabled = this.on('boxes.enabled')
-
-    return {
-      type: 'page',
-      name: 'Boxes',
-      desc: 'Organise zettels into boxes (folders, tags, links or properties)',
-      displayValue: () => (enabled() ? this.get<string>('boxes.mode') : 'Off'),
-      items: [
-        {
-          type: 'group',
-          items: [
-            toggle(
-              'Enable box system',
-              'boxes.enabled',
-              'Use boxes to organise notes into separate collections. When off, all zettels go to a single folder.'
-            ),
-            {
-              ...folder(
-                'Zettels folder',
-                'boxes.rootFolder',
-                'Folder where all zettels are stored',
-                'Zettels'
-              ),
-              visible: () => !enabled(),
-            },
-          ],
-        },
-        {
-          type: 'group',
-          visible: enabled,
-          items: [
-            dropdown(
-              'Box mode',
-              'boxes.mode',
-              {
-                [BoxMode.FOLDER]: 'Folders',
-                [BoxMode.TAG]: 'Tags',
-                [BoxMode.LINK]: 'Links',
-                [BoxMode.PROPERTY]: 'Properties',
-              },
-              'How boxes identify their notes'
-            ),
-            {
-              ...folder(
-                'Root folder',
-                'boxes.rootFolder',
-                'Root folder containing all boxes',
-                'Zettels'
-              ),
-              visible: this.is('boxes.mode', BoxMode.FOLDER),
-            },
-            toggle(
-              'Auto-create boxes',
-              'boxes.autoCreateBoxes',
-              'Automatically create boxes when referenced'
-            ),
-          ],
-        },
-        {
-          type: 'list',
-          heading: 'Boxes',
-          visible: enabled,
-          emptyState: 'No boxes yet',
-          items: manager.getBoxes().boxes.map((box, index) => ({
-            name: box.name,
-            desc: box.isDefault
-              ? 'Default box'
-              : `${manager.getBoxes().mode}: ${box.value || '(root)'}`,
-            action: () => this.editBox(index),
-          })),
-          addItem: { name: 'Add box', action: () => this.addBox() },
-          onDelete: (index) => void this.deleteBox(index),
-        },
-      ],
-    }
-  }
-
-  private async saveBoxes(boxes: BoxConfig[]): Promise<void> {
-    await this.plugin.getSettingsManager().updateBoxes({ boxes })
-    this.update()
-  }
-
-  private addBox(): void {
-    const box = createDefaultBoxConfig()
-    box.id = `box-${Date.now()}`
-    box.name = 'New box'
-    box.isDefault = false
-    new BoxConfigModal(this.app, box, (config) => {
-      void this.saveBoxes([...this.plugin.getSettingsManager().getBoxes().boxes, config])
-    }).open()
-  }
-
-  private editBox(index: number): void {
-    const boxes = [...this.plugin.getSettingsManager().getBoxes().boxes]
-    const box = boxes[index]
-    if (!box) return
-    new BoxConfigModal(this.app, box, (config) => {
-      boxes[index] = config
-      void this.saveBoxes(boxes)
-    }).open()
-  }
-
-  private async deleteBox(index: number): Promise<void> {
-    const boxes = this.plugin.getSettingsManager().getBoxes().boxes
-    if (boxes[index]?.isDefault) {
-      new Notice('The default box cannot be deleted')
-      return
-    }
-    await this.saveBoxes(boxes.filter((_, i) => i !== index))
   }
 
   // ============================================
@@ -285,7 +169,6 @@ export default class SettingsTab extends PluginSettingTab {
       type: 'page',
       name: 'Note types',
       desc: 'Detection, folders and templates for each kind of note',
-      visible: () => !this.get<boolean>('boxes.enabled'),
       items: [
         this.noteTypePage({
           name: 'Zettel notes',
@@ -293,11 +176,14 @@ export default class SettingsTab extends PluginSettingTab {
           key: 'zettel',
           modeKey: 'zettelDetectionMode',
           tagKey: 'zettelTag',
+          // Tags and links would stamp type tags / bare links onto permanent notes
+          modes: [ZettelDetectionMode.FOLDER, ZettelDetectionMode.PROPERTY],
           creation: [
             folder(
-              'Default folder',
+              'Slip-box folder',
               'zettel.defaultFolder',
-              'Folder for zettel notes (relative to box root)'
+              'One flat folder for zettels, structure notes and the Index. No subfolders.',
+              'slip-box'
             ),
             dropdown(
               'Filename format',
@@ -309,7 +195,11 @@ export default class SettingsTab extends PluginSettingTab {
               'How zettel filenames are formatted'
             ),
             {
-              ...text('Separator', 'zettel.separator', 'Character(s) between ID and title', '⁝'),
+              ...text(
+                'Separator',
+                'zettel.separator',
+                'Optional character(s) between ID and title (empty: "ID Title")'
+              ),
               visible: this.is('zettel.filenameFormat', FilenameFormat.ID_TITLE),
             },
             ...common('zettel', 'zettel'),
@@ -327,7 +217,7 @@ export default class SettingsTab extends PluginSettingTab {
           modeKey: 'detectionMode',
           tagKey: 'tag',
           creation: [
-            folder('Folder', 'fleeting.folder', 'Folder for fleeting notes', 'Fleeting'),
+            folder('Folder', 'fleeting.folder', 'The single inbox for fleeting notes', 'inbox'),
             ...common('fleeting', 'fleeting'),
           ],
         }),
@@ -338,20 +228,20 @@ export default class SettingsTab extends PluginSettingTab {
           modeKey: 'detectionMode',
           tagKey: 'tag',
           creation: [
-            folder('Folder', 'literature.folder', 'Folder for literature notes', 'Literature'),
+            folder(
+              'Folder',
+              'literature.folder',
+              'Folder for literature notes, one per source',
+              'reference'
+            ),
             ...common('literature', 'literature'),
           ],
         }),
         this.noteTypePage({
-          name: 'Index notes',
-          desc: 'Index or map-of-content notes for organising and linking zettels',
+          name: 'Structure notes',
+          desc: 'Notes in the slip-box that order and annotate zettels (type: structure)',
           key: 'index',
-          modeKey: 'detectionMode',
-          tagKey: 'tag',
-          creation: [
-            folder('Folder', 'index.folder', 'Folder for index notes', 'Index'),
-            ...common('index', 'index'),
-          ],
+          creation: common('structure', 'index'),
         }),
         this.noteTypePage({
           name: 'Project notes',
@@ -373,6 +263,13 @@ export default class SettingsTab extends PluginSettingTab {
     const modeKey = `${o.key}.${o.modeKey}`
     const tagKey = `${o.key}.${o.tagKey}`
     const marker = 'New notes get this added automatically'
+    const labels: Record<ZettelDetectionMode, string> = {
+      [ZettelDetectionMode.FOLDER]: 'Folder-based',
+      [ZettelDetectionMode.TAG]: 'Tag-based',
+      [ZettelDetectionMode.LINK]: 'Link-based',
+      [ZettelDetectionMode.PROPERTY]: 'Property-based',
+    }
+    const modes = o.modes ?? Object.values(ZettelDetectionMode)
 
     return {
       type: 'page',
@@ -384,17 +281,12 @@ export default class SettingsTab extends PluginSettingTab {
         {
           type: 'group',
           heading: 'Detection',
-          visible: enabled,
+          visible: () => enabled() && !!o.modeKey,
           items: [
             dropdown(
               'Detection mode',
               modeKey,
-              {
-                [ZettelDetectionMode.FOLDER]: 'Folder-based',
-                [ZettelDetectionMode.TAG]: 'Tag-based',
-                [ZettelDetectionMode.LINK]: 'Link-based',
-                [ZettelDetectionMode.PROPERTY]: 'Property-based',
-              },
+              Object.fromEntries(modes.map((m) => [m, labels[m]])),
               'Identify notes by folder location, tag, link or property'
             ),
             {
@@ -462,7 +354,7 @@ export default class SettingsTab extends PluginSettingTab {
         filter: 'literatureFilterTag',
       },
       {
-        label: 'Index',
+        label: 'Structure notes',
         show: 'showIndex',
         name: 'indexName',
         dash: 'dashboardIndexNote',

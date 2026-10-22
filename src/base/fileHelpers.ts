@@ -1,5 +1,49 @@
 import { App, CachedMetadata, TFile, getAllTags } from 'obsidian'
-import { ZettelDetectionMode } from './settings'
+import { FilenameFormat, ZettelDetectionMode, type ZettelSettings } from './settings'
+
+/** Zettel filename (no extension): "ID", or "ID Title" / "ID <separator> Title" */
+export function zettelFilename(
+  id: string,
+  title: string,
+  settings: Pick<ZettelSettings, 'filenameFormat' | 'separator'>
+): string {
+  if (settings.filenameFormat === FilenameFormat.ID_ONLY || !title) return id
+  return [id, settings.separator, title].filter(Boolean).join(' ')
+}
+
+/** Title part of a zettel basename: drops the leading ID and any separator token after it */
+function zettelTitle(basename: string): string {
+  return basename.replace(/^\S+\s*/, '').replace(/^[^\p{L}\p{N}\s]+\s+/u, '')
+}
+
+/** New "<id> <title>.md" name for a zettel whose ID changes; keeps the frontmatter or filename title */
+export function zettelRename(
+  app: App,
+  file: TFile,
+  id: string,
+  settings: Pick<ZettelSettings, 'filenameFormat' | 'separator'>
+): string {
+  const title = app.metadataCache.getFileCache(file)?.frontmatter?.title as string | undefined
+  return `${zettelFilename(id, title ?? zettelTitle(file.basename), settings)}.md`
+}
+
+/** Fill a note template: every {{title}}, and {{date}} as YYYY-MM-DD */
+export function fillTemplate(template: string, title: string): string {
+  const date = new Date().toLocaleDateString('sv') // sv locale formats as YYYY-MM-DD
+  return template.replaceAll('{{title}}', title).replaceAll('{{date}}', date)
+}
+
+/** Zettel content from its template; "ID only" filenames keep the idea on the first line (Duffney) */
+export function zettelContent(
+  template: string,
+  title: string,
+  settings: Pick<ZettelSettings, 'filenameFormat'>
+): string {
+  const content = fillTemplate(template, title)
+  const needsTitleLine =
+    settings.filenameFormat === FilenameFormat.ID_ONLY && !template.includes('{{title}}')
+  return needsTitleLine ? content.replace(/^(---\n[\s\S]*?\n---\n)?/, `$1# ${title}\n`) : content
+}
 
 /**
  * Get the display title for a file
@@ -18,7 +62,10 @@ export function getFileTitleFromCache(file: TFile, cache: CachedMetadata | null)
 }
 
 function resolveTarget(app: App, target: string): TFile | null {
-  const linkpath = target.replace(/^\[\[|\]\]$/g, '').split(/[|#]/)[0]?.trim()
+  const linkpath = target
+    .replace(/^\[\[|\]\]$/g, '')
+    .split(/[|#]/)[0]
+    ?.trim()
   return linkpath ? app.metadataCache.getFirstLinkpathDest(linkpath, '') : null
 }
 

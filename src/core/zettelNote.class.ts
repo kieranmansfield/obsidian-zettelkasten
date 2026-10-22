@@ -5,20 +5,17 @@ import { TFile } from 'obsidian'
 import ZettelId from './zettelId.class'
 import type { ZettelCreateInput } from '../base/zettel'
 import NoteCore from './note.class'
-import type BoxManager from './boxManager.class'
-import type { Box } from '../base/box'
 import type SettingsManager from '../settings/SettingsManager'
 import { FilenameFormat } from '../base/settings'
+import { zettelFilename } from '../base/fileHelpers'
 
 export default class ZettelNote extends NoteCore {
   protected fileService: FileService
-  protected boxManager: BoxManager
   protected settingsManager: SettingsManager
 
-  constructor(fileService: FileService, boxManager: BoxManager, settingsManager: SettingsManager) {
+  constructor(fileService: FileService, settingsManager: SettingsManager) {
     super()
     this.fileService = fileService
-    this.boxManager = boxManager
     this.settingsManager = settingsManager
   }
 
@@ -26,15 +23,7 @@ export default class ZettelNote extends NoteCore {
     const settings = this.settingsManager.getZettel()
     const idString = input.zettelId.toString()
 
-    // ID only mode - just the zettel ID
-    if (settings.filenameFormat === FilenameFormat.ID_ONLY) {
-      return idString
-    }
-
-    // ID + Title mode - ID, separator, and title
-    const title = this.sanitizeName(input.title)
-    const separator = settings.separator || '⁝'
-    return `${idString} ${separator} ${title}`.trim()
+    return zettelFilename(idString, this.sanitizeName(input.title), settings)
   }
 
   protected buildRenameRequest(file: TFile, input: NoteRenameInput): FileRenameInput {
@@ -48,10 +37,9 @@ export default class ZettelNote extends NoteCore {
       }
     }
 
-    // ID + Title mode - extract ID and update title
-    const separator = settings.separator || '⁝'
-    const [idString] = file.basename.split(separator)
-    const newFilename = `${idString.trim()} ${separator} ${this.sanitizeName(input.newTitle)}`
+    // ID + Title mode - keep the leading ID, replace the title
+    const [idString] = file.basename.split(' ')
+    const newFilename = zettelFilename(idString, this.sanitizeName(input.newTitle), settings)
     return {
       file,
       newName: `${newFilename}.md`,
@@ -74,25 +62,16 @@ export default class ZettelNote extends NoteCore {
     return this.renameFile(input)
   }
 
-  protected async resolveFolder(inputFolder?: string, zettelId?: ZettelId): Promise<string> {
-    if (inputFolder) return inputFolder
-
-    const box: Box = this.boxManager.resolveBoxForZettel(zettelId?.toString() ?? '')
-    const ensuredBox = await this.boxManager.ensureBox(box)
-
-    if (ensuredBox.type === 'folder') {
-      return ensuredBox.value
-    }
-
-    // For tag boxes, fallback folder
-    return this.boxManager.getDefaultFolder()
+  /** Zettels always go into the one flat slip-box folder */
+  protected resolveFolder(inputFolder?: string): string {
+    return inputFolder || this.settingsManager.getZettel().defaultFolder
   }
 
   async createNew(
     input: Omit<ZettelCreateInput, 'zettelId'> & { title: string }
   ): Promise<FileResult> {
     const zettelId = ZettelId.create()
-    const folder = await this.resolveFolder(input.folder, zettelId)
+    const folder = this.resolveFolder(input.folder)
 
     const fileInput: FileCreateInput = {
       folder,
@@ -108,7 +87,7 @@ export default class ZettelNote extends NoteCore {
     input: Omit<ZettelCreateInput, 'zettelId'> & { title: string }
   ): Promise<FileResult> {
     const childId = parentId.nextChild()
-    const folder = await this.resolveFolder(input.folder, childId)
+    const folder = this.resolveFolder(input.folder)
 
     const fileInput: FileCreateInput = {
       folder,
@@ -124,7 +103,7 @@ export default class ZettelNote extends NoteCore {
     input: Omit<ZettelCreateInput, 'zettelId'> & { title: string }
   ): Promise<FileResult> {
     const next = siblingId.nextSibling()!
-    const folder = await this.resolveFolder(input.folder, next)
+    const folder = this.resolveFolder(input.folder)
 
     const fileInput: FileCreateInput = {
       folder,

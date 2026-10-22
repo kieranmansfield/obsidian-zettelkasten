@@ -5,7 +5,6 @@ import type {
   PluginSettings,
   GeneralSettings,
   CommandSettings,
-  BoxSettings,
   ZettelSettings,
   FleetingSettings,
   IndexSettings,
@@ -46,6 +45,8 @@ export default class SettingsManager {
       raw['zettelkastenSidebar'] = raw['zettelkastenView']
       delete raw['zettelkastenView']
     }
+
+    migrateToSlipBox(raw)
 
     // Deep merge loaded data with defaults
     this.settings = this.deepMerge(DEFAULT_SETTINGS, raw)
@@ -97,13 +98,6 @@ export default class SettingsManager {
   }
 
   /**
-   * Get box settings
-   */
-  getBoxes() {
-    return { ...this.settings.boxes }
-  }
-
-  /**
    * Get zettel settings
    */
   getZettel() {
@@ -118,8 +112,9 @@ export default class SettingsManager {
   }
 
   /**
-   * Get index note settings
+   * Get structure note settings
    */
+  // fallow-ignore-next-line unused-class-member
   getIndex() {
     return { ...this.settings.index }
   }
@@ -166,16 +161,6 @@ export default class SettingsManager {
   async updateCommands(commands: Partial<typeof this.settings.commands>): Promise<void> {
     this.settings.commands = { ...this.settings.commands, ...commands }
     await this.save()
-  }
-
-  /**
-   * Update box settings
-   */
-  async updateBoxes(boxes: Partial<typeof this.settings.boxes>): Promise<void> {
-    this.settings.boxes = { ...this.settings.boxes, ...boxes }
-    await this.save()
-    // Refresh the Zettelkasten view if it's open
-    this.refreshZettelkastenSidebar()
   }
 
   /**
@@ -323,8 +308,6 @@ export default class SettingsManager {
       this.settings.general = { ...(defaultValue as GeneralSettings) }
     } else if (section === 'commands') {
       this.settings.commands = { ...(defaultValue as CommandSettings) }
-    } else if (section === 'boxes') {
-      this.settings.boxes = { ...(defaultValue as BoxSettings) }
     } else if (section === 'zettel') {
       this.settings.zettel = { ...(defaultValue as ZettelSettings) }
     } else if (section === 'fleeting') {
@@ -412,5 +395,33 @@ export default class SettingsManager {
         { cause: error }
       )
     }
+  }
+}
+
+type RawSection = Record<string, unknown>
+
+/**
+ * Strict Zettelkasten structure (one flat slip-box, no topic boxes, no type tags on permanent notes):
+ * - boxes are removed; the old box root becomes the slip-box if no zettel folder was set
+ * - zettel detection by tag or link becomes folder detection (they stamp #type tags / bare links)
+ * - structure notes always live in the slip-box, so index folder/detection settings are dropped
+ */
+function migrateToSlipBox(raw: Record<string, unknown>): void {
+  const boxes = section(raw, 'boxes')
+  delete raw['boxes']
+  migrateZettel(section(raw, 'zettel'), boxes['rootFolder'])
+
+  const index = section(raw, 'index')
+  for (const key of ['folder', 'detectionMode', 'tag']) delete index[key]
+}
+
+const section = (raw: Record<string, unknown>, key: string): RawSection =>
+  (raw[key] ??= {}) as RawSection
+
+function migrateZettel(zettel: RawSection, boxRoot: unknown): void {
+  zettel['defaultFolder'] ||= boxRoot || DEFAULT_SETTINGS.zettel.defaultFolder
+  if (['tag', 'link'].includes(String(zettel['zettelDetectionMode']))) {
+    zettel['zettelDetectionMode'] = 'folder'
+    zettel['zettelTag'] = DEFAULT_SETTINGS.zettel.zettelTag
   }
 }

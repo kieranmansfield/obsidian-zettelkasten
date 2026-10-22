@@ -23,7 +23,6 @@ src/commands/
 ├── createFleetingNote.ts        # Command: Create fleeting note
 ├── createIndexNote.ts           # Command: Create index note
 ├── createLiteratureNote.ts      # Command: Create literature note
-└── openBoxPalette.ts            # Command: Open box selection palette
 ```
 
 ## How to Add a New Command
@@ -83,8 +82,6 @@ Commands receive a `CommandContext` object with access to:
 
 - `app`: Obsidian App instance
 - `fileService`: File operations service
-- `boxService`: Box management service
-- `boxManager`: High-level box orchestration
 - `zettelNote`: Zettel note handler
 - `fleetingNote`: Fleeting note handler
 - `indexNote`: Index note handler
@@ -273,7 +270,6 @@ for (const [category, commands] of categories) {
 Commands are organized by category:
 
 - **`note-creation`**: Commands for creating notes (zettel, fleeting, index, literature)
-- **`box-management`**: Commands for managing boxes (open palette, create box, etc.)
 - **`navigation`**: Commands for navigating between notes
 - **`uncategorized`**: Commands without a category
 

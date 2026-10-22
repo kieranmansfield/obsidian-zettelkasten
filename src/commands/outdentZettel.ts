@@ -1,6 +1,7 @@
 import type { CommandFactory } from '../base/command'
 import { Notice } from 'obsidian'
 import ZettelId from '../core/zettelId.class'
+import { renameZettelToId } from '../base/sequenceEdit'
 
 /**
  * Command: Outdent Zettel
@@ -87,32 +88,14 @@ export const outdentZettelCommand: CommandFactory = (context) => {
         return
       }
 
-      // Generate new ID as sibling of parent (after parent)
-      const newId = parentId.nextSibling()
-
-      if (!newId) {
-        new Notice('Error generating new ID')
-        return
-      }
-
-      // Get title from frontmatter to preserve it
-      const cache = context.app.metadataCache.getFileCache(activeFile)
-      const title = (cache?.frontmatter?.title as string | undefined) ?? ''
-
-      // Build new filename
-      const newFilename = title ? `${newId.toString()} ${title}` : newId.toString()
-
-      // Rename the file
-      const result = await context.fileService.rename({
-        file: activeFile,
-        newName: newFilename,
-      })
-
-      if (result) {
-        new Notice(`Outdented zettel to sibling of ${parentFile.basename}`)
-      } else {
-        new Notice('Failed to outdent zettel')
-      }
+      // New ID: sibling after the parent
+      await renameZettelToId(
+        context,
+        activeFile,
+        parentId.nextSibling(),
+        `Outdented zettel to sibling of ${parentFile.basename}`,
+        'Failed to outdent zettel'
+      )
     },
   }
 }

@@ -1,17 +1,62 @@
 import {
   FilenameFormat,
   PluginSettings,
-  BoxMode,
   ZettelSettings,
   FleetingSettings,
   IndexSettings,
   LiteratureSettings,
   ProjectSettings,
-  BoxConfig,
   ZettelDetectionMode,
   ZettelkastenSidebarSettings,
   NoteSequenceSettings,
 } from '../base/settings'
+
+// Note formats from the strict Zettelkasten skill (Ahrens, zettelkasten.de, Duffney, Kadavy).
+// {{title}} and {{date}} (YYYY-MM-DD) are filled in on creation.
+
+const PERMANENT_TEMPLATE = `---
+created: {{date}}
+---
+%% One idea, in your own words and full sentences, for a reader who has not seen the source. It must fit on one screen. %%
+
+
+- Continues [[ID title]] because …
+
+Source: [[Surname YYYY]] p. 
+`
+
+const LITERATURE_TEMPLATE = `---
+type: literature
+author: 
+title: 
+year: 
+source: 
+---
+%% Very short, very selective, your own words. One point per line, each with its page. Quote only when the wording itself matters. %%
+- p.  – 
+`
+
+const STRUCTURE_TEMPLATE = `---
+type: structure
+---
+%% Your current view of how these notes hang together. Order them and say what each contributes. When your view changes, write a new structure note, link it from this one and update the index. %%
+- [[ID title]] – what it contributes here
+`
+
+export const INDEX_TEMPLATE = `---
+type: index
+---
+# Index
+%% Keyword → 1–2 entry notes, never more than 4. Choose by asking: in which situation do I want to stumble on this again? %%
+## keyword
+- [[ID title]]
+`
+
+/** Basename of the single Index note in the slip-box */
+export const INDEX_NOTE = 'Index'
+
+/** Property that marks structure notes */
+export const STRUCTURE_MARKER = 'type: structure'
 
 /**
  * Default zettel settings
@@ -19,40 +64,37 @@ import {
 export const DEFAULT_ZETTEL_SETTINGS: ZettelSettings = {
   enabled: true,
   zettelDetectionMode: ZettelDetectionMode.FOLDER,
-  zettelTag: 'zettel',
+  zettelTag: 'type: permanent',
   zettelIdFormat: 'YYYYMMDDHHmmssSSS',
-  defaultFolder: '',
+  defaultFolder: 'slip-box',
   templatePath: '',
-  template: '# {{title}}\n\n',
-  filenameFormat: FilenameFormat.ID_ONLY,
-  separator: '⁝',
+  template: PERMANENT_TEMPLATE,
+  filenameFormat: FilenameFormat.ID_TITLE,
+  separator: '',
   autoLinkToParent: true,
   openOnCreate: true,
 }
 
 /**
- * Default fleeting settings
+ * Default fleeting settings (fleeting notes have no format, Ahrens 2.1)
  */
 export const DEFAULT_FLEETING_SETTINGS: FleetingSettings = {
   enabled: true,
   detectionMode: ZettelDetectionMode.FOLDER,
   tag: 'fleeting',
-  folder: 'fleeting',
+  folder: 'inbox',
   templatePath: '',
-  template: '# {{title}}\n\n',
+  template: '',
   openOnCreate: true,
 }
 
 /**
- * Default index settings
+ * Default structure note settings
  */
 export const DEFAULT_INDEX_SETTINGS: IndexSettings = {
   enabled: true,
-  detectionMode: ZettelDetectionMode.FOLDER,
-  tag: 'index',
-  folder: 'index',
   templatePath: '',
-  template: '# {{title}}\n\n## Overview\n\n## Notes\n\n',
+  template: STRUCTURE_TEMPLATE,
   openOnCreate: true,
 }
 
@@ -63,10 +105,9 @@ export const DEFAULT_LITERATURE_SETTINGS: LiteratureSettings = {
   enabled: true,
   detectionMode: ZettelDetectionMode.FOLDER,
   tag: 'literature',
-  folder: 'literature',
+  folder: 'reference',
   templatePath: '',
-  template:
-    '# {{title}}\n\n## Metadata\n- Author: \n- Year: \n- Type: \n\n## Summary\n\n## Key Points\n\n',
+  template: LITERATURE_TEMPLATE,
   openOnCreate: true,
 }
 
@@ -91,7 +132,7 @@ export const DEFAULT_ZETTELKASTEN_SIDEBAR_SETTINGS: ZettelkastenSidebarSettings 
   inboxName: 'Inbox',
   zettelsName: 'Zettels',
   literatureName: 'Literature',
-  indexName: 'Index',
+  indexName: 'Structure notes',
   projectsName: 'Projects',
   bookmarksName: 'Bookmarks',
   showInbox: true,
@@ -128,22 +169,6 @@ export const DEFAULT_NOTE_SEQUENCE_SETTINGS: NoteSequenceSettings = {
 }
 
 /**
- * Create a default box configuration
- */
-export function createDefaultBoxConfig(): BoxConfig {
-  return {
-    id: 'default',
-    name: 'Default',
-    value: '',
-    isDefault: true,
-    zettel: { ...DEFAULT_ZETTEL_SETTINGS },
-    fleeting: { ...DEFAULT_FLEETING_SETTINGS },
-    index: { ...DEFAULT_INDEX_SETTINGS },
-    literature: { ...DEFAULT_LITERATURE_SETTINGS },
-  }
-}
-
-/**
  * Default plugin settings
  */
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -155,15 +180,6 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
   commands: {
     enabledCommands: {},
-  },
-
-  boxes: {
-    enabled: false,
-    mode: BoxMode.FOLDER,
-    rootFolder: '',
-    defaultBox: '',
-    autoCreateBoxes: true,
-    boxes: [createDefaultBoxConfig()],
   },
 
   zettel: { ...DEFAULT_ZETTEL_SETTINGS },

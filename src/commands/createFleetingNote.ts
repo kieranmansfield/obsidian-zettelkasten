@@ -1,5 +1,5 @@
 import type { CommandFactory } from '../base/command'
-import { finishNote } from '../base/fileHelpers'
+import { fillTemplate, finishNote } from '../base/fileHelpers'
 
 /**
  * Command: Create Fleeting Note
@@ -37,9 +37,8 @@ export const createFleetingNoteCommand: CommandFactory = (context) => {
         const result = await context.fleetingNote.createNote({
           folder: settings.folder,
           title: 'Quick Note',
-          content: templateContent.replace('{{title}}', 'Quick Note'),
+          content: fillTemplate(templateContent, 'Quick Note'),
         })
-
 
         await finishNote(
           context.app,

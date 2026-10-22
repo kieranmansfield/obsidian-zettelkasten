@@ -1,5 +1,5 @@
 import type { CommandFactory } from '../base/command'
-import { finishNote } from '../base/fileHelpers'
+import { fillTemplate, finishNote } from '../base/fileHelpers'
 
 /**
  * Command: Create Literature Note
@@ -37,9 +37,8 @@ export const createLiteratureNoteCommand: CommandFactory = (context) => {
         const result = await context.literatureNote.createNote({
           folder: settings.folder,
           title: 'New Source',
-          content: templateContent.replace('{{title}}', 'New Source'),
+          content: fillTemplate(templateContent, 'New Source'),
         })
-
 
         await finishNote(
           context.app,

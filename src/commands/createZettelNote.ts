@@ -1,7 +1,7 @@
 import type { CommandFactory } from '../base/command'
 import { CreateNoteWithSuggestModal } from '../ui/CreateNoteWithSuggestModal'
 import { Notice, TFile, App } from 'obsidian'
-import { finishNote } from '../base/fileHelpers'
+import { finishNote, zettelContent } from '../base/fileHelpers'
 
 /**
  * Command: Create Zettel
@@ -45,7 +45,7 @@ export const createZettelNoteCommand: CommandFactory = (context) => {
             const result = await context.zettelNote!.createNew({
               title,
               folder: settings.defaultFolder || undefined,
-              content: templateContent.replace('{{title}}', title),
+              content: zettelContent(templateContent, title, settings),
             })
 
             new Notice(`Created zettel: ${result.filename}`)

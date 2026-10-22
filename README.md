@@ -42,16 +42,29 @@ Inspired by [luhman-obsidian-plugin](https://github.com/Dyldog/luhman-obsidian-p
     - Hierarchical numbering display
     - Maintains complete note sequence integrity
 
+### 🗂️ Vault Structure
+
+The plugin follows a strict Zettelkasten layout (Ahrens, zettelkasten.de, Duffney, Kadavy):
+
+```
+inbox/       fleeting notes, any format; process within 2 days
+reference/   literature notes, one per source ("Surname YYYY"), in your own words
+slip-box/    FLAT: permanent notes ("ID Title"), structure notes and Index.md. Nothing else.
+projects/    one folder per writing project
+```
+
+- The slip-box is one flat folder: no topic subfolders or topic boxes.
+- Permanent notes carry no type or category tags; zettels are detected by folder (or a property).
+- New notes use the method's templates: a permanent note continues an existing note with a link that says why, and cites its literature note with the page.
+
 ### 📝 Note Types & Templates
 
 - **Inbox Notes**: Capture fleeting thoughts with optional templates
     - Default mode or fleeting notes mode
     - Configurable locations and templates
     - Custom filename formats
-- **Structure Notes**: MOCs (Maps of Content) or Zettelkasten Indexes
-    - Switchable modes
-    - Separate templates for each type
-    - Optional zettel IDs
+- **Structure Notes**: `<ID> <topic>` notes marked `type: structure`, kept in the slip-box
+- **Index**: one `Index.md` in the slip-box (keyword → 1–2 entry notes), opened or created with "Open Index"
 - **Reference Notes**: Literature and source material organization
 - **Project Notes**: Dedicated project management notes
 
@@ -133,8 +146,8 @@ Inspired by [luhman-obsidian-plugin](https://github.com/Dyldog/luhman-obsidian-p
 
 1. **Configure Zettel Location**:
     - Go to Settings → Zettelkasten
-    - Set your main zettels folder path
-    - Choose detection mode (folder or tag-based)
+    - Set the slip-box folder (default `slip-box`)
+    - Choose detection mode (folder or property)
 
 2. **Set Up the Panel** (optional):
     - Enable "Zettelkasten Panel" toggle
@@ -149,7 +162,7 @@ Inspired by [luhman-obsidian-plugin](https://github.com/Dyldog/luhman-obsidian-p
 
 4. **Configure Note Types**:
     - Set up Inbox location and template
-    - Configure Structure Notes (MOC or Zettelkasten mode)
+    - Configure the structure note template
     - Set up Projects and References as needed
 
 ### Creating Your First Zettel

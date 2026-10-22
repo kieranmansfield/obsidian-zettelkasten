@@ -1,7 +1,5 @@
 import type { App, Command, Plugin } from 'obsidian'
 import type FileService from '../service/file.service'
-import type BoxService from '../service/box.service'
-import type BoxManager from '../core/boxManager.class'
 import type SettingsManager from '../settings/SettingsManager'
 import type NoteSequenceService from '../service/noteSequence.service'
 import type ZettelNote from '../core/zettelNote.class'
@@ -15,7 +13,7 @@ import type LiteratureNote from '../core/literatureNote.class'
 export interface CommandMetadata {
   /**
    * Category for organizing commands in settings
-   * e.g., 'note-creation', 'navigation', 'box-management'
+   * e.g., 'note-creation', 'navigation'
    */
   category?: string
 
@@ -63,8 +61,6 @@ export interface CommandContext {
 
   // Plugin services (add as needed)
   fileService?: FileService
-  boxService?: BoxService
-  boxManager?: BoxManager
   settingsManager?: SettingsManager
   noteSequenceService?: NoteSequenceService
 

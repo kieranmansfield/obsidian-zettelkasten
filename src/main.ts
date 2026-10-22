@@ -4,8 +4,6 @@ import ZettelNote from './core/zettelNote.class'
 import FleetingNote from './core/fleetingNote.class'
 import IndexNote from './core/indexNote.class'
 import LiteratureNote from './core/literatureNote.class'
-import BoxService from './service/box.service'
-import BoxManager from './core/boxManager.class'
 import NoteSequenceService from './service/noteSequence.service'
 import CommandRegistry from './commands/CommandRegistry'
 import SettingsManager from './settings/SettingsManager'
@@ -25,8 +23,6 @@ export default class ZettelkastenPlugin extends Plugin {
   private fleetingNote!: FleetingNote
   private indexNote!: IndexNote
   private literatureNote!: LiteratureNote
-  private boxService!: BoxService
-  private boxManager!: BoxManager
   private noteSequenceService!: NoteSequenceService
   private commandRegistry!: CommandRegistry
 
@@ -88,15 +84,7 @@ export default class ZettelkastenPlugin extends Plugin {
    * Initialize core services
    */
   private initializeServices(): void {
-    const boxSettings = this.settingsManager.getBoxes()
-
     this.fileService = new FileService(this.app)
-    this.boxService = new BoxService(
-      this.app.vault,
-      boxSettings.defaultBox || boxSettings.rootFolder,
-      boxSettings.rootFolder
-    )
-    this.boxManager = new BoxManager(this.boxService, this.fileService)
     this.noteSequenceService = new NoteSequenceService(this.app, this.fileService)
   }
 
@@ -104,7 +92,7 @@ export default class ZettelkastenPlugin extends Plugin {
    * Initialize note type handlers
    */
   private initializeNoteTypes(): void {
-    this.zettelNote = new ZettelNote(this.fileService, this.boxManager, this.settingsManager)
+    this.zettelNote = new ZettelNote(this.fileService, this.settingsManager)
     this.fleetingNote = new FleetingNote(this.fileService)
     this.indexNote = new IndexNote(this.fileService)
     this.literatureNote = new LiteratureNote(this.fileService)
@@ -114,8 +102,7 @@ export default class ZettelkastenPlugin extends Plugin {
    * Register views for Note Sequences and Zettelkasten Sidebar
    */
   private registerViews(): void {
-    const boxSettings = this.settingsManager.getBoxes()
-    const rootFolder = boxSettings.rootFolder
+    const rootFolder = this.settingsManager.getZettel().defaultFolder
 
     // Always register view types (even if disabled) to prevent ghost icons
     this.registerView(VIEW_TYPE_ZETTELKASTEN, (leaf) => new ZettelkastenSidebar(leaf, this))
@@ -160,8 +147,6 @@ export default class ZettelkastenPlugin extends Plugin {
       app: this.app,
       plugin: this,
       fileService: this.fileService,
-      boxService: this.boxService,
-      boxManager: this.boxManager,
       settingsManager: this.settingsManager,
       noteSequenceService: this.noteSequenceService,
       zettelNote: this.zettelNote,
@@ -179,7 +164,6 @@ export default class ZettelkastenPlugin extends Plugin {
       .add(commands.createFleetingNoteCommand)
       .add(commands.createIndexNoteCommand)
       .add(commands.createLiteratureNoteCommand)
-      .add(commands.openBoxPaletteCommand)
       .add(commands.openZettelCommand)
       .add(commands.openIndexCommand)
       .add(commands.openNoteSequencesViewCommand)
