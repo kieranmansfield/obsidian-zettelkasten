@@ -360,14 +360,14 @@ export default class SettingsManager {
     let needsSave = false
 
     // Example migration: if version is old, update something
-    if (!currentVersion || currentVersion < '0.1.4') {
+    if (compareSemver(currentVersion ?? '0.0.0', '0.1.4') < 0) {
       // Add any migration logic here
       this.settings.version = '0.1.4'
       needsSave = true
     }
 
     // Add future migrations here
-    // if (currentVersion < '0.2.0') { ... }
+    // if (compareSemver(currentVersion ?? '0.0.0', '0.2.0') < 0) { ... }
 
     if (needsSave) {
       await this.save()
@@ -396,6 +396,17 @@ export default class SettingsManager {
       )
     }
   }
+}
+
+/** Numeric `major.minor.patch` comparison ('0.1.10' > '0.1.4'); no pre-release tags */
+export function compareSemver(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0)
+    if (d) return d
+  }
+  return 0
 }
 
 type RawSection = Record<string, unknown>

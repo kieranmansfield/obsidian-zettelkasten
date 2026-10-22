@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Plugin } from 'obsidian'
-import SettingsManager from './SettingsManager'
+import SettingsManager, { compareSemver } from './SettingsManager'
 import { INDEX_TEMPLATE, STRUCTURE_MARKER } from './DefaultSettings'
 
 const load = async (data: unknown) => {
@@ -53,5 +53,13 @@ describe('SettingsManager', () => {
     expect(s.zettel.template).toMatch(/^---\ncreated: \{\{date\}\}\n---/)
     expect(s.literature.template).toContain('type: literature')
     expect(s.fleeting.template).toBe('')
+  })
+})
+
+describe('compareSemver', () => {
+  it('compares numerically', () => {
+    expect(compareSemver('0.1.10', '0.1.4')).toBeGreaterThan(0)
+    expect(compareSemver('0.1.4', '0.1.4')).toBe(0)
+    expect(compareSemver('0.0.9', '0.1.0')).toBeLessThan(0)
   })
 })
