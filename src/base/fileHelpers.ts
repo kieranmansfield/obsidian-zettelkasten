@@ -16,15 +16,16 @@ function zettelTitle(basename: string): string {
   return basename.replace(/^\S+\s*/, '').replace(/^[^\p{L}\p{N}\s]+\s+/u, '')
 }
 
-/** New "<id> <title>.md" name for a zettel whose ID changes; keeps the frontmatter or filename title */
+/** New "<id> <title>.md" name for a zettel whose ID changes; keeps the filename title, else the frontmatter one */
 export function zettelRename(
   app: App,
   file: TFile,
   id: string,
   settings: Pick<ZettelSettings, 'filenameFormat' | 'separator'>
 ): string {
-  const title = frontmatterTitle(app.metadataCache.getFileCache(file))
-  return `${zettelFilename(id, title ?? zettelTitle(file.basename), settings)}.md`
+  const title =
+    zettelTitle(file.basename) || frontmatterTitle(app.metadataCache.getFileCache(file)) || ''
+  return `${zettelFilename(id, title, settings)}.md`
 }
 
 /** Fill a note template: every {{title}}, and {{date}} as YYYY-MM-DD */
@@ -196,4 +197,9 @@ export async function finishNote(
   if (!(file instanceof TFile)) return
   await stampFile(app, file, mode, value)
   if (open) await app.workspace.getLeaf().openFile(file)
+}
+
+/** `path` lies in `folder` or a subfolder; '' and '/' are the vault root */
+export function isInFolder(path: string, folder: string): boolean {
+  return folder === '' || folder === '/' || path.startsWith(`${folder}/`)
 }

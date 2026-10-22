@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { App, TFile } from 'obsidian'
-import { fillTemplate, zettelContent, zettelFilename, zettelRename } from './fileHelpers'
+import {
+  fillTemplate,
+  isInFolder,
+  zettelContent,
+  zettelFilename,
+  zettelRename,
+} from './fileHelpers'
 import { FilenameFormat } from './settings'
 
 // obsidian has no runtime code outside the app; fileHelpers only needs it for getAllTags
@@ -34,6 +40,12 @@ describe('zettelRename', () => {
     )
     expect(zettelRename(app(), f(`${ID}a1`), 'NEW', T)).toBe('NEW.md')
     expect(zettelRename(app(), f(`${ID}a1 Old`), 'NEW', ID_ONLY)).toBe('NEW.md')
+    expect(zettelRename(app(), f(`${ID}a1 Node v1.2 vs. Deno`), 'NEW', T)).toBe(
+      'NEW Node v1.2 vs. Deno.md'
+    )
+    expect(zettelRename(app(), f(`${ID}a1 ⁝ A ⁝ B`), 'NEW', { ...T, separator: '⁝' })).toBe(
+      'NEW ⁝ A ⁝ B.md'
+    )
   })
 
   it('ignores a non-string frontmatter title', () => {
@@ -44,8 +56,9 @@ describe('zettelRename', () => {
     expect(zettelRename(app({ title: null }), f(`${ID}a1 Real`), 'NEW', T)).toBe('NEW Real.md')
   })
 
-  it('prefers the frontmatter title', () => {
-    expect(zettelRename(app({ title: 'FM' }), f(`${ID}a1 x`), 'NEW', T)).toBe('NEW FM.md')
+  it('prefers the filename title, then the frontmatter one', () => {
+    expect(zettelRename(app({ title: 'FM' }), f(`${ID}a1 x`), 'NEW', T)).toBe('NEW x.md')
+    expect(zettelRename(app({ title: 'FM' }), f(`${ID}a1`), 'NEW', T)).toBe('NEW FM.md')
   })
 })
 
@@ -62,5 +75,15 @@ describe('templates', () => {
     )
     expect(zettelContent('# {{title}}', 'Idea', ID_ONLY)).toBe('# Idea')
     expect(zettelContent('body', 'Idea', T)).toBe('body')
+  })
+})
+
+describe('isInFolder', () => {
+  it('needs a path boundary', () => {
+    expect(isInFolder('Notes Archive/x.md', 'Notes')).toBe(false)
+    expect(isInFolder('Notes/x.md', 'Notes')).toBe(true)
+    expect(isInFolder('Notes/sub/x.md', 'Notes')).toBe(true)
+    expect(isInFolder('x.md', '')).toBe(true)
+    expect(isInFolder('x.md', '/')).toBe(true)
   })
 })

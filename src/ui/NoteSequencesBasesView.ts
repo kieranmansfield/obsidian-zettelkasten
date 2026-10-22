@@ -1,6 +1,7 @@
 import { ItemView, WorkspaceLeaf, setIcon, TFile } from 'obsidian'
 import type { NoteSequence } from '../base/noteSequence'
 import type NoteSequenceService from '../service/noteSequence.service'
+import { isInFolder } from '../base/fileHelpers'
 
 export const VIEW_TYPE_NOTE_SEQUENCES_BASES = 'note-sequences-bases-view'
 
@@ -59,7 +60,6 @@ export class NoteSequencesBasesView extends ItemView {
     return 'network'
   }
 
-   
   async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement
     container.empty()
@@ -71,9 +71,8 @@ export class NoteSequencesBasesView extends ItemView {
     // Get all root zettel notes (bases - absolute top-level parents)
     const core = this.sequenceService.getCore()
     const allFiles = this.rootFolder
-      ? this.app.vault.getMarkdownFiles().filter((f) => f.path.startsWith(this.rootFolder))
+      ? this.app.vault.getMarkdownFiles().filter((f) => isInFolder(f.path, this.rootFolder))
       : this.app.vault.getMarkdownFiles()
-
 
     const rootZettels = core.findAllRoots(allFiles)
 
@@ -218,7 +217,6 @@ export class NoteSequencesBasesView extends ItemView {
     }
   }
 
-   
   async onClose(): Promise<void> {
     // Clear any pending refresh timeout
     if (this.refreshTimeout) {

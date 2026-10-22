@@ -1,5 +1,6 @@
 import type { CommandFactory } from '../base/command'
 import { Notice } from 'obsidian'
+import { isInFolder } from '../base/fileHelpers'
 
 /**
  * Command: Next Sequence
@@ -42,7 +43,7 @@ export const nextSequenceCommand: CommandFactory = (context) => {
       // Find the root of the current sequence
       const allFiles = context.app.vault
         .getMarkdownFiles()
-        .filter((f) => f.path.startsWith(activeFile.parent?.path || ''))
+        .filter((f) => isInFolder(f.path, activeFile.parent?.path || ''))
 
       const rootFile = core.findRootFile(activeFile, allFiles)
 

@@ -9,6 +9,7 @@ import type {
 } from '../base/noteSequence'
 import NoteSequenceCore from '../core/noteSequence.class'
 import type FileService from './file.service'
+import { isInFolder } from '../base/fileHelpers'
 
 /**
  * NoteSequenceService
@@ -33,7 +34,7 @@ export default class NoteSequenceService {
    * Find all sequences in a specific folder
    */
   findSequencesInFolder(folderPath: string, options?: SequenceBuildOptions): NoteSequence[] {
-    const files = this.vault.getMarkdownFiles().filter((file) => file.path.startsWith(folderPath))
+    const files = this.vault.getMarkdownFiles().filter((file) => isInFolder(file.path, folderPath))
     return this.core.findAllSequences(files, options)
   }
 
@@ -56,7 +57,7 @@ export default class NoteSequenceService {
     // Find the root file
     const allFiles = this.vault
       .getMarkdownFiles()
-      .filter((f) => f.path.startsWith(file.parent?.path || ''))
+      .filter((f) => isInFolder(f.path, file.parent?.path || ''))
 
     const rootFile = this.core.findRootFile(file, allFiles)
     if (!rootFile) return null
@@ -91,7 +92,7 @@ export default class NoteSequenceService {
     // Find the parent file
     const allFiles = this.vault
       .getMarkdownFiles()
-      .filter((f) => f.path.startsWith(currentFile.parent?.path || ''))
+      .filter((f) => isInFolder(f.path, currentFile.parent?.path || ''))
 
     for (const file of allFiles) {
       const fileId = this.core.extractZettelId(file.basename)
@@ -138,7 +139,7 @@ export default class NoteSequenceService {
 
     const allFiles = this.vault
       .getMarkdownFiles()
-      .filter((f) => f.path.startsWith(currentFile.parent?.path || ''))
+      .filter((f) => isInFolder(f.path, currentFile.parent?.path || ''))
 
     const children = this.core.findChildren(currentFile, allFiles, true)
 
@@ -210,7 +211,7 @@ export default class NoteSequenceService {
     // Check if there are any related files (parent or children)
     const allFiles = this.vault
       .getMarkdownFiles()
-      .filter((f) => f.path.startsWith(file.parent?.path || ''))
+      .filter((f) => isInFolder(f.path, file.parent?.path || ''))
 
     // Check for parent
     const parentId = this.core.getParentId(zettelId)
@@ -227,7 +228,7 @@ export default class NoteSequenceService {
    * Get all root zettels in a folder
    */
   getRootsInFolder(folderPath: string): TFile[] {
-    const files = this.vault.getMarkdownFiles().filter((file) => file.path.startsWith(folderPath))
+    const files = this.vault.getMarkdownFiles().filter((file) => isInFolder(file.path, folderPath))
     return this.core.findAllRoots(files)
   }
 

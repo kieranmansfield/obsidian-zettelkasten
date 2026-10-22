@@ -1,4 +1,4 @@
-import { TFile, Vault, App } from 'obsidian'
+import { TFile, Vault, App, normalizePath } from 'obsidian'
 import type { FileCreateInput, FileRenameInput, FileResult } from '../base/file'
 
 export default class FileService {
@@ -21,41 +21,26 @@ export default class FileService {
   }
 
   /**
-   * Ensures a folder exists before writing a file.
+   * Ensures a folder exists before writing a file. The vault root ('') always exists.
    */
 
   private async ensureFolder(folder: string): Promise<void> {
-    const normalized = this.normalizeFolder(folder)
-
-    // Obsidian stores folder paths WITHOUT trailing slash
-    const folderObj = this.vault.getAbstractFileByPath(normalized)
-    if (folderObj) return
-
-    await this.vault.createFolder(normalized)
+    if (!folder || this.vault.getAbstractFileByPath(folder)) return
+    await this.vault.createFolder(folder)
   }
 
   /**
-   * Creates a file in the vault.
+   * Creates a file in the vault. Throws if the path already exists (never overwrites).
    */
   public async create(input: FileCreateInput): Promise<FileResult> {
     const folder = this.normalizeFolder(input.folder)
-    const folderPath = folder // no slash
-    const ext = input.extension ?? 'md'
-    const filePath = `${folder}/${input.filename}.${ext}`
-
-    await this.ensureFolder(folderPath)
-
-    // Ensure folder exists
     await this.ensureFolder(folder)
 
-    // Actually write file via adapter
-    await this.vault.adapter.write(filePath, input.content ?? '')
-
-    // Retrieve TFile reference
-    const file = this.vault.getAbstractFileByPath(filePath)
-    if (!file || !(file instanceof TFile)) {
-      throw new Error(`Failed to create file at path: ${filePath}`)
-    }
+    const ext = input.extension ?? 'md'
+    const file = await this.vault.create(
+      normalizePath(`${folder}/${input.filename}.${ext}`),
+      input.content ?? ''
+    )
 
     return {
       path: file.path,
@@ -64,24 +49,21 @@ export default class FileService {
   }
 
   /**
-   * Rename a file in the vault.
+   * Rename a file in its folder. `newName` may include the extension; it is added when missing.
    */
   public async rename(input: FileRenameInput): Promise<FileResult> {
     const { file, newName } = input
 
-    const newPath = file.path.replace(/[^/]+$/, newName)
+    // ponytail: suffix check, not a regex: titles can contain dots
+    const name = newName.endsWith(`.${file.extension}`) ? newName : `${newName}.${file.extension}`
+    const newPath = normalizePath(`${file.parent?.path ?? ''}/${name}`)
 
     // fileManager (not vault) rewrites links to the file, per the user's link settings
     await this.app.fileManager.renameFile(file, newPath)
 
-    const renamed = this.vault.getAbstractFileByPath(newPath)
-    if (!renamed || !(renamed instanceof TFile)) {
-      throw new Error(`Failed to rename file to ${newName}`)
-    }
-
     return {
-      path: renamed.path,
-      filename: renamed.basename,
+      path: file.path,
+      filename: file.basename,
     }
   }
 
@@ -89,14 +71,7 @@ export default class FileService {
    * Read file content.
    */
   public async read(file: TFile): Promise<string> {
-    return await this.vault.adapter.read(file.path)
-  }
-
-  /**
-   * Write file content.
-   */
-  public async write(file: TFile, content: string): Promise<void> {
-    await this.vault.adapter.write(file.path, content)
+    return await this.vault.cachedRead(file)
   }
 
   /**
