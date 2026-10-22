@@ -89,7 +89,7 @@ export const indentZettelCommand: CommandFactory = (context) => {
       await renameZettelToId(
         context,
         activeFile,
-        nextChildId(core, prevSibling, prevId, siblings),
+        nextChildId(core, prevSibling, prevId, context.app.vault.getMarkdownFiles()),
         `Indented zettel under ${prevSibling.basename}`,
         'Failed to indent zettel'
       )

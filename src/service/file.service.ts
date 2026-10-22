@@ -71,8 +71,8 @@ export default class FileService {
 
     const newPath = file.path.replace(/[^/]+$/, newName)
 
-    // Let Obsidian rename
-    await this.vault.rename(file, newPath)
+    // fileManager (not vault) rewrites links to the file, per the user's link settings
+    await this.app.fileManager.renameFile(file, newPath)
 
     const renamed = this.vault.getAbstractFileByPath(newPath)
     if (!renamed || !(renamed instanceof TFile)) {

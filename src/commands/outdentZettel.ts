@@ -1,7 +1,7 @@
 import type { CommandFactory } from '../base/command'
 import { Notice } from 'obsidian'
 import ZettelId from '../core/zettelId.class'
-import { renameZettelToId } from '../base/sequenceEdit'
+import { firstFreeId, renameZettelToId } from '../base/sequenceEdit'
 
 /**
  * Command: Outdent Zettel
@@ -92,7 +92,7 @@ export const outdentZettelCommand: CommandFactory = (context) => {
       await renameZettelToId(
         context,
         activeFile,
-        parentId.nextSibling(),
+        firstFreeId(core, parentId.nextSibling(), context.app.vault.getMarkdownFiles()),
         `Outdented zettel to sibling of ${parentFile.basename}`,
         'Failed to outdent zettel'
       )

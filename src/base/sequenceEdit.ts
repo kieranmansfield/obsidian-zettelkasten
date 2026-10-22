@@ -11,10 +11,27 @@ export function nextChildId(
   parentId: ZettelId,
   files: TFile[]
 ): ZettelId | null {
-  const last = core.findChildren(parentFile, files, true).at(-1)
-  if (!last) return parentId.nextChild()
-  const lastId = core.extractZettelId(last.basename)
-  return lastId ? ZettelId.parse(lastId).nextSibling() : null
+  const children = core.findChildren(parentFile, files, true)
+  const lastId = children.length
+    ? core.extractZettelId(children[children.length - 1].basename)
+    : null
+  // ponytail: children sort as strings (a10 before a9), so firstFreeId steps past taken IDs; natural order is WP1
+  return firstFreeId(
+    core,
+    lastId ? ZettelId.parse(lastId).nextSibling() : parentId.nextChild(),
+    children
+  )
+}
+
+/** `id`, or the first sibling after it that no file in `files` uses */
+export function firstFreeId(
+  core: NoteSequenceCore,
+  id: ZettelId | null,
+  files: TFile[]
+): ZettelId | null {
+  const taken = new Set(files.map((f) => core.extractZettelId(f.basename)))
+  while (id && taken.has(id.toString())) id = id.nextSibling()
+  return id
 }
 
 /** Rename a zettel to a new ID, keeping its title and extension, and report the outcome */
