@@ -24,7 +24,7 @@ export class CommandsModal extends Modal {
     // Header
     contentEl.createEl('h2', { text: 'Manage commands' })
     contentEl.createEl('p', {
-      text: 'Enable or disable individual commands. Changes require a plugin reload.',
+      text: 'Enable or disable individual commands.',
       cls: 'setting-item-description',
     })
 
@@ -90,10 +90,10 @@ export class CommandsModal extends Modal {
           toggle.setValue(isEnabled).onChange(async (value) => {
             if (value) {
               await this.plugin.enableCommand(id)
-              new Notice(`Enabled: ${command.name}. Reload plugin to apply.`)
+              new Notice(`Enabled: ${command.name}`)
             } else {
               await this.plugin.disableCommand(id)
-              new Notice(`Disabled: ${command.name}. Reload plugin to apply.`)
+              new Notice(`Disabled: ${command.name}`)
             }
           })
 

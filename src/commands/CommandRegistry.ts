@@ -123,9 +123,7 @@ export default class CommandRegistry {
   }
 
   /**
-   * Disable a specific command
-   * Note: Obsidian doesn't provide a way to unregister commands,
-   * so we work around this by removing the command from the internal registry
+   * Disable a specific command: removes it from the command palette straight away
    */
   disableCommand(commandId: string): boolean {
     const registered = this.registeredCommands.get(commandId)
@@ -145,12 +143,9 @@ export default class CommandRegistry {
       return true
     }
 
-    // Obsidian doesn't provide removeCommand(), so we need to reload the plugin
-    // For now, just mark as disabled and log a warning
+    this.plugin.removeCommand(commandId)
     registered.enabled = false
-    console.warn(
-      `Command "${commandId}" marked as disabled. Plugin reload required to take effect.`
-    )
+    registered.obsidianCommand = null
 
     return true
   }
@@ -160,15 +155,6 @@ export default class CommandRegistry {
    */
   updateContext(context: CommandContext): void {
     this.context = context
-  }
-
-  /**
-   * Reload all commands with new enabled state
-   * This requires plugin reload in Obsidian
-   */
-  reloadAll(enabledCommands: Map<string, boolean>): void {
-    // Store for next load
-    // In a real implementation, this would save to plugin settings
   }
 
   /**

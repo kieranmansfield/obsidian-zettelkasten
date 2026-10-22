@@ -208,8 +208,7 @@ export default class ZettelkastenPlugin extends Plugin {
   }
 
   /**
-   * Enable a command dynamically
-   * Note: Requires plugin reload to take effect
+   * Enable a command: adds it to the command palette straight away
    */
   public async enableCommand(commandId: string): Promise<void> {
     this.commandRegistry.enableCommand(commandId)
@@ -217,8 +216,7 @@ export default class ZettelkastenPlugin extends Plugin {
   }
 
   /**
-   * Disable a command dynamically
-   * Note: Requires plugin reload to take effect
+   * Disable a command: removes it from the command palette straight away
    */
   public async disableCommand(commandId: string): Promise<void> {
     this.commandRegistry.disableCommand(commandId)

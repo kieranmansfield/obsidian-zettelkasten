@@ -1,6 +1,7 @@
 import { Notice } from 'obsidian'
 import { BookmarkModal } from '../ui/BookmarkModal'
 import type { CommandFactory } from '../base/command'
+import { VIEW_TYPE_ZETTELKASTEN } from '../ui/ZettelkastenSidebar'
 import type { Bookmark } from '../base/settings'
 import type ZettelkastenPlugin from '../main'
 
@@ -46,7 +47,7 @@ export const addBookmarkCommand: CommandFactory = (context) => {
           new Notice(`Bookmark "${bookmark.title}" added`)
 
           // Refresh the view immediately if it's open
-          const leaves = context.app.workspace.getLeavesOfType('zettelkasten-view')
+          const leaves = context.app.workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
           leaves.forEach((leaf) => {
             if (leaf.view && 'refreshImmediate' in leaf.view) {
               ;(leaf.view as { refreshImmediate: () => void }).refreshImmediate()
@@ -139,7 +140,7 @@ export const removeBookmarkCommand: CommandFactory = (context) => {
         new Notice(`Bookmark "${removedBookmark.title}" removed`)
 
         // Refresh the view immediately if it's open
-        const leaves = context.app.workspace.getLeavesOfType('zettelkasten-view')
+        const leaves = context.app.workspace.getLeavesOfType(VIEW_TYPE_ZETTELKASTEN)
         leaves.forEach((leaf) => {
           if (leaf.view && 'refreshImmediate' in leaf.view) {
             ;(leaf.view as { refreshImmediate: () => void }).refreshImmediate()
