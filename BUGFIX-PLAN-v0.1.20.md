@@ -54,16 +54,16 @@ Restructure for the strict Zettelkasten skill. Line numbers in packages 1–4 an
 | 0   | Test harness (Vitest) and characterisation tests                  | —        | S      | DONE — `pnpm test` (vitest 5), tests next to modules; fake TFiles allowed in `*.test.ts` by eslint override |
 | 1   | One ID parser, natural ordering, segment-based hierarchy          | P1       | M      | DONE — `src/base/zettelIdOrder.ts`; core indexes children once; `totalNotes` fixed (`0abdd65`) |
 | 2   | Free-ID allocation                                                | P1       | S      | DONE — `nextFreeChildId` (vault-wide, max + 1, no gap refill) |
-| 3   | Link-safe, extension-safe renames and one filename builder        | P1       | M      | PARTIAL — one builder (`zettelFilename`/`zettelRename` in `src/base/fileHelpers.ts`); all four sequence commands keep title + `.md`. `FileService.rename` now uses `fileManager.renameFile` (links follow). Still TODO: extension guard in `FileService.rename` |
+| 3   | Link-safe, extension-safe renames and one filename builder        | P1       | M      | DONE — `FileService.rename` adds the extension only when missing, `normalizePath`, `fileManager.renameFile`; zettel renames keep the filename title, then frontmatter (`a0c3f8e`) |
 | 4   | Subtree moves for indent / outdent / assign parent / assign child | P1       | L      | DONE — `planSubtreeMove`/`planMoveUnder` + `moveUnder` (`src/base/sequenceEdit.ts`), confirm modal, stop on first failure; verified live in the dev vault (`bbf70ca`) |
-| 5   | Create files with `vault.create`                                  | P1       | S      | TODO   |
-| 6   | Folder-scope boundary checks                                      | P2       | S      | TODO   |
-| 7   | Settings migration: semver comparison                             | P2       | S      | TODO   |
+| 5   | Create files with `vault.create`                                  | P1       | S      | DONE — `vault.create` (throws on existing path), root folder treated as existing, `cachedRead`, unused `write` removed (`a0c3f8e`); verified live |
+| 6   | Folder-scope boundary checks                                      | P2       | S      | DONE — `isInFolder` (also treats `/` as root, which `file.parent.path` returns) at every call site (`a0c3f8e`) |
+| 7   | Settings migration: semver comparison                             | P2       | S      | DONE — `compareSemver` (`964cdbd`) |
 | 8   | Template placeholder replacement                                  | P2       | S      | DONE — `fillTemplate` (`src/base/fileHelpers.ts`) replaces every `{{title}}` and `{{date}}` in all create commands; default templates keep `{{title}}` out of frontmatter |
-| 9   | `removeCommand`, and the view-type constant                       | P3       | S      | TODO   |
-| 10  | Vault-specific local storage                                      | P3       | S      | TODO   |
-| 11  | Docs                                                              | P3       | S      | PARTIAL — item 1 (17-digit ID format) and the "Zettelaksten" typo done; items 2, 3 and the rest of 4 TODO |
-| 12  | Repo hygiene (**operator decision**)                              | P3       | S      | TODO   |
+| 9   | `removeCommand`, and the view-type constant                       | P3       | S      | DONE — `removeCommand(id)` with the unprefixed ID works live; `reloadAll` stub and reload notices removed; view constant imported (`fc48cb6`) |
+| 10  | Vault-specific local storage                                      | P3       | S      | DONE — `app.load/saveLocalStorage`, old global key read once as fallback; verified live (`a8cd3a1`) |
+| 11  | Docs                                                              | P3       | S      | DONE — AGENTS.md canonical, CLAUDE.md is `@AGENTS.md`; settings/commands READMEs updated; `SETTINGS-INTEGRATION.md` removed as obsolete; typos and package.json fixed (`1030f66`) |
+| 12  | Repo hygiene (**operator decision**)                              | P3       | S      | DONE — operator approved; removed with config ignores (`fcf38cf`) |
 
 ## Domain rules (the specification for packages 1, 2 and 4)
 
@@ -339,8 +339,8 @@ Git history keeps all of them. **Ask the operator before deleting anything.** If
 
 ## Done criteria
 
-- [ ] Status table updated for every row
-- [ ] `pnpm test` passes, with tests for packages 0–2, 3 (pure builders), 4 (planner and validation), 6 and 7
-- [ ] Typecheck, `pnpm exec eslint .` and `pnpm build` exit 0
-- [ ] Dev-vault manual check (package 4) done, or recorded as an operator step
-- [ ] Nothing in `~/Obsidian/ZK2026` touched; nothing pushed, tagged or published
+- [x] Status table updated for every row
+- [x] `pnpm test` passes, with tests for packages 0–2, 3 (pure builders), 4 (planner and validation), 6 and 7
+- [x] Typecheck, `pnpm exec eslint .` and `pnpm build` exit 0
+- [x] Dev-vault manual check (package 4) done, or recorded as an operator step
+- [x] Nothing in `~/Obsidian/ZK2026` touched; pushed at the operator's request, nothing tagged or published
